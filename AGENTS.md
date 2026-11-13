@@ -13,7 +13,7 @@ question is enough.
 
 ## Working preferences
 
-Two standing preferences, chosen deliberately and recorded here so fresh sessions
+Three standing preferences, chosen deliberately and recorded here so fresh sessions
 and handoffs inherit them without re-asking:
 
 1. **Pick the approach before coding.** For any non-trivial feature, settle the
@@ -26,6 +26,12 @@ and handoffs inherit them without re-asking:
    look at it (screenshot via the Playwright harness in the temp `climb-ui` folder),
    then remove the seed. Keep the seed clearly marked, uncommitted, and confined to
    one throwaway file plus a single hook, so it is trivial to delete.
+3. **Run the free tests, always.** After any code change, run the full test suite
+   (`dotnet test`) and report its real output — never a cached, filtered, or
+   remembered result you did not just produce. Tests that spend tokens (the
+   Playwright harness under `scripts/ui`, which drives real `opencode` runs) may be
+   skipped, but say plainly that they were **not run** rather than implying they
+   passed.
 
 ## Session hygiene
 
