@@ -19,6 +19,10 @@ loop only keeps a change if a gate passes.
 
 ## Workflow
 
+0. **Sharpen (optional).** If the objective is vague or the user is unsure what
+   "better" means, load the `grilling` skill and interview them in rounds until
+   you reach shared understanding, then continue. Skip this for a crisp,
+   already-measurable objective — grilling costs real tokens.
 1. **Frame the objective.** Restate it as a single measurable metric. If it is
    not measurable, stop and agree on a metric first.
 2. **Plan.** Launch the `planner` subagent. Capture its metric, baseline, gates,
@@ -45,3 +49,14 @@ loop only keeps a change if a gate passes.
 - Prefer reverting a losing change over debugging it — hillclimbing only moves
   forward on proven improvements.
 - Write conventional commit messages scoped to the part of the project changed.
+
+## Related skills
+
+- `grilling` (and its `grill-me` wrapper): sharpen a fuzzy objective into settled
+  decisions before planning. Optional and token-heavy — use it only when the
+  goal is genuinely unclear, to keep costs down.
+- `find-skills`: discover and install more skills when the loop needs a
+  capability this project does not have yet.
+
+All skills inherit the project's default cheap model unless they pin their own,
+so prefer leaving skill models unset.
