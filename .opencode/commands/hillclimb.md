@@ -1,6 +1,6 @@
 ---
 description: Run the hillclimb loop against measurable quality gates
-agent: build
+agent: Task-Orchestrator
 ---
 
 Start a hillclimbing run for the objective below. Follow the `hillclimb` skill

@@ -16,7 +16,8 @@ score, reliability) with a `Plan-Architect` agent and a read-only
 - **Quality-Gatekeeper** (`Quality-Gatekeeper` subagent): read-only gatekeeper.
   Independently re-measures and returns `PASS`/`FAIL` per gate. It does not edit
   code.
-- **Orchestrator** (you): runs the loop, makes the changes, and commits.
+- **Task-Orchestrator** (`Task-Orchestrator`, primary): runs the loop, makes the
+  changes, and commits.
 
 ## Workflow
 
