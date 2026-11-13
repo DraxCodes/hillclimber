@@ -49,6 +49,19 @@ public class ClimberAuthTests
         Assert.False(auth.IsUnlocked(session));
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void EmptySession_TouchAndLock_AreNoOps(string? session)
+    {
+        var auth = Create(Clock());
+
+        auth.Touch(session);
+        auth.Lock(session);
+
+        Assert.False(auth.IsUnlocked(session));
+    }
+
     [Fact]
     public void Session_LocksAfterIdleTimeout()
     {
