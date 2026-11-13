@@ -14,10 +14,14 @@ public class ClimberBindingTests
         Assert.Equal(ClimberBinding.DefaultPin, ClimberBinding.ResolvePin(configured));
     }
 
-    [Fact]
-    public void ResolvePin_KeepsAConfiguredPin()
+    [Theory]
+    [InlineData("4321", "4321")]
+    [InlineData(" 4321 ", "4321")]
+    [InlineData("1234 ", ClimberBinding.DefaultPin)]
+    [InlineData(" 1234 ", ClimberBinding.DefaultPin)]
+    public void ResolvePin_TrimsAConfiguredPin(string configured, string expected)
     {
-        Assert.Equal("4321", ClimberBinding.ResolvePin("4321"));
+        Assert.Equal(expected, ClimberBinding.ResolvePin(configured));
     }
 
     [Fact]
@@ -39,10 +43,13 @@ public class ClimberBindingTests
         Assert.True(result.DowngradedToLoopback);
     }
 
-    [Fact]
-    public void ExplicitDefaultPin_OnAllInterfaces_StillDowngrades()
+    [Theory]
+    [InlineData("1234")]
+    [InlineData("1234 ")]
+    [InlineData(" 1234 ")]
+    public void ExplicitDefaultPin_OnAllInterfaces_StillDowngrades(string pin)
     {
-        var result = ClimberBinding.Resolve("http://0.0.0.0:5179", ClimberBinding.DefaultPin);
+        var result = ClimberBinding.Resolve("http://0.0.0.0:5179", pin);
 
         Assert.Equal(ClimberBinding.LoopbackUrl, result.Urls);
         Assert.True(result.DowngradedToLoopback);

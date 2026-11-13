@@ -17,7 +17,7 @@ public static class ClimberBinding
     public const string LoopbackUrl = "http://localhost:5179";
 
     /// <summary>The resolved listen URL and whether the default PIN forced a loopback bind.</summary>
-    public sealed record Result(string Urls, string Pin, bool UsedDefaultPin, bool DowngradedToLoopback);
+    public sealed record Result(string Urls, bool UsedDefaultPin, bool DowngradedToLoopback);
 
     /// <summary>
     /// Resolves the effective listen URL. A missing/empty PIN falls back to
@@ -32,15 +32,19 @@ public static class ClimberBinding
 
         if (usedDefault && !IsLoopbackOnly(urls))
         {
-            return new Result(LoopbackUrl, pin, UsedDefaultPin: true, DowngradedToLoopback: true);
+            return new Result(LoopbackUrl, UsedDefaultPin: true, DowngradedToLoopback: true);
         }
 
-        return new Result(urls, pin, usedDefault, DowngradedToLoopback: false);
+        return new Result(urls, usedDefault, DowngradedToLoopback: false);
     }
 
-    /// <summary>Returns the configured PIN, or <see cref="DefaultPin"/> when none is set.</summary>
+    /// <summary>
+    /// Returns the configured PIN, trimmed, or <see cref="DefaultPin"/> when none is set.
+    /// Trimming matters: <c>"1234 "</c> must still be treated as the default and kept off
+    /// the LAN.
+    /// </summary>
     public static string ResolvePin(string? configuredPin) =>
-        string.IsNullOrWhiteSpace(configuredPin) ? DefaultPin : configuredPin;
+        string.IsNullOrWhiteSpace(configuredPin) ? DefaultPin : configuredPin.Trim();
 
     /// <summary>
     /// Whether every URL in a semicolon-separated listen list is loopback. Anything that

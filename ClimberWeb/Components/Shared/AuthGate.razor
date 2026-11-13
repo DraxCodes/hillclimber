@@ -1,3 +1,4 @@
+@implements IDisposable
 @inject IClimberAuth Auth
 @inject IJSRuntime JS
 
@@ -54,6 +55,8 @@ else
     private string? _sessionId;
     private string _pin = string.Empty;
     private string? _error;
+    private DotNetObjectReference<AuthGate>? _selfRef;
+    private CancellationTokenSource? _expiryCts;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -74,6 +77,19 @@ else
         _unlocked = Auth.IsUnlocked(_sessionId);
         _checked = true;
 
+        _selfRef = DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("climberAuth.start", _selfRef);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit went away mid-setup.
+        }
+
+        _expiryCts = new CancellationTokenSource();
+        _ = WatchExpiryAsync(_expiryCts.Token);
+
         if (_unlocked)
         {
             await OnUnlocked.InvokeAsync();
@@ -82,9 +98,51 @@ else
         StateHasChanged();
     }
 
+    private async Task WatchExpiryAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!_unlocked || _sessionId is null || Auth.IsUnlocked(_sessionId))
+                {
+                    continue;
+                }
+
+                await InvokeAsync(() =>
+                {
+                    _unlocked = false;
+                    _pin = string.Empty;
+                    _error = null;
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Component disposed.
+        }
+    }
+
+    [JSInvokable]
+    public void TouchActivity()
+    {
+        if (_unlocked && _sessionId is not null)
+        {
+            Auth.Touch(_sessionId);
+        }
+    }
+
     private async Task Unlock()
     {
-        if (_sessionId is not null && Auth.TryUnlock(_sessionId, _pin))
+        if (_sessionId is null)
+        {
+            _error = "Session not ready — reload the page.";
+            return;
+        }
+
+        if (Auth.TryUnlock(_sessionId, _pin))
         {
             _unlocked = true;
             _error = null;
@@ -103,5 +161,12 @@ else
         {
             await Unlock();
         }
+    }
+
+    public void Dispose()
+    {
+        _expiryCts?.Cancel();
+        _expiryCts?.Dispose();
+        _selfRef?.Dispose();
     }
 }

@@ -1,11 +1,11 @@
 ﻿{
-    "generated":  "2026-11-13T10:16:08.3405558Z",
+    "generated":  "2026-11-13T10:28:28.6857009Z",
     "tests":  {
-                  "passed":  185,
+                  "passed":  190,
                   "failed":  0,
                   "skipped":  0
               },
     "coverage":  {
-                     "line":  0.6318
+                     "line":  0.6242
                  }
 }

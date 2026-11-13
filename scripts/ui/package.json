@@ -5,7 +5,8 @@
   "description": "Browser regression checks for ClimberWeb, run against a live server.",
   "type": "module",
   "scripts": {
-    "theme-nav": "node theme-nav.mjs"
+    "theme-nav": "node theme-nav.mjs",
+    "security": "node security.mjs"
   },
   "license": "UNLICENSED",
   "devDependencies": {
