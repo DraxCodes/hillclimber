@@ -68,7 +68,7 @@ check('spend line shows a connection state', (await page.locator('.spendline .co
 // --- method switch --------------------------------------------------------
 check('method switch is present', (await page.locator('.methodbar .method').count()) === 2);
 check('run is the default method', (await page.locator('.method.active').innerText()).toLowerCase() === 'run');
-check('spend line shows a monthly figure', (await page.locator('.spendline').innerText()).includes('/pm'));
+check('spend line shows a total', /\$/.test(await page.locator('.spendline').innerText()) && (await page.locator('.spendline').innerText()).toLowerCase().includes('total'));
 
 // --- run-mode controls ----------------------------------------------------
 for (const sel of ['#folder', '#prompt']) {

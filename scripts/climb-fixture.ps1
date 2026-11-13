@@ -39,6 +39,15 @@ New-Item -ItemType Directory -Path $Destination -Force | Out-Null
 Get-ChildItem -Path $source -Force | Where-Object { $_.Name -notin @('bin', 'obj', '.git') } |
     ForEach-Object { Copy-Item $_.FullName -Destination $Destination -Recurse -Force }
 
+# Give the throwaway repo the same agents the dashboard runs with, so a run or climb here
+# exercises the real (orchestrated) workflow instead of failing on an unknown agent.
+$agentsSource = Join-Path $repoRoot '.opencode/agents'
+if (Test-Path $agentsSource) {
+    $agentsTarget = Join-Path $Destination '.opencode/agents'
+    New-Item -ItemType Directory -Path $agentsTarget -Force | Out-Null
+    Copy-Item (Join-Path $agentsSource '*') -Destination $agentsTarget -Recurse -Force
+}
+
 Push-Location $Destination
 try {
     git init --quiet

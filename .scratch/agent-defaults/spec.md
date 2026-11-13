@@ -20,8 +20,10 @@ The main page now defaults to a general run with hillclimb as a mode. Two gaps r
 3. **`task-orchestrator` is the default agent in both modes.** It delegates to
    `plan-architect` (when a plan is warranted) and `quality-gatekeeper` (before keeping a
    change) as it sees fit. The run | hillclimb method switch stays the UI distinction.
-4. **Agents are read from the chosen target folder's `.opencode/agents`.** If none resolve,
-   fall back to opencode's default agent and say so.
+4. **Agents are read from the chosen target folder's `.opencode/agents`; when it ships none,
+   the global opencode config (`~/.config/opencode/agents`) is used** — the same sources
+   opencode itself consults, so a name resolved here is one `--agent` accepts. Only opencode's
+   own default is used when neither has the agent.
 5. **No `/hillclimb`** — this is a product change, not a numeric objective.
 
 ## Goal
@@ -82,21 +84,29 @@ show a monthly spend figure.
 
 ## Evidence
 
-- **Tests:** `dotnet test --nologo` → **160 passing** (was 148): the default-agent resolver
-  (preferred, configured, first-primary, none), agent `mode` parsing, the `--agent` flag in
-  `OpenCodeRun.Request`/`CommandLine`, agent pass-through in both services, and
-  `SpendSummary.Monthly` / `SpendFormat.UsdPerMonth`.
-- **Browser:** `node scripts/ui/surfaces.mjs` → **42 checks, 0 failures, 0 console errors**.
-  Targeting this repo, run mode shows `task-orchestrator` with "delegates to plan-architect /
-  quality-gatekeeper as needed"; hillclimb shows the trio with "gated loop"; the spend line
-  carries a `/pm` figure.
-- **Visual:** screenshots confirm both agent lines render.
+- **Tests:** `dotnet test --nologo` → **164 passing** (was 148): the default-agent resolver
+  (preferred, configured, first-primary, none, fallback folder, target-wins), agent `mode`
+  parsing, the `--agent` flag in `OpenCodeRun.Request`/`CommandLine`, agent pass-through in
+  both services, `SpendSummary.Monthly` / `Headline` / `SpendFormat.UsdPerMonth`, and the
+  subagent log parse.
+- **Browser:** `node scripts/ui/surfaces.mjs` → **0 failures, 0 console errors**, including
+  the repo default agent and the fallback to this repo's trio from a folder with no agents.
+- **Spend:** the total reads the rolling per-month figure once 30-day activity exists, else
+  the all-time account total; on this account it shows `total $3.15` (activity is all inside
+  today, which OpenRouter's `/activity` excludes).
+- **Agent source:** the target folder's own agents win; when it ships none, the global
+  opencode config (`~/.config/opencode/agents`) is used, so a run works through
+  `task-orchestrator` in any folder that (locally or globally) provides it — labelled
+  `orchestrated`, with `plan-architect`/`quality-gatekeeper` as delegates. opencode resolves
+  agents per project, so the dashboard repo's own agents only apply when it is the target or
+  the trio is installed globally.
+- **Output tabs:** a subagent call is a single `subagent` tool event carrying the agent name
+  and its final result (there is no live subagent stream), so the panel gains a `main` tab
+  plus one tab per subagent used; main shows a marker, each tab shows that subagent's prompt
+  and result. Verified with a real delegated run (`main`, `plan-architect` tabs).
 - **Agents:** `task-orchestrator` now documents both a general and a hillclimb path;
   `plan-architect`/`quality-gatekeeper` are no longer worded as hillclimb-only.
-- **Note:** on this account the rolling figure reads `$0.00/pm` because OpenRouter
-  `/activity` only covers completed UTC days and all spend so far is today. The figure is
-  the honest 30-day sum, not a fabricated number.
-- **Coverage:** `powershell -File scripts/status.ps1` → 160/160, ~64% line.
+- **Coverage:** `powershell -File scripts/status.ps1` → 164/164, ~64% line.
 
 ## Fixed point for review
 
