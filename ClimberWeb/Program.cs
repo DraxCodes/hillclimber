@@ -38,18 +38,27 @@ builder.Services.AddSingleton<IOpenRouterClient, OpenRouterClient>();
 builder.Services.AddSingleton<IClimberAuth>(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
-    var pin = config["Climber:Pin"] is { Length: > 0 } value ? value : "1234";
+    var pin = ClimberBinding.ResolvePin(config["Climber:Pin"]);
     var minutes = int.TryParse(config["Climber:SessionMinutes"], out var parsed) && parsed > 0 ? parsed : 30;
     return new ClimberAuth(pin, TimeSpan.FromMinutes(minutes));
 });
 
 // Listen on all interfaces so the dashboard is reachable from a phone on the same Wi-Fi.
-// ASPNETCORE_URLS (or DOTNET_URLS) still wins when explicitly set.
+// ASPNETCORE_URLS (or DOTNET_URLS) still wins when explicitly set. The shipped default PIN
+// is loopback-only: a real PIN is required before the app is exposed on the LAN.
 var configuredUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
     ?? Environment.GetEnvironmentVariable("DOTNET_URLS");
-builder.WebHost.UseUrls(configuredUrls ?? "http://0.0.0.0:5179");
+var binding = ClimberBinding.Resolve(configuredUrls, builder.Configuration["Climber:Pin"]);
+builder.WebHost.UseUrls(binding.Urls);
 
 var app = builder.Build();
+
+if (binding.DowngradedToLoopback)
+{
+    app.Logger.LogWarning(
+        "Climber:Pin is the default; listening on {Url} only. Set a real PIN to expose the dashboard on the LAN.",
+        binding.Urls);
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
