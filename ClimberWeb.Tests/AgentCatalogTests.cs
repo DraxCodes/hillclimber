@@ -11,14 +11,15 @@ public class AgentCatalogTests
         var folder = NewFolder();
         try
         {
-            WriteAgent(folder, "other-primary", "mode: primary\nmodel: m");
-            WriteAgent(folder, "task-orchestrator", "mode: primary\nmodel: m");
-            WriteAgent(folder, "plan-architect", "mode: subagent\nmodel: m");
+            WriteTargetAgent(folder, "other-primary", "mode: primary\nmodel: m");
+            WriteTargetAgent(folder, "task-orchestrator", "mode: primary\nmodel: m");
+            WriteTargetAgent(folder, "plan-architect", "mode: subagent\nmodel: m");
 
             var selection = AgentCatalog.Resolve(folder);
 
             Assert.Equal("task-orchestrator", selection.DefaultAgent);
             Assert.Equal(3, selection.Roles.Count);
+            Assert.False(selection.FromGlobal);
         }
         finally
         {
@@ -32,8 +33,8 @@ public class AgentCatalogTests
         var folder = NewFolder();
         try
         {
-            WriteAgent(folder, "task-orchestrator", "mode: primary\nmodel: m");
-            WriteAgent(folder, "custom", "mode: primary\nmodel: m");
+            WriteTargetAgent(folder, "task-orchestrator", "mode: primary\nmodel: m");
+            WriteTargetAgent(folder, "custom", "mode: primary\nmodel: m");
 
             Assert.Equal("custom", AgentCatalog.Resolve(folder, "custom").DefaultAgent);
         }
@@ -49,8 +50,8 @@ public class AgentCatalogTests
         var folder = NewFolder();
         try
         {
-            WriteAgent(folder, "alpha", "mode: primary\nmodel: m");
-            WriteAgent(folder, "beta", "mode: subagent\nmodel: m");
+            WriteTargetAgent(folder, "alpha", "mode: primary\nmodel: m");
+            WriteTargetAgent(folder, "beta", "mode: subagent\nmodel: m");
 
             Assert.Equal("alpha", AgentCatalog.Resolve(folder).DefaultAgent);
         }
@@ -78,12 +79,60 @@ public class AgentCatalogTests
         }
     }
 
+    [Fact]
+    public void Resolve_FallsBackToTheGlobalAgents_WhenTheTargetHasNoAgents()
+    {
+        var target = NewFolder();
+        var global = NewFolder();
+        try
+        {
+            WriteAgentsFile(Path.Combine(global, "task-orchestrator.md"), "mode: primary\nmodel: m");
+            WriteAgentsFile(Path.Combine(global, "plan-architect.md"), "mode: subagent\nmodel: m");
+
+            var selection = AgentCatalog.Resolve(target, globalAgentsDirectory: global);
+
+            Assert.Equal("task-orchestrator", selection.DefaultAgent);
+            Assert.Equal(2, selection.Roles.Count);
+            Assert.True(selection.FromGlobal);
+        }
+        finally
+        {
+            Directory.Delete(target, recursive: true);
+            Directory.Delete(global, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Resolve_TargetAgentsWinOverTheGlobalOnes()
+    {
+        var target = NewFolder();
+        var global = NewFolder();
+        try
+        {
+            WriteTargetAgent(target, "my-agent", "mode: primary\nmodel: m");
+            WriteAgentsFile(Path.Combine(global, "task-orchestrator.md"), "mode: primary\nmodel: m");
+
+            var selection = AgentCatalog.Resolve(target, globalAgentsDirectory: global);
+
+            Assert.Equal("my-agent", selection.DefaultAgent);
+            Assert.Single(selection.Roles);
+            Assert.False(selection.FromGlobal);
+        }
+        finally
+        {
+            Directory.Delete(target, recursive: true);
+            Directory.Delete(global, recursive: true);
+        }
+    }
+
     private static string NewFolder() => Directory.CreateTempSubdirectory("climber-agents").FullName;
 
-    private static void WriteAgent(string folder, string name, string frontMatter)
+    private static void WriteTargetAgent(string folder, string name, string frontMatter) =>
+        WriteAgentsFile(Path.Combine(folder, ".opencode", "agents", name + ".md"), frontMatter);
+
+    private static void WriteAgentsFile(string path, string frontMatter)
     {
-        var directory = Path.Combine(folder, ".opencode", "agents");
-        Directory.CreateDirectory(directory);
-        File.WriteAllText(Path.Combine(directory, name + ".md"), frontMatter + "\n\nBody\n");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, frontMatter + "\n\nBody\n");
     }
 }
