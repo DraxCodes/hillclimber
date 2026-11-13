@@ -80,6 +80,55 @@
             apply(pref());
         })();
     </script>
+    <script>
+        // Session + activity heartbeat for the PIN gate. Keeps a stable id in
+        // localStorage (so a refresh is not re-prompted) and pings the server on
+        // user activity so the sliding idle timeout only expires when truly idle.
+        window.climberAuth = (function () {
+            var KEY = "hillclimber-session";
+            var dotNet = null;
+            var attached = false;
+            var lastSent = 0;
+            var THROTTLE = 30000;
+
+            function sessionId() {
+                var id = null;
+                try { id = localStorage.getItem(KEY); } catch (e) { }
+                if (!id) {
+                    id = (window.crypto && crypto.randomUUID)
+                        ? crypto.randomUUID()
+                        : "s-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+                    try { localStorage.setItem(KEY, id); } catch (e) { }
+                }
+                return id;
+            }
+
+            function ping(force) {
+                if (!dotNet) return;
+                var now = Date.now();
+                if (!force && now - lastSent < THROTTLE) return;
+                lastSent = now;
+                dotNet.invokeMethodAsync("TouchActivity").catch(function () { });
+            }
+
+            function attach() {
+                if (attached) return;
+                attached = true;
+                ["pointerdown", "keydown", "wheel", "touchstart"].forEach(function (name) {
+                    document.addEventListener(name, function () { ping(false); }, { passive: true });
+                });
+                document.addEventListener("scroll", function () { ping(false); }, { passive: true, capture: true });
+                document.addEventListener("visibilitychange", function () {
+                    if (document.visibilityState === "visible") ping(false);
+                });
+            }
+
+            return {
+                sessionId: sessionId,
+                start: function (ref) { dotNet = ref; attach(); ping(true); }
+            };
+        })();
+    </script>
 </body>
 
 </html>

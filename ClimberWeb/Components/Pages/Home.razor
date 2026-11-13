@@ -4,10 +4,22 @@
 @inject IHillClimberService Climber
 @inject IConfiguration Config
 @inject IFileBrowser Browser
+@inject IClimberAuth Auth
+@inject IJSRuntime JS
 
 <PageTitle>hillclimber</PageTitle>
 
-@if (!_unlocked)
+@if (!_authChecked)
+{
+    <section class="panel auth">
+        <div class="panel-head">
+            <span class="idx">[00]</span>
+            <span class="panel-title">session</span>
+        </div>
+        <p class="lede">Establishing session…</p>
+    </section>
+}
+else if (!_unlocked)
 {
     <section class="panel auth">
         <div class="panel-head">
@@ -220,13 +232,14 @@ else
     private bool _unlocked;
     private bool _browseOpen;
     private DirectoryListing? _browseListing;
+    private bool _authChecked;
+    private string? _sessionId;
+    private DotNetObjectReference<Home>? _selfRef;
+    private CancellationTokenSource? _expiryCts;
 
     private bool IsRunning => _state.Status == ClimberStatus.Running;
 
     private string StatusKey => _state.Status.ToString().ToLowerInvariant();
-
-    private static string ExpectedPin(IConfiguration config) =>
-        config["Climber:Pin"] is { Length: > 0 } pin ? pin : "1234";
 
     private string DefaultFolder =>
         Config["Climber:DefaultFolder"] is { Length: > 0 } folder ? folder : @"C:\Users\joelp\code";
@@ -290,9 +303,80 @@ else
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            _sessionId = await JS.InvokeAsync<string>("climberAuth.sessionId");
+        }
+        catch (JSDisconnectedException)
+        {
+            return;
+        }
+
+        _unlocked = Auth.IsUnlocked(_sessionId);
+        _authChecked = true;
+
+        _selfRef = DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("climberAuth.start", _selfRef);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit went away mid-setup.
+        }
+
+        _expiryCts = new CancellationTokenSource();
+        _ = WatchExpiryAsync(_expiryCts.Token);
+
+        StateHasChanged();
+    }
+
+    private async Task WatchExpiryAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!_unlocked || _sessionId is null || Auth.IsUnlocked(_sessionId))
+                {
+                    continue;
+                }
+
+                await InvokeAsync(() =>
+                {
+                    _unlocked = false;
+                    _pinInput = string.Empty;
+                    _pinError = null;
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Component disposed.
+        }
+    }
+
+    [JSInvokable]
+    public void TouchActivity()
+    {
+        if (_unlocked && _sessionId is not null)
+        {
+            Auth.Touch(_sessionId);
+        }
+    }
+
     private void Unlock()
     {
-        if (string.Equals(_pinInput, ExpectedPin(Config), StringComparison.Ordinal))
+        if (_sessionId is not null && Auth.TryUnlock(_sessionId, _pinInput))
         {
             _unlocked = true;
             _pinError = null;
@@ -306,6 +390,11 @@ else
 
     private void Lock()
     {
+        if (_sessionId is not null)
+        {
+            Auth.Lock(_sessionId);
+        }
+
         _unlocked = false;
         _pinInput = string.Empty;
         _pinError = null;
@@ -360,5 +449,11 @@ else
 
     private void Stop() => Climber.Stop();
 
-    public void Dispose() => Climber.StateChanged -= OnStateChanged;
+    public void Dispose()
+    {
+        Climber.StateChanged -= OnStateChanged;
+        _expiryCts?.Cancel();
+        _expiryCts?.Dispose();
+        _selfRef?.Dispose();
+    }
 }
