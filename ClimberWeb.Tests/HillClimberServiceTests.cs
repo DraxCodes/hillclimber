@@ -75,6 +75,25 @@ public class HillClimberServiceTests
     }
 
     [Fact]
+    public async Task UnexpectedException_MarksRunAsFailed()
+    {
+        var runner = new FakeCommandRunner((request, _) =>
+            request.FileName == "opencode"
+                ? throw new InvalidOperationException("boom")
+                : CannedResults.Git());
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(Options(max: 1));
+
+        var state = service.State;
+        Assert.Equal(ClimberStatus.Failed, state.Status);
+        Assert.NotNull(state.Message);
+        Assert.Contains("boom", state.Message);
+        Assert.Contains(state.Logs, line => line.Contains("ERROR: boom"));
+        Assert.False(service.IsRunning);
+    }
+
+    [Fact]
     public async Task RegressingIteration_RevertsWorkingChanges()
     {
         var runner = RunnerWithScores(5, 3);
