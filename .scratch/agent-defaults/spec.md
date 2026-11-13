@@ -84,29 +84,32 @@ show a monthly spend figure.
 
 ## Evidence
 
-- **Tests:** `dotnet test --nologo` → **164 passing** (was 148): the default-agent resolver
-  (preferred, configured, first-primary, none, fallback folder, target-wins), agent `mode`
-  parsing, the `--agent` flag in `OpenCodeRun.Request`/`CommandLine`, agent pass-through in
-  both services, `SpendSummary.Monthly` / `Headline` / `SpendFormat.UsdPerMonth`, and the
-  subagent log parse.
-- **Browser:** `node scripts/ui/surfaces.mjs` → **0 failures, 0 console errors**, including
-  the repo default agent and the fallback to this repo's trio from a folder with no agents.
+- **Tests:** `dotnet test --nologo` → **165 passing** (was 148): the default-agent resolver
+  (preferred, configured, first-primary, none, global fallback, target-wins), agent `mode`
+  and `display_name` parsing, the `--agent` flag in `OpenCodeRun.Request`/`CommandLine`,
+  agent pass-through in both services, `SpendSummary.Monthly` / `Headline` /
+  `SpendFormat.UsdPerMonth`, and the subagent log parse.
+- **Browser:** `node scripts/ui/surfaces.mjs` → **0 failures, 0 console errors**, checking
+  the agent line, the total, and the output tab's label.
 - **Spend:** the total reads the rolling per-month figure once 30-day activity exists, else
   the all-time account total; on this account it shows `total $3.15` (activity is all inside
   today, which OpenRouter's `/activity` excludes).
 - **Agent source:** the target folder's own agents win; when it ships none, the global
   opencode config (`~/.config/opencode/agents`) is used, so a run works through
   `task-orchestrator` in any folder that (locally or globally) provides it — labelled
-  `orchestrated`, with `plan-architect`/`quality-gatekeeper` as delegates. opencode resolves
-  agents per project, so the dashboard repo's own agents only apply when it is the target or
-  the trio is installed globally.
-- **Output tabs:** a subagent call is a single `subagent` tool event carrying the agent name
-  and its final result (there is no live subagent stream), so the panel gains a `main` tab
-  plus one tab per subagent used; main shows a marker, each tab shows that subagent's prompt
-  and result. Verified with a real delegated run (`main`, `plan-architect` tabs).
-- **Agents:** `task-orchestrator` now documents both a general and a hillclimb path;
-  `plan-architect`/`quality-gatekeeper` are no longer worded as hillclimb-only.
-- **Coverage:** `powershell -File scripts/status.ps1` → 164/164, ~64% line.
+  `orchestrated`. opencode resolves agents per project, so the dashboard repo's own agents
+  only apply when it is the target or the set is installed globally.
+- **Output tabs:** always shown. The first tab is the running agent, labelled with its
+  friendly name (`display_name` front-matter, else a title-cased id), so a single-agent run
+  reads `Orchestrator`; each subagent used adds a tab showing its prompt and result, while
+  the primary tab keeps a `◆ <agent> — see its tab` marker. Verified with a real delegated
+  run (`Orchestrator`, `plan-architect` tabs); the always-delegate-to-security behaviour is
+  prompt-level and was **not** verified by a live run, which would spend tokens.
+- **Agents:** a new read-only `security-auditor` — always delegated to by the orchestrator,
+  checking tests passing, secrets/exposure, a general security pass, and current practice —
+  joins `plan-architect` and `quality-gatekeeper`; `task-orchestrator` documents both a
+  general and a hillclimb path, and all four agents carry a `display_name`.
+- **Coverage:** `powershell -File scripts/status.ps1` → 165/165, ~64% line.
 
 ## Fixed point for review
 
