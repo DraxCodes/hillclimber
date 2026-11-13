@@ -68,31 +68,6 @@
     padding: 0.14rem 0.4rem;
 }
 
-.icon-btn {
-    width: 34px;
-    height: 34px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--line);
-    background: transparent;
-    color: var(--ink-2);
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
-}
-
-.icon-btn:hover {
-    color: var(--ink);
-    border-color: var(--line-2);
-    background: var(--surface-2);
-}
-
-.icon-btn:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px var(--focus);
-}
-
 .stage {
     flex: 1;
     width: 100%;

@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IHillClimberService Climber
 @inject IConfiguration Config
+@inject IFileBrowser Browser
 
 <PageTitle>hillclimber</PageTitle>
 
@@ -80,12 +81,15 @@ else
 
         <div class="field">
             <label class="label" for="folder">target folder</label>
-            <input id="folder"
-                   class="input"
-                   type="text"
-                   placeholder="C:\path\to\your\repo"
-                   disabled="@IsRunning"
-                   @bind="_folderPath" />
+            <div class="folder-row">
+                <input id="folder"
+                       class="input"
+                       type="text"
+                       placeholder="C:\path\to\your\repo"
+                       disabled="@IsRunning"
+                       @bind="_folderPath" />
+                <button class="btn btn-ghost browse-btn" type="button" disabled="@IsRunning" @onclick="OpenBrowser">browse</button>
+            </div>
         </div>
 
         <div class="field">
@@ -137,6 +141,72 @@ else
             }
         </div>
     </section>
+
+    @if (_browseOpen && _browseListing is not null)
+    {
+        <div class="browser-backdrop" @onclick="CloseBrowser"></div>
+        <section class="browser" role="dialog" aria-modal="true" aria-label="Select target folder">
+            <div class="panel-head browser-head">
+                <span class="idx">[04]</span>
+                <span class="panel-title">select folder</span>
+                <button class="icon-btn browser-x" type="button" @onclick="CloseBrowser" aria-label="Close">✕</button>
+            </div>
+
+            <div class="browser-roots">
+                @foreach (var root in _browseListing.Roots)
+                {
+                    <button class="chip" type="button" @onclick="() => Navigate(root.FullPath)">@root.Name</button>
+                }
+            </div>
+
+            <nav class="crumbs" aria-label="Breadcrumb">
+                <button class="crumb" type="button" @onclick="() => Navigate(null)">computer</button>
+                @foreach (var crumb in _browseListing.Trail)
+                {
+                    <span class="crumb-sep" aria-hidden="true">/</span>
+                    <button class="crumb" type="button" @onclick="() => Navigate(crumb.FullPath)">@crumb.Name</button>
+                }
+            </nav>
+
+            <div class="browser-list">
+                @if (_browseListing.Error is not null)
+                {
+                    <p class="notice notice-bad">@_browseListing.Error</p>
+                }
+
+                @if (_browseListing.CurrentPath is not null)
+                {
+                    <button class="dir up" type="button" @onclick="() => Navigate(_browseListing.ParentPath)">
+                        <span class="dir-name">..</span>
+                    </button>
+                }
+
+                @foreach (var dir in _browseListing.Directories)
+                {
+                    <button class="dir" type="button" @onclick="() => Navigate(dir.FullPath)">
+                        <span class="dir-name">@dir.Name</span>
+                    </button>
+                }
+
+                @if (_browseListing.CurrentPath is not null
+                     && _browseListing.Directories.Count == 0
+                     && _browseListing.Error is null)
+                {
+                    <p class="empty">no subfolders</p>
+                }
+            </div>
+
+            <div class="browser-foot">
+                <span class="browser-current mono">@(_browseListing.CurrentPath ?? "this computer")</span>
+                <div class="browser-actions">
+                    <button class="btn btn-ghost" type="button" @onclick="CloseBrowser">cancel</button>
+                    <button class="btn btn-primary" type="button"
+                            disabled="@(_browseListing.CurrentPath is null)"
+                            @onclick="ChooseFolder">use this folder</button>
+                </div>
+            </div>
+        </section>
+    }
 }
 
 @code {
@@ -148,6 +218,8 @@ else
     private string? _pinError;
     private string? _error;
     private bool _unlocked;
+    private bool _browseOpen;
+    private DirectoryListing? _browseListing;
 
     private bool IsRunning => _state.Status == ClimberStatus.Running;
 
@@ -238,6 +310,26 @@ else
             Unlock();
         }
     }
+
+    private void OpenBrowser()
+    {
+        var start = string.IsNullOrWhiteSpace(_folderPath) ? null : _folderPath.Trim();
+        _browseListing = Browser.List(start);
+        _browseOpen = true;
+    }
+
+    private void Navigate(string? path) => _browseListing = Browser.List(path);
+
+    private void ChooseFolder()
+    {
+        if (_browseListing?.CurrentPath is { } chosen)
+        {
+            _folderPath = chosen;
+            _browseOpen = false;
+        }
+    }
+
+    private void CloseBrowser() => _browseOpen = false;
 
     private void Start()
     {

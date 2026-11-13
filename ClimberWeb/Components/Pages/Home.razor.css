@@ -208,3 +208,222 @@
         min-width: 104px;
     }
 }
+
+/* Folder picker ----------------------------------------------------------- */
+
+.folder-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.folder-row .input {
+    flex: 1;
+    min-width: 0;
+}
+
+.browse-btn {
+    flex: 0 0 auto;
+}
+
+.browser-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(12, 12, 12, 0.5);
+    animation: browser-fade 0.15s ease;
+}
+
+.browser {
+    position: fixed;
+    z-index: 50;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    width: min(560px, calc(100vw - 1.5rem));
+    max-height: min(78dvh, 720px);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.browser-head {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.browser-x {
+    width: 28px;
+    height: 28px;
+    margin-left: auto;
+}
+
+.browser-roots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.chip {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--ink-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.chip:hover {
+    color: var(--ink);
+    border-color: var(--line-2);
+    background: var(--surface-2);
+}
+
+.crumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.1rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+}
+
+.crumb {
+    background: none;
+    border: 0;
+    padding: 0.1rem 0.3rem;
+    color: var(--ink-2);
+    font-family: inherit;
+    font-size: inherit;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.crumb:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+}
+
+.crumb-sep {
+    color: var(--ink-3);
+}
+
+.browser-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow-y: auto;
+    padding: 0.35rem;
+}
+
+.dir {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.dir:hover {
+    background: var(--surface-2);
+}
+
+.dir::before {
+    content: "\25B8";
+    color: var(--ink-3);
+    font-size: 0.7rem;
+}
+
+.dir.up::before {
+    content: "\2191";
+}
+
+.dir-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty {
+    margin: 0;
+    padding: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-3);
+}
+
+.browser-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--line);
+}
+
+.browser-current {
+    min-width: 0;
+    font-size: 0.72rem;
+    color: var(--ink-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.browser-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+}
+
+@keyframes browser-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 520px) {
+    .browser {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+        transform: none;
+        width: 100%;
+        max-width: none;
+        max-height: 85dvh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .browser-foot {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .browser-current {
+        text-align: center;
+    }
+
+    .browser-actions .btn {
+        flex: 1;
+    }
+}
