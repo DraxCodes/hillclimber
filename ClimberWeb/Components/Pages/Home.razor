@@ -161,7 +161,7 @@ else
                 }
                 else
                 {
-                    <div class="log-line @css log-event log-@entry.Kind.ToString().ToLowerInvariant()">
+                    <div class="log-line @css log-event @KindClass(entry.Kind)">
                         <span class="log-time">@entry.Timestamp</span>
                         @if (entry.Kind == LogKind.Tool)
                         {
@@ -292,6 +292,17 @@ else
 
     /// <summary>The log feed, newest first, classified for display. Parsing is cached per line.</summary>
     private IEnumerable<LogEntry> Entries => _state.Logs.Reverse().Select(_logFormatter.Format);
+
+    /// <summary>CSS hook for a structured row; mirrors the kind names styled in Home.razor.css.</summary>
+    private static string KindClass(LogKind kind) => kind switch
+    {
+        LogKind.Text => "log-text",
+        LogKind.Tool => "log-tool",
+        LogKind.StepStart => "log-step-start",
+        LogKind.StepFinish => "log-step-finish",
+        LogKind.Error => "log-error",
+        _ => string.Empty,
+    };
 
     private static string LineClass(string line)
     {

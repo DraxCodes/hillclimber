@@ -208,8 +208,8 @@
     word-break: break-word;
 }
 
-.log-event.log-step_start,
-.log-event.log-step_finish {
+.log-event.log-step-start,
+.log-event.log-step-finish {
     color: var(--ink-3);
 }
 
