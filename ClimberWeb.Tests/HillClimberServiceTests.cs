@@ -94,6 +94,23 @@ public class HillClimberServiceTests
     }
 
     [Fact]
+    public async Task ExcessiveLogOutput_IsTrimmedToMaxLogLines()
+    {
+        var manyLines = string.Join("\n", Enumerable.Range(0, 5100).Select(i => $"line {i}"));
+        var runner = new FakeCommandRunner((request, _) => request.FileName switch
+        {
+            "opencode" => CannedResults.Raw(manyLines),
+            "dotnet" => CannedResults.Tests(1),
+            _ => CannedResults.Git(),
+        });
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(Options(max: 1));
+
+        Assert.Equal(5000, service.State.Logs.Count);
+    }
+
+    [Fact]
     public async Task RegressingIteration_RevertsWorkingChanges()
     {
         var runner = RunnerWithScores(5, 3);
