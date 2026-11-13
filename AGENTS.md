@@ -52,3 +52,13 @@ and `capabilities.tools: true`, because discovery may not supply a limit and
 compaction depends on it.
 
 Treat the model choice as machine-specific: pick it per project, not in the base.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as local markdown under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout: a root `GLOSSARY.md` and `docs/adr/`. See `docs/agents/domain.md`.
