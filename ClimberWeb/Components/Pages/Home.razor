@@ -1,6 +1,7 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @implements IDisposable
+@inject IRunService Run
 @inject IHillClimberService Climber
 @inject IConfiguration Config
 @inject IFileBrowser Browser
@@ -28,7 +29,7 @@ else if (!_unlocked)
             <span class="idx">[01]</span>
             <span class="panel-title">authenticate</span>
         </div>
-        <p class="lede">Enter the access PIN to control the climb loop.</p>
+        <p class="lede">Enter the access PIN to drive OpenCode.</p>
 
         <label class="label" for="pin">pin</label>
         <input id="pin"
@@ -53,10 +54,19 @@ else
     <section class="statusline" aria-live="polite">
         <span class="pulse pulse-@StatusKey" aria-hidden="true"></span>
         <span class="status-word st-@StatusKey">@StatusText</span>
-        @if (_state.Message is not null)
+        @if (ActiveMessage is not null)
         {
-            <span class="status-msg">@_state.Message</span>
+            <span class="status-msg">@ActiveMessage</span>
         }
+    </section>
+
+    <section class="methodbar" role="tablist" aria-label="method">
+        <button class="method @(_method == RunMethod.Run ? "active" : string.Empty)"
+                type="button" role="tab" aria-selected="@(_method == RunMethod.Run)"
+                disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Run)">run</button>
+        <button class="method @(_method == RunMethod.Hillclimb ? "active" : string.Empty)"
+                type="button" role="tab" aria-selected="@(_method == RunMethod.Hillclimb)"
+                disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Hillclimb)">hillclimb</button>
     </section>
 
     <section class="spendline" aria-label="OpenRouter connection and spend">
@@ -65,47 +75,71 @@ else
             <span>openrouter: @SpendLabel</span>
         </span>
         <span class="spend-sep" aria-hidden="true">/</span>
-        <span class="spend-item">this climb <b>@SpendFormat.Usd((double)_state.SpendUsd)</b></span>
+        <span class="spend-item">@ActiveSpendNoun <b>@SpendFormat.Usd((double)ActiveSpendUsd)</b></span>
         <span class="spend-sep" aria-hidden="true">/</span>
         <span class="spend-item">total <b>@TotalSpendLabel</b></span>
     </section>
 
-    <dl class="telemetry" aria-label="Climb telemetry">
-        <div class="cell">
-            <dt>status</dt>
-            <dd class="st-@StatusKey">@StatusText</dd>
-        </div>
-        <div class="cell">
-            <dt>iteration</dt>
-            <dd>
-                @if (_state.MaxIterations > 0)
-                {
-                    @_state.CurrentIteration<span class="slash dim">/@_state.MaxIterations</span>
-                }
-                else
-                {
-                    <span class="dim">—</span>
-                }
-            </dd>
-        </div>
-        <div class="cell">
-            <dt>best score</dt>
-            <dd>@_state.BestScore</dd>
-        </div>
-        <div class="cell">
-            <dt>last run</dt>
-            <dd class="last">
-                @if (_state.LastPassed is int passed)
-                {
-                    <span class="g">@passed</span><span class="dim slash">/</span><span class="r">@_state.LastFailed</span>
-                }
-                else
-                {
-                    <span class="dim">—</span>
-                }
-            </dd>
-        </div>
-    </dl>
+    @if (_method == RunMethod.Run)
+    {
+        <dl class="telemetry" aria-label="Run telemetry">
+            <div class="cell">
+                <dt>status</dt>
+                <dd class="st-@StatusKey">@StatusText</dd>
+            </div>
+            <div class="cell">
+                <dt>spent</dt>
+                <dd>@SpendFormat.Usd((double)_run.Metrics.SpendUsd)</dd>
+            </div>
+            <div class="cell">
+                <dt>tokens</dt>
+                <dd>@SpendFormat.Tokens(_run.Metrics.TotalTokens)</dd>
+            </div>
+            <div class="cell">
+                <dt>elapsed</dt>
+                <dd>@ElapsedLabel</dd>
+            </div>
+        </dl>
+    }
+    else
+    {
+        <dl class="telemetry" aria-label="Climb telemetry">
+            <div class="cell">
+                <dt>status</dt>
+                <dd class="st-@StatusKey">@StatusText</dd>
+            </div>
+            <div class="cell">
+                <dt>iteration</dt>
+                <dd>
+                    @if (_climb.MaxIterations > 0)
+                    {
+                        @_climb.CurrentIteration<span class="slash dim">/@_climb.MaxIterations</span>
+                    }
+                    else
+                    {
+                        <span class="dim">—</span>
+                    }
+                </dd>
+            </div>
+            <div class="cell">
+                <dt>best score</dt>
+                <dd>@_climb.BestScore</dd>
+            </div>
+            <div class="cell">
+                <dt>last run</dt>
+                <dd class="last">
+                    @if (_climb.LastPassed is int passed)
+                    {
+                        <span class="g">@passed</span><span class="dim slash">/</span><span class="r">@_climb.LastFailed</span>
+                    }
+                    else
+                    {
+                        <span class="dim">—</span>
+                    }
+                </dd>
+            </div>
+        </dl>
+    }
 
     <section class="panel">
         <div class="panel-head">
@@ -120,31 +154,40 @@ else
                        class="input"
                        type="text"
                        placeholder="C:\path\to\your\repo"
-                       disabled="@IsRunning"
-                       @bind="_folderPath" />
-                <button class="btn btn-ghost browse-btn" type="button" disabled="@IsRunning" @onclick="OpenBrowser">browse</button>
+                       disabled="@AnyRunning"
+                       @bind="_folderPath"
+                       @bind:after="ResolveModel" />
+                <button class="btn btn-ghost browse-btn" type="button" disabled="@AnyRunning" @onclick="OpenBrowser">browse</button>
             </div>
         </div>
 
         <div class="field">
-            <label class="label" for="goal">goal prompt</label>
-            <textarea id="goal"
+            <label class="label" for="prompt">@PromptLabel</label>
+            <textarea id="prompt"
                       class="input"
                       rows="3"
-                      placeholder="What should each iteration try to accomplish?"
-                      disabled="@IsRunning"
-                      @bind="_goalPrompt"></textarea>
+                      placeholder="@PromptPlaceholder"
+                      disabled="@AnyRunning"
+                      @bind="_prompt"></textarea>
         </div>
 
-        <div class="field field-narrow">
-            <label class="label" for="max">max iterations</label>
-            <input id="max"
-                   class="input"
-                   type="number"
-                   min="1"
-                   disabled="@IsRunning"
-                   @bind="_maxIterations" />
-        </div>
+        @if (_method == RunMethod.Hillclimb)
+        {
+            <div class="field field-narrow">
+                <label class="label" for="max">max iterations</label>
+                <input id="max"
+                       class="input"
+                       type="number"
+                       min="1"
+                       disabled="@AnyRunning"
+                       @bind="_maxIterations" />
+            </div>
+        }
+
+        <p class="model-line">
+            <span class="label">model</span>
+            <span class="chip mono">@ModelLabel</span>
+        </p>
 
         @if (_error is not null)
         {
@@ -157,8 +200,8 @@ else
         }
 
         <div class="btn-row">
-            <button class="btn btn-primary" disabled="@IsRunning" @onclick="Start">start</button>
-            <button class="btn btn-danger" disabled="@(!IsRunning)" @onclick="Stop">stop</button>
+            <button class="btn btn-primary" disabled="@AnyRunning" @onclick="Start">start</button>
+            <button class="btn btn-danger" disabled="@(!ActiveRunning)" @onclick="Stop">stop</button>
             <button class="btn btn-ghost" @onclick="Lock">lock</button>
         </div>
     </section>
@@ -167,7 +210,7 @@ else
         <div class="panel-head">
             <span class="idx">[03]</span>
             <span class="panel-title">output</span>
-            <span class="panel-meta">@_state.Logs.Count lines</span>
+            <span class="panel-meta">@ActiveLogs.Count lines</span>
         </div>
         <div class="log" id="log-feed">
             @foreach (var entry in Entries)
@@ -200,7 +243,7 @@ else
                     </div>
                 }
             }
-            @if (_state.Logs.Count == 0)
+            @if (ActiveLogs.Count == 0)
             {
                 <div class="log-line dim">awaiting output…</div>
             }
@@ -276,9 +319,12 @@ else
 
 @code {
     private readonly LogFormatter _logFormatter = new();
-    private ClimberState _state = new();
+    private RunState _run = new();
+    private ClimberState _climb = new();
+    private RunMethod _method = RunMethod.Run;
     private string _folderPath = string.Empty;
-    private string _goalPrompt = string.Empty;
+    private string _prompt = string.Empty;
+    private string? _model;
     private int _maxIterations = 5;
     private string _pinInput = string.Empty;
     private string? _pinError;
@@ -293,9 +339,31 @@ else
     private SpendReport? _spend;
     private IReadOnlyList<string> _preflightWarnings = Array.Empty<string>();
 
-    private bool IsRunning => _state.Status == RunStatus.Running;
+    /// <summary>True while the method currently on screen is running.</summary>
+    private bool ActiveRunning => _method == RunMethod.Run
+        ? _run.Status == RunStatus.Running
+        : _climb.Status == RunStatus.Running;
 
-    private string StatusKey => _state.Status.ToString().ToLowerInvariant();
+    /// <summary>True while either method is running; the two share the machine, so only one may go at a time.</summary>
+    private bool AnyRunning => _run.Status == RunStatus.Running || _climb.Status == RunStatus.Running;
+
+    private RunStatus ActiveStatus => _method == RunMethod.Run ? _run.Status : _climb.Status;
+
+    private string? ActiveMessage => _method == RunMethod.Run ? _run.Message : _climb.Message;
+
+    private IReadOnlyList<string> ActiveLogs => _method == RunMethod.Run ? _run.Logs : _climb.Logs;
+
+    private decimal ActiveSpendUsd => _method == RunMethod.Run ? _run.Metrics.SpendUsd : _climb.SpendUsd;
+
+    private string ActiveSpendNoun => _method == RunMethod.Run ? "this run" : "this climb";
+
+    private string PromptLabel => _method == RunMethod.Run ? "prompt" : "goal prompt";
+
+    private string PromptPlaceholder => _method == RunMethod.Run
+        ? "What should this run do?"
+        : "What should each iteration try to accomplish?";
+
+    private string StatusKey => ActiveStatus.ToString().ToLowerInvariant();
 
     private string DefaultFolder =>
         Config["Climber:DefaultFolder"] is { Length: > 0 } folder ? folder : @"C:\Users\joelp\code";
@@ -306,18 +374,37 @@ else
 
     private string TotalSpendLabel => _spend?.Account is { } account ? SpendFormat.Usd(account.TotalUsage) : "—";
 
-    private string StatusText => _state.Status switch
+    private string ModelLabel =>
+        string.IsNullOrEmpty(_model) || _model == "unknown" ? "opencode default" : _model;
+
+    private string ElapsedLabel
+    {
+        get
+        {
+            if (_run.StartedAt is not { } start)
+            {
+                return "—";
+            }
+
+            var span = (_run.FinishedAt ?? DateTimeOffset.Now) - start;
+            return span.TotalMinutes >= 1
+                ? $"{(int)span.TotalMinutes}m {span.Seconds:00}s"
+                : $"{span.TotalSeconds:0.0}s";
+        }
+    }
+
+    private string StatusText => ActiveStatus switch
     {
         RunStatus.Idle => "idle",
         RunStatus.Running => "running",
         RunStatus.Completed => "completed",
         RunStatus.Stopped => "stopped",
         RunStatus.Failed => "failed",
-        _ => _state.Status.ToString(),
+        _ => ActiveStatus.ToString(),
     };
 
     /// <summary>The log feed, newest first, classified for display. Parsing is cached per line.</summary>
-    private IEnumerable<LogEntry> Entries => _state.Logs.Reverse().Select(_logFormatter.Format);
+    private IEnumerable<LogEntry> Entries => ActiveLogs.Reverse().Select(_logFormatter.Format);
 
     /// <summary>CSS hook for a structured row; mirrors the kind names styled in Home.razor.css.</summary>
     private static string KindClass(LogKind kind) => kind switch
@@ -357,21 +444,47 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        _state = Climber.State;
-        Climber.StateChanged += OnStateChanged;
+        _run = Run.State;
+        _climb = Climber.State;
+        Run.StateChanged += OnRunStateChanged;
+        Climber.StateChanged += OnClimbStateChanged;
 
         if (string.IsNullOrWhiteSpace(_folderPath))
         {
             _folderPath = DefaultFolder;
         }
 
+        ResolveModel();
         _spend = await OpenRouter.GetSpendAsync();
     }
 
-    private void OnStateChanged(ClimberState state)
+    private void OnRunStateChanged(RunState state)
     {
-        var wasRunning = _state.Status == RunStatus.Running;
-        _state = state;
+        var wasRunning = _run.Status == RunStatus.Running;
+        _run = state;
+        Rerender();
+
+        if (wasRunning && state.Status != RunStatus.Running)
+        {
+            _ = RefreshSpendAsync();
+        }
+    }
+
+    private void OnClimbStateChanged(ClimberState state)
+    {
+        var wasRunning = _climb.Status == RunStatus.Running;
+        _climb = state;
+        Rerender();
+
+        // The account total moves once a run spends something; refresh when it finishes.
+        if (wasRunning && state.Status != RunStatus.Running)
+        {
+            _ = RefreshSpendAsync();
+        }
+    }
+
+    private void Rerender()
+    {
         try
         {
             _ = InvokeAsync(StateHasChanged);
@@ -379,12 +492,6 @@ else
         catch (ObjectDisposedException)
         {
             // The circuit is gone; nothing left to update.
-        }
-
-        // The account total moves once a run spends something; refresh when it finishes.
-        if (wasRunning && state.Status != RunStatus.Running)
-        {
-            _ = RefreshSpendAsync();
         }
     }
 
@@ -403,6 +510,27 @@ else
         {
             // The circuit is gone; nothing left to update.
         }
+    }
+
+    /// <summary>Reads the base model the target folder's own <c>opencode.json</c> selects, for display.</summary>
+    private void ResolveModel()
+    {
+        var folder = _folderPath.Trim();
+        _model = string.IsNullOrWhiteSpace(folder)
+            ? null
+            : WorkflowCatalogReader.ReadBaseModel(Path.Combine(folder, "opencode.json"));
+    }
+
+    private void SetMethod(RunMethod method)
+    {
+        if (AnyRunning)
+        {
+            return;
+        }
+
+        _method = method;
+        _error = null;
+        _preflightWarnings = Array.Empty<string>();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -525,6 +653,7 @@ else
         {
             _folderPath = chosen;
             _browseOpen = false;
+            ResolveModel();
         }
     }
 
@@ -536,7 +665,7 @@ else
         _preflightWarnings = Array.Empty<string>();
 
         var folder = _folderPath.Trim();
-        var preflight = Preflight.Check(folder);
+        var preflight = Preflight.Check(folder, _method);
         if (!preflight.CanRun)
         {
             _error = preflight.Warnings.FirstOrDefault() ?? "The target folder is not usable.";
@@ -544,15 +673,20 @@ else
         }
 
         _preflightWarnings = preflight.Warnings;
+        ResolveModel();
 
         try
         {
-            // StartAsync throws synchronously for invalid input / concurrent runs and
-            // returns a task that completes when the loop finishes; we don't await it here.
-            _ = Climber.StartAsync(new ClimberOptions(
-                folder,
-                _goalPrompt.Trim(),
-                Math.Max(1, _maxIterations)));
+            // StartAsync throws synchronously for invalid input / concurrent runs and returns a
+            // task that completes when the run finishes; we don't await it here.
+            if (_method == RunMethod.Hillclimb)
+            {
+                _ = Climber.StartAsync(new ClimberOptions(folder, _prompt.Trim(), Math.Max(1, _maxIterations)));
+            }
+            else
+            {
+                _ = Run.StartAsync(new RunOptions(folder, _prompt.Trim()));
+            }
         }
         catch (Exception ex)
         {
@@ -571,11 +705,22 @@ else
             : message;
     }
 
-    private void Stop() => Climber.Stop();
+    private void Stop()
+    {
+        if (_method == RunMethod.Run)
+        {
+            Run.Stop();
+        }
+        else
+        {
+            Climber.Stop();
+        }
+    }
 
     public void Dispose()
     {
-        Climber.StateChanged -= OnStateChanged;
+        Run.StateChanged -= OnRunStateChanged;
+        Climber.StateChanged -= OnClimbStateChanged;
         _expiryCts?.Cancel();
         _expiryCts?.Dispose();
         _selfRef?.Dispose();

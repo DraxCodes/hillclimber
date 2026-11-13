@@ -114,6 +114,45 @@
     color: var(--ink-3);
 }
 
+/* Method switch ----------------------------------------------------------- */
+
+.methodbar {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    margin: 0 0 0.9rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+.method {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.01em;
+    color: var(--ink-2);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 0.28rem 0.7rem;
+    cursor: pointer;
+    transition: color 0.12s ease, background 0.12s ease;
+}
+
+.method:hover:not(:disabled):not(.active) {
+    color: var(--ink);
+}
+
+.method.active {
+    color: var(--ink);
+    background: var(--surface);
+}
+
+.method:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* Telemetry --------------------------------------------------------------- */
 
 .telemetry {
@@ -189,6 +228,18 @@
 
 .field-narrow {
     max-width: 170px;
+}
+
+/* Read-only base model resolved from the target folder's opencode.json */
+.model-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.85rem;
+}
+
+.model-line .label {
+    margin: 0;
 }
 
 .btn-row {
