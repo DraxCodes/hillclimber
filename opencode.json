@@ -1,7 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "openrouter/deepseek/deepseek-v4.1-flash",
-  "warming": true,
   "permissions": [
     { "action": "shell", "resource": "*", "effect": "allow" },
     { "action": "read", "resource": "**/.env*", "effect": "ask" },
