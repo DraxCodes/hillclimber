@@ -95,7 +95,7 @@ else
         <div class="panel-head">
             <span class="idx">[02]</span>
             <span class="panel-title">activity</span>
-            <span class="panel-meta">@_report.Activity.Count rows</span>
+            <span class="panel-meta">@_daily.Count day@(_daily.Count == 1 ? "" : "s")</span>
         </div>
         @if (_daily.Count == 0)
         {
