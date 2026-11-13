@@ -180,6 +180,41 @@
 .log-line.err { color: var(--red); }
 .log-line.dim { color: var(--ink-3); }
 
+/* opencode --format json events, parsed into readable fields */
+.log-time {
+    color: var(--ink-3);
+    margin-right: 0.45rem;
+}
+
+.log-tool-name {
+    color: var(--ink);
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
+.log-tool-input {
+    color: var(--ink-2);
+    word-break: break-all;
+}
+
+.log-tool-out {
+    margin: 0.2rem 0 0.4rem;
+    padding: 0.4rem 0.55rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    border-left: 2px solid var(--line-2);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink-2);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-event.log-step_start,
+.log-event.log-step_finish {
+    color: var(--ink-3);
+}
+
 .log::-webkit-scrollbar {
     width: 10px;
     height: 10px;

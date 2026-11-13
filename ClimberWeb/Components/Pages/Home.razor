@@ -152,9 +152,35 @@ else
             <span class="panel-meta">@_state.Logs.Count lines</span>
         </div>
         <div class="log" id="log-feed">
-            @foreach (var line in _state.Logs.Reverse())
+            @foreach (var entry in Entries)
             {
-                <div class="log-line @LineClass(line)">@line</div>
+                var css = LineClass(entry.Raw);
+                if (entry.Kind == LogKind.Plain)
+                {
+                    <div class="log-line @css">@entry.Raw</div>
+                }
+                else
+                {
+                    <div class="log-line @css log-event log-@entry.Kind.ToString().ToLowerInvariant()">
+                        <span class="log-time">@entry.Timestamp</span>
+                        @if (entry.Kind == LogKind.Tool)
+                        {
+                            <span class="log-tool-name">⚙ @entry.ToolName</span>
+                            @if (!string.IsNullOrEmpty(entry.ToolInput))
+                            {
+                                <span class="log-tool-input">@entry.ToolInput</span>
+                            }
+                            @if (!string.IsNullOrEmpty(entry.ToolOutput))
+                            {
+                                <pre class="log-tool-out">@entry.ToolOutput</pre>
+                            }
+                        }
+                        else
+                        {
+                            <span class="log-text">@entry.Text</span>
+                        }
+                    </div>
+                }
             }
             @if (_state.Logs.Count == 0)
             {
@@ -231,6 +257,7 @@ else
 }
 
 @code {
+    private readonly LogFormatter _logFormatter = new();
     private ClimberState _state = new();
     private string _folderPath = string.Empty;
     private string _goalPrompt = string.Empty;
@@ -262,6 +289,9 @@ else
         ClimberStatus.Failed => "failed",
         _ => _state.Status.ToString(),
     };
+
+    /// <summary>The log feed, newest first, classified for display. Parsing is cached per line.</summary>
+    private IEnumerable<LogEntry> Entries => _state.Logs.Reverse().Select(_logFormatter.Format);
 
     private static string LineClass(string line)
     {
