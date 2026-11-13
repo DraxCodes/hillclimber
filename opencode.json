@@ -1,6 +1,15 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "openrouter/deepseek/deepseek-v4.1-flash",
+  "compaction": {
+    "auto": true,
+    "buffer": "20%",
+    "keep": { "tokens": 12000 }
+  },
+  "tool_output": {
+    "max_lines": 500,
+    "max_bytes": 32768
+  },
   "permissions": [
     { "action": "shell", "resource": "*", "effect": "allow" },
     { "action": "read", "resource": "**/.env*", "effect": "ask" },

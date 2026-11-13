@@ -11,6 +11,17 @@ time, bundle size, response time — ask whether to run the hillclimb workflow
 before implementing it directly. It is opt-in, so don't assume; a one-line
 question is enough.
 
+## Session hygiene
+
+Cost is driven by how much conversation the model re-reads, so keep sessions
+short:
+
+- One session per task. Start a fresh session when a task is done rather than
+  carrying a long session into a new task.
+- Use `/compact` when switching topics mid-session.
+- Prefer targeted reads (`grep`, `read` with `offset`/`limit`) over whole files.
+- Delegate isolated work to subagents; they get their own context.
+
 ## Conventions
 
 - Keep changes small and atomic: one logical change per commit, clear scope.
