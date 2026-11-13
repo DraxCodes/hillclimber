@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "PIl6lZc39rg=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\joelp\\code\\HillClimberUI\\ClimberWeb\\ClimberWeb.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\joelp\\.nuget\\packages\\microsoft.aspnetcore.app.internal.assets\\11.0.0\\microsoft.aspnetcore.app.internal.assets.11.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

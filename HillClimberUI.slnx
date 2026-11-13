@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Climberweb.Tests/">
+    <Project Path="Climberweb.Tests/ClimberWeb.Tests.csproj" />
+  </Folder>
+  <Project Path="ClimberWeb/ClimberWeb.csproj" />
+</Solution>
