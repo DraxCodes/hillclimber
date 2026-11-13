@@ -228,6 +228,9 @@ else
     private static string ExpectedPin(IConfiguration config) =>
         config["Climber:Pin"] is { Length: > 0 } pin ? pin : "1234";
 
+    private string DefaultFolder =>
+        Config["Climber:DefaultFolder"] is { Length: > 0 } folder ? folder : @"C:\Users\joelp\code";
+
     private string StatusText => _state.Status switch
     {
         ClimberStatus.Idle => "idle",
@@ -267,6 +270,11 @@ else
     {
         _state = Climber.State;
         Climber.StateChanged += OnStateChanged;
+
+        if (string.IsNullOrWhiteSpace(_folderPath))
+        {
+            _folderPath = DefaultFolder;
+        }
     }
 
     private void OnStateChanged(ClimberState state)
@@ -313,7 +321,7 @@ else
 
     private void OpenBrowser()
     {
-        var start = string.IsNullOrWhiteSpace(_folderPath) ? null : _folderPath.Trim();
+        var start = string.IsNullOrWhiteSpace(_folderPath) ? DefaultFolder : _folderPath.Trim();
         _browseListing = Browser.List(start);
         _browseOpen = true;
     }
