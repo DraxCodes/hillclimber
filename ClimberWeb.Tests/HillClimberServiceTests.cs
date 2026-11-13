@@ -190,7 +190,9 @@ public class HillClimberServiceTests
         await service.StartAsync(Options(max: 1));
 
         Assert.Empty(runner.RequestsFor("git"));
-        Assert.Equal(0, service.State.BestScore);
+        // A 0 passing count is equal to the carried-in best, so it takes the unchanged branch;
+        // asserting the branch (not just BestScore == 0) distinguishes it from a new best.
+        Assert.Contains(service.State.Logs, line => line.Contains("Score unchanged at 0"));
         Assert.DoesNotContain(service.State.Logs, line => line.Contains("New best score"));
     }
 
