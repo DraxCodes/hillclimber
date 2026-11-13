@@ -1,7 +1,235 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject IHillClimberService Climber
+@inject IConfiguration Config
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Hill Climber</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="climber">
 
-Welcome to your new app.
+    @if (!_unlocked)
+    {
+        <section class="card pin-card">
+            <h1>🔒 Hill Climber</h1>
+            <p class="muted">Enter the PIN to control the climb loop.</p>
+
+            <label class="field-label" for="pin">PIN</label>
+            <input id="pin"
+                   class="form-control"
+                   type="password"
+                   inputmode="numeric"
+                   autocomplete="off"
+                   placeholder="••••"
+                   @bind="_pinInput"
+                   @bind:event="oninput"
+                   @onkeydown="OnPinKeyDown" />
+
+            @if (_pinError is not null)
+            {
+                <div class="alert alert-danger mt-2" role="alert">@_pinError</div>
+            }
+
+            <button class="btn btn-primary btn-block mt-3" @onclick="Unlock">Unlock</button>
+        </section>
+    }
+    else
+    {
+        <section class="status-grid" aria-label="Climb status">
+            <div class="stat">
+                <span class="stat-label">Status</span>
+                <span class="stat-value status-@_state.Status.ToString().ToLowerInvariant()">@StatusText</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Iteration</span>
+                <span class="stat-value">@_state.CurrentIteration <span class="muted">/ @_state.MaxIterations</span></span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Best score</span>
+                <span class="stat-value">@_state.BestScore</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Last run</span>
+                <span class="stat-value">
+                    @if (_state.LastPassed is int passed)
+                    {
+                        <span class="ok">@passed</span> <span class="muted">/</span> <span class="bad">@_state.LastFailed</span>
+                    }
+                    else
+                    {
+                        <span class="muted">—</span>
+                    }
+                </span>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="field">
+                <label class="field-label" for="folder">Target folder path</label>
+                <input id="folder"
+                       class="form-control"
+                       type="text"
+                       placeholder="C:\path\to\your\repo"
+                       disabled="@IsRunning"
+                       @bind="_folderPath" />
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="goal">Goal prompt</label>
+                <textarea id="goal"
+                          class="form-control"
+                          rows="3"
+                          placeholder="Describe what each iteration should try to accomplish…"
+                          disabled="@IsRunning"
+                          @bind="_goalPrompt"></textarea>
+            </div>
+
+            <div class="field field-narrow">
+                <label class="field-label" for="max">Max iterations</label>
+                <input id="max"
+                       class="form-control"
+                       type="number"
+                       min="1"
+                       disabled="@IsRunning"
+                       @bind="_maxIterations" />
+            </div>
+
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger" role="alert">@_error</div>
+            }
+
+            <div class="actions">
+                <button class="btn btn-primary btn-block" disabled="@IsRunning" @onclick="Start">
+                    ▶ Start
+                </button>
+                <button class="btn btn-danger btn-block" disabled="@(!IsRunning)" @onclick="Stop">
+                    ■ Stop
+                </button>
+                <button class="btn btn-outline-secondary btn-block" @onclick="Lock">
+                    Lock
+                </button>
+            </div>
+        </section>
+
+        @if (_state.Message is not null)
+        {
+            <p class="message">@_state.Message</p>
+        }
+
+        <section class="card logs-card">
+            <div class="logs-header">
+                <h2>Live log</h2>
+                <span class="muted">@_state.Logs.Count line(s)</span>
+            </div>
+            <div class="log-feed" id="log-feed">
+                @foreach (var line in _state.Logs.Reverse())
+                {
+                    <div class="log-line">@line</div>
+                }
+                @if (_state.Logs.Count == 0)
+                {
+                    <div class="log-line muted">No output yet.</div>
+                }
+            </div>
+        </section>
+    }
+
+</div>
+
+@code {
+    private ClimberState _state = new();
+    private string _folderPath = string.Empty;
+    private string _goalPrompt = string.Empty;
+    private int _maxIterations = 5;
+    private string _pinInput = string.Empty;
+    private string? _pinError;
+    private string? _error;
+    private bool _unlocked;
+
+    private bool IsRunning => _state.Status == ClimberStatus.Running;
+
+    private static string ExpectedPin(IConfiguration config) =>
+        config["Climber:Pin"] is { Length: > 0 } pin ? pin : "1234";
+
+    private string StatusText => _state.Status switch
+    {
+        ClimberStatus.Idle => "Idle",
+        ClimberStatus.Running => "Running",
+        ClimberStatus.Completed => "Completed",
+        ClimberStatus.Stopped => "Stopped",
+        ClimberStatus.Failed => "Failed",
+        _ => _state.Status.ToString(),
+    };
+
+    protected override void OnInitialized()
+    {
+        _state = Climber.State;
+        Climber.StateChanged += OnStateChanged;
+    }
+
+    private void OnStateChanged(ClimberState state)
+    {
+        _state = state;
+        try
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The circuit is gone; nothing left to update.
+        }
+    }
+
+    private void Unlock()
+    {
+        if (string.Equals(_pinInput, ExpectedPin(Config), StringComparison.Ordinal))
+        {
+            _unlocked = true;
+            _pinError = null;
+            _pinInput = string.Empty;
+        }
+        else
+        {
+            _pinError = "Incorrect PIN.";
+        }
+    }
+
+    private void Lock()
+    {
+        _unlocked = false;
+        _pinInput = string.Empty;
+        _pinError = null;
+    }
+
+    private void OnPinKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            Unlock();
+        }
+    }
+
+    private void Start()
+    {
+        _error = null;
+
+        try
+        {
+            // StartAsync throws synchronously for invalid input / concurrent runs and
+            // returns a task that completes when the loop finishes; we don't await it here.
+            _ = Climber.StartAsync(new ClimberOptions(
+                _folderPath.Trim(),
+                _goalPrompt.Trim(),
+                Math.Max(1, _maxIterations)));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void Stop() => Climber.Stop();
+
+    public void Dispose() => Climber.StateChanged -= OnStateChanged;
+}
