@@ -60,4 +60,19 @@ public class TestResultParserTests
         Assert.Equal(4, summary!.Value.Passed);
         Assert.Equal(0, summary.Value.Failed);
     }
+
+    [Fact]
+    public void SumsSummariesFromMultipleProjects()
+    {
+        var output = string.Join('\n',
+            "Passed!  - Failed:     0, Passed:     5, Skipped:     0, Total:     5",
+            "Failed!  - Failed:     2, Passed:     8, Skipped:     0, Total:    10");
+
+        var summary = TestResultParser.Parse(output);
+
+        Assert.NotNull(summary);
+        Assert.Equal(13, summary!.Value.Passed);
+        Assert.Equal(2, summary.Value.Failed);
+        Assert.Equal(15, summary.Value.Total);
+    }
 }

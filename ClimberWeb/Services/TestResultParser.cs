@@ -26,7 +26,8 @@ public static partial class TestResultParser
     /// <summary>
     /// Attempts to extract the passing/failing counts from <paramref name="output"/>.
     /// Returns <c>null</c> when no recognizable summary is present (for example a build failure
-    /// before any test ran).
+    /// before any test ran). When several summaries are present — a solution with more than one
+    /// test project prints one per project — their counts are summed.
     /// </summary>
     public static TestSummary? Parse(string? output)
     {
@@ -35,17 +36,25 @@ public static partial class TestResultParser
             return null;
         }
 
-        var passedMatch = PassedRegex().Match(output);
-        var failedMatch = FailedRegex().Match(output);
+        var passedMatches = PassedRegex().Matches(output);
+        var failedMatches = FailedRegex().Matches(output);
 
-        if (!passedMatch.Success && !failedMatch.Success)
+        if (passedMatches.Count == 0 && failedMatches.Count == 0)
         {
             return null;
         }
 
-        var passed = passedMatch.Success ? int.Parse(passedMatch.Groups[1].Value) : 0;
-        var failed = failedMatch.Success ? int.Parse(failedMatch.Groups[1].Value) : 0;
+        return new TestSummary(SumOf(passedMatches), SumOf(failedMatches));
+    }
 
-        return new TestSummary(passed, failed);
+    private static int SumOf(MatchCollection matches)
+    {
+        var total = 0;
+        foreach (Match match in matches)
+        {
+            total += int.Parse(match.Groups[1].Value);
+        }
+
+        return total;
     }
 }
