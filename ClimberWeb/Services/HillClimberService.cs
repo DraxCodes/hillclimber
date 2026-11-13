@@ -227,15 +227,17 @@ public sealed class HillClimberService : IHillClimberService
                 UpdateState(state => state with { LastPassed = passed, LastFailed = failed });
 
                 // The run's BestScore starts at 0 (see StartAsync), so the first iteration is
-                // reported as a new best only when it actually beats what we carried in.
-                if (passed > State.BestScore)
+                // reported as a new best only when it actually beats what we carried in. Snapshot
+                // it once so the comparison and both messages agree without re-reading state.
+                var bestSoFar = State.BestScore;
+                if (passed > bestSoFar)
                 {
                     UpdateState(state => state with { BestScore = passed });
                     Log($"New best score: {passed}. Keeping changes.");
                 }
-                else if (passed < State.BestScore)
+                else if (passed < bestSoFar)
                 {
-                    Log($"Regression: {passed} < {State.BestScore}. Reverting with 'git checkout -- .'.");
+                    Log($"Regression: {passed} < {bestSoFar}. Reverting with 'git checkout -- .'.");
                     await RevertAsync(options.TargetFolder, cancellationToken).ConfigureAwait(false);
                 }
                 else
