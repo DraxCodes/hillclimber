@@ -69,6 +69,28 @@ public class SpendTests
         Assert.Contains(service.State.Logs, line => line.Contains("Spend this run"));
     }
 
+    // ---- spend summary -------------------------------------------------------
+
+    [Fact]
+    public void Monthly_SumsActivityRows()
+    {
+        var rows = new[]
+        {
+            new OpenRouterActivityRow(new DateOnly(2026, 11, 12), "a/model", 1, 10, 2, 0.30),
+            new OpenRouterActivityRow(new DateOnly(2026, 11, 13), "b/model", 2, 20, 4, 2.50),
+        };
+
+        Assert.Equal(2.80, SpendSummary.Monthly(rows), 6);
+        Assert.Equal(0d, SpendSummary.Monthly(Array.Empty<OpenRouterActivityRow>()));
+    }
+
+    [Fact]
+    public void UsdPerMonth_FormatsTheRateAndTheEmptyState()
+    {
+        Assert.Equal("$2.80/pm", SpendFormat.UsdPerMonth(2.80));
+        Assert.Equal("—/pm", SpendFormat.UsdPerMonth(null));
+    }
+
     // ---- OpenRouter parsing --------------------------------------------------
 
     [Fact]

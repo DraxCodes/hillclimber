@@ -16,6 +16,10 @@ public static class SpendFormat
             ? amount.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)
             : amount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
 
+    /// <summary>Formats a rolling-month USD figure, e.g. <c>$2.80/pm</c>. Null renders <c>—/pm</c>.</summary>
+    public static string UsdPerMonth(double? value) =>
+        value is not { } amount ? "—/pm" : "$" + Amount(amount) + "/pm";
+
     /// <summary>Formats a token count compactly, e.g. <c>12.3k</c>.</summary>
     public static string Tokens(long value) =>
         value >= 1000
