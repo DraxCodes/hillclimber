@@ -11,6 +11,7 @@ builder.Services.AddRazorComponents()
 // running (and stays observable) across page reloads and mobile reconnects.
 builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 builder.Services.AddSingleton<IHillClimberService, HillClimberService>();
+builder.Services.AddSingleton<IFileBrowser, FileBrowser>();
 
 // Listen on all interfaces so the dashboard is reachable from a phone on the same Wi-Fi.
 // ASPNETCORE_URLS (or DOTNET_URLS) still wins when explicitly set.
