@@ -64,7 +64,16 @@ else
         </div>
         <div class="cell">
             <dt>iteration</dt>
-            <dd>@_state.CurrentIteration<span class="slash dim">/@_state.MaxIterations</span></dd>
+            <dd>
+                @if (_state.MaxIterations > 0)
+                {
+                    @_state.CurrentIteration<span class="slash dim">/@_state.MaxIterations</span>
+                }
+                else
+                {
+                    <span class="dim">—</span>
+                }
+            </dd>
         </div>
         <div class="cell">
             <dt>best score</dt>
