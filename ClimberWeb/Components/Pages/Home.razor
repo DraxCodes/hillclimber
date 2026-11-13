@@ -553,7 +553,8 @@ else
         }
 
         ResolveAgents();
-        RebuildEntries();        _spend = await OpenRouter.GetSpendAsync();
+        RebuildEntries();
+        _spend = await OpenRouter.GetSpendAsync();
     }
 
     private void OnRunStateChanged(RunState state)
