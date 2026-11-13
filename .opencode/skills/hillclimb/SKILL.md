@@ -6,18 +6,16 @@ description: Optimise a measurable objective in small, reversible increments tha
 # Hillclimbing
 
 Use this skill when asked to improve a measurable objective (performance, size,
-score, reliability) with a `Plan-Architect` agent and a read-only
-`Quality-Gatekeeper` gate. The loop only keeps a change if a gate passes.
+score, reliability) with a `plan-architect` agent and a read-only
+`quality-gatekeeper` gate. The loop only keeps a change if a gate passes.
 
 ## Roles
 
-- **Plan-Architect** (`Plan-Architect` subagent): defines the metric, baseline,
-  quality gates, ordered plan, and stop conditions. It does not edit code.
-- **Quality-Gatekeeper** (`Quality-Gatekeeper` subagent): read-only gatekeeper.
-  Independently re-measures and returns `PASS`/`FAIL` per gate. It does not edit
-  code.
-- **Task-Orchestrator** (`Task-Orchestrator`, primary): runs the loop, makes the
-  changes, and commits.
+- `plan-architect` (subagent): defines the metric, baseline, quality gates,
+  ordered plan, and stop conditions. It does not edit code.
+- `quality-gatekeeper` (subagent): read-only gatekeeper. Independently
+  re-measures and returns `PASS`/`FAIL` per gate. It does not edit code.
+- `task-orchestrator` (primary): runs the loop, makes the changes, and commits.
 
 ## Workflow
 
@@ -27,14 +25,14 @@ score, reliability) with a `Plan-Architect` agent and a read-only
    already-measurable objective — grilling costs real tokens.
 1. **Frame the objective.** Restate it as a single measurable metric. If it is
    not measurable, stop and agree on a metric first.
-2. **Plan.** Launch the `Plan-Architect` subagent. Capture its metric, baseline,
+2. **Plan.** Launch the `plan-architect` subagent. Capture its metric, baseline,
    gates, plan, and stop conditions. Do not proceed without a numeric baseline.
 3. **Baseline.** Record the current metric value and ensure the working tree is
    clean.
 4. **Iterate.** For each step in the plan:
    1. Make the smallest change that could move the metric.
    2. Measure locally.
-   3. Launch the `Quality-Gatekeeper` subagent on the change.
+   3. Launch the `quality-gatekeeper` subagent on the change.
    4. On `PASS`, stage and commit exactly this change as one atomic commit.
    5. On `FAIL`, revert the change and record why. If the same failure repeats,
       move to the stop conditions.
@@ -47,7 +45,7 @@ score, reliability) with a `Plan-Architect` agent and a read-only
 - One logical change per iteration, one atomic commit per accepted iteration.
 - Never commit secrets or personal data such as `.env`, API keys, `*.pem`,
   `*.key`, or `*.local.json`. Check `git status` before every commit.
-- Never let the Quality-Gatekeeper or Plan-Architect modify files; both are
+- Never let the `quality-gatekeeper` or `plan-architect` modify files; both are
   read-only.
 - Prefer reverting a losing change over debugging it — hillclimbing only moves
   forward on proven improvements.
