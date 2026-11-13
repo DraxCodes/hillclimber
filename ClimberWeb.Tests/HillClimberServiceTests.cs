@@ -32,7 +32,7 @@ public class HillClimberServiceTests
         await service.StartAsync(Options(max: 3));
 
         var state = service.State;
-        Assert.Equal(ClimberStatus.Completed, state.Status);
+        Assert.Equal(RunStatus.Completed, state.Status);
         Assert.Equal(3, state.CurrentIteration);
         Assert.Equal(3, state.BestScore);
         Assert.Equal(3, state.LastPassed);
@@ -54,7 +54,7 @@ public class HillClimberServiceTests
 
         Assert.Same(run, awaited);
         await awaited;
-        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class HillClimberServiceTests
 
         await service.StartAsync(Options(max: 1));
 
-        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
         Assert.Contains(service.State.Logs, line => line.Contains("opencode exited with code 1"));
     }
 
@@ -87,7 +87,7 @@ public class HillClimberServiceTests
 
         await service.StartAsync(Options(max: 1));
 
-        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
         Assert.Contains(service.State.Logs, line => line.Contains("dotnet test exited with code 1"));
     }
 
@@ -103,7 +103,7 @@ public class HillClimberServiceTests
         await service.StartAsync(Options(max: 1));
 
         var state = service.State;
-        Assert.Equal(ClimberStatus.Failed, state.Status);
+        Assert.Equal(RunStatus.Failed, state.Status);
         Assert.NotNull(state.Message);
         Assert.Contains("boom", state.Message);
         Assert.Contains(state.Logs, line => line.Contains("ERROR: boom"));
@@ -141,7 +141,7 @@ public class HillClimberServiceTests
         Assert.Equal(@"C:\work\repo", revert.WorkingDirectory);
 
         var state = service.State;
-        Assert.Equal(ClimberStatus.Completed, state.Status);
+        Assert.Equal(RunStatus.Completed, state.Status);
         // The regression must not lower the best score.
         Assert.Equal(5, state.BestScore);
         Assert.Equal(3, state.LastPassed);
@@ -157,7 +157,7 @@ public class HillClimberServiceTests
 
         Assert.Empty(runner.RequestsFor("git"));
         Assert.Equal(4, service.State.BestScore);
-        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class HillClimberServiceTests
         Assert.Empty(runner.RequestsFor("git"));
         Assert.Equal(0, service.State.BestScore);
         Assert.Equal(0, service.State.LastPassed);
-        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
         Assert.Contains(service.State.Logs, line => line.Contains("could not parse", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(service.State.Logs, line => line.Contains("New best score"));
     }
@@ -258,7 +258,7 @@ public class HillClimberServiceTests
         service.Stop();
         await run.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(ClimberStatus.Stopped, service.State.Status);
+        Assert.Equal(RunStatus.Stopped, service.State.Status);
         Assert.False(service.IsRunning);
         Assert.Contains(service.State.Logs, line => line.Contains("Stopped by user"));
     }
@@ -274,7 +274,7 @@ public class HillClimberServiceTests
         service.Stop();
         await run.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(ClimberStatus.Stopped, service.State.Status);
+        Assert.Equal(RunStatus.Stopped, service.State.Status);
     }
 
     [Fact]
@@ -318,7 +318,7 @@ public class HillClimberServiceTests
         await service.StartAsync(Options(max: 2));
 
         Assert.Single(runner.RequestsFor("git"));
-        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
         Assert.Equal(5, service.State.BestScore);
     }
 
@@ -338,8 +338,8 @@ public class HillClimberServiceTests
             snapshot = updates.ToList();
         }
 
-        Assert.Contains(snapshot, s => s.Status == ClimberStatus.Running);
-        Assert.Contains(snapshot, s => s.Status == ClimberStatus.Completed);
+        Assert.Contains(snapshot, s => s.Status == RunStatus.Running);
+        Assert.Contains(snapshot, s => s.Status == RunStatus.Completed);
         Assert.Contains(snapshot, s => s.CurrentIteration == 2);
         Assert.Contains(service.State.Logs, line => line.Contains("Iteration 1/2"));
         Assert.Contains(service.State.Logs, line => line.Contains("Iteration 2/2"));

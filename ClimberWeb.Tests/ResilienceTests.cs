@@ -78,7 +78,7 @@ public class ResilienceTests
 
         Assert.Contains(service.State.Logs, line => line.Contains("opencode not found"));
         Assert.Contains(service.State.Logs, line => line.Contains("dotnet not found"));
-        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class ResilienceTests
         await service.StartAsync(new ClimberOptions(@"C:\work\repo", "goal", 2));
 
         Assert.Contains(service.State.Logs, line => line.Contains("git not found"));
-        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
     }
 
     private static string RepoRoot()

@@ -2,25 +2,6 @@ using Microsoft.Extensions.Logging;
 
 namespace ClimberWeb.Services;
 
-/// <summary>Lifecycle state of a climb run.</summary>
-public enum ClimberStatus
-{
-    /// <summary>No run has been started yet.</summary>
-    Idle,
-
-    /// <summary>The loop is actively running.</summary>
-    Running,
-
-    /// <summary>All requested iterations finished normally.</summary>
-    Completed,
-
-    /// <summary>The run was aborted by the user (cancellation).</summary>
-    Stopped,
-
-    /// <summary>The run terminated because of an unexpected error.</summary>
-    Failed,
-}
-
 /// <summary>Immutable snapshot of everything the dashboard needs to render.</summary>
 public sealed record ClimberState
 {
@@ -37,7 +18,7 @@ public sealed record ClimberState
     /// <summary>Failing tests from the most recent iteration, if any has finished.</summary>
     public int? LastFailed { get; init; }
 
-    public ClimberStatus Status { get; init; } = ClimberStatus.Idle;
+    public RunStatus Status { get; init; } = RunStatus.Idle;
 
     /// <summary>Human-readable detail about the current status.</summary>
     public string? Message { get; init; }
@@ -100,13 +81,12 @@ public interface IHillClimberService
 /// </summary>
 public sealed class HillClimberService : IHillClimberService
 {
-    private const int MaxLogLines = 5000;
-
     private readonly ICommandRunner _runner;
     private readonly ILogger<HillClimberService>? _logger;
     private readonly object _gate = new();
-    private readonly List<string> _logs = new();
+    private readonly RunLogFeed _log = new();
 
+    private RunMetrics _metrics = RunMetrics.Zero;
     private ClimberState _state = new();
     private CancellationTokenSource? _cts;
     private Task _runTask = Task.CompletedTask;
@@ -136,7 +116,7 @@ public sealed class HillClimberService : IHillClimberService
         {
             lock (_gate)
             {
-                return _state.Status == ClimberStatus.Running;
+                return _state.Status == RunStatus.Running;
             }
         }
     }
@@ -159,17 +139,18 @@ public sealed class HillClimberService : IHillClimberService
 
         lock (_gate)
         {
-            if (_state.Status == ClimberStatus.Running)
+            if (_state.Status == RunStatus.Running)
             {
                 throw new InvalidOperationException("A climb is already running. Stop it before starting another.");
             }
 
-            _logs.Clear();
+            _log.Clear();
+            _metrics = RunMetrics.Zero;
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
             _state = new ClimberState
             {
-                Status = ClimberStatus.Running,
+                Status = RunStatus.Running,
                 MaxIterations = maxIterations,
                 CurrentIteration = 0,
                 BestScore = 0,
@@ -205,9 +186,9 @@ public sealed class HillClimberService : IHillClimberService
                 Log($"===== Iteration {iteration}/{maxIterations} =====");
 
                 // 1. Ask opencode to make a change toward the goal.
-                Log($"$ opencode run \"{options.GoalPrompt}\" --format json");
+                Log($"$ {OpenCodeRun.CommandLine(options.GoalPrompt)}");
                 var opencode = await _runner.RunAsync(
-                    new CommandRequest("opencode", new[] { "run", options.GoalPrompt, "--format", "json" }, options.TargetFolder),
+                    OpenCodeRun.Request(options.GoalPrompt, options.TargetFolder),
                     OnOpenCodeLine,
                     cancellationToken).ConfigureAwait(false);
 
@@ -276,7 +257,7 @@ public sealed class HillClimberService : IHillClimberService
             var finalSpend = State.SpendUsd;
             UpdateState(state => state with
             {
-                Status = ClimberStatus.Completed,
+                Status = RunStatus.Completed,
                 Message = $"Completed {maxIterations} iteration(s). Best score: {finalBest}.",
             });
             Log($"===== Completed. Best score: {finalBest} =====");
@@ -286,7 +267,7 @@ public sealed class HillClimberService : IHillClimberService
         {
             UpdateState(state => state with
             {
-                Status = ClimberStatus.Stopped,
+                Status = RunStatus.Stopped,
                 Message = "Stopped by user.",
             });
             Log("===== Stopped by user =====");
@@ -297,7 +278,7 @@ public sealed class HillClimberService : IHillClimberService
             Log($"ERROR: {ex.Message}");
             UpdateState(state => state with
             {
-                Status = ClimberStatus.Failed,
+                Status = RunStatus.Failed,
                 Message = ex.Message,
             });
         }
@@ -333,35 +314,32 @@ public sealed class HillClimberService : IHillClimberService
     {
         Log(line);
 
-        if (OpenCodeEvents.TryReadStepUsage(line) is { } usage)
+        var updated = _metrics.Add(line);
+        if (updated == _metrics)
         {
-            // Round after converting to decimal so summing doubles does not accumulate noise.
-            var cost = Math.Round((decimal)usage.Cost, 8);
-            UpdateState(state => state with
-            {
-                SpendUsd = state.SpendUsd + cost,
-                InputTokens = state.InputTokens + usage.Input,
-                OutputTokens = state.OutputTokens + usage.Output,
-                CacheReadTokens = state.CacheReadTokens + usage.CacheRead,
-                CacheWriteTokens = state.CacheWriteTokens + usage.CacheWrite,
-            });
+            return;
         }
+
+        _metrics = updated;
+        UpdateState(state => state with
+        {
+            SpendUsd = updated.SpendUsd,
+            InputTokens = updated.InputTokens,
+            OutputTokens = updated.OutputTokens,
+            CacheReadTokens = updated.CacheReadTokens,
+            CacheWriteTokens = updated.CacheWriteTokens,
+        });
     }
 
     private void Log(string line)
     {
-        var stamped = $"[{DateTime.Now:HH:mm:ss}] {line}";
+        string stamped;
         ClimberState snapshot;
 
         lock (_gate)
         {
-            _logs.Add(stamped);
-            if (_logs.Count > MaxLogLines)
-            {
-                _logs.RemoveRange(0, _logs.Count - MaxLogLines);
-            }
-
-            _state = _state with { Logs = _logs.ToArray() };
+            stamped = _log.Append(line);
+            _state = _state with { Logs = _log.Snapshot() };
             snapshot = _state;
         }
 

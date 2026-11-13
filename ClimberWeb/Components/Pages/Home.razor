@@ -293,7 +293,7 @@ else
     private SpendReport? _spend;
     private IReadOnlyList<string> _preflightWarnings = Array.Empty<string>();
 
-    private bool IsRunning => _state.Status == ClimberStatus.Running;
+    private bool IsRunning => _state.Status == RunStatus.Running;
 
     private string StatusKey => _state.Status.ToString().ToLowerInvariant();
 
@@ -308,11 +308,11 @@ else
 
     private string StatusText => _state.Status switch
     {
-        ClimberStatus.Idle => "idle",
-        ClimberStatus.Running => "running",
-        ClimberStatus.Completed => "completed",
-        ClimberStatus.Stopped => "stopped",
-        ClimberStatus.Failed => "failed",
+        RunStatus.Idle => "idle",
+        RunStatus.Running => "running",
+        RunStatus.Completed => "completed",
+        RunStatus.Stopped => "stopped",
+        RunStatus.Failed => "failed",
         _ => _state.Status.ToString(),
     };
 
@@ -370,7 +370,7 @@ else
 
     private void OnStateChanged(ClimberState state)
     {
-        var wasRunning = _state.Status == ClimberStatus.Running;
+        var wasRunning = _state.Status == RunStatus.Running;
         _state = state;
         try
         {
@@ -382,7 +382,7 @@ else
         }
 
         // The account total moves once a run spends something; refresh when it finishes.
-        if (wasRunning && state.Status != ClimberStatus.Running)
+        if (wasRunning && state.Status != RunStatus.Running)
         {
             _ = RefreshSpendAsync();
         }
