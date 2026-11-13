@@ -177,10 +177,6 @@ public sealed class HillClimberService : IHillClimberService
 
     private async Task RunLoopAsync(ClimberOptions options, int maxIterations, CancellationToken cancellationToken)
     {
-        // Start from 0 to match the run's initial ClimberState.BestScore, so the first
-        // iteration is reported as a new best only when it actually beats what we carried in.
-        var best = 0;
-
         try
         {
             for (var iteration = 1; iteration <= maxIterations; iteration++)
@@ -230,15 +226,16 @@ public sealed class HillClimberService : IHillClimberService
                 Log($"Result: {passed} passed, {failed} failed.");
                 UpdateState(state => state with { LastPassed = passed, LastFailed = failed });
 
-                if (passed > best)
+                // The run's BestScore starts at 0 (see StartAsync), so the first iteration is
+                // reported as a new best only when it actually beats what we carried in.
+                if (passed > State.BestScore)
                 {
-                    best = passed;
-                    UpdateState(state => state with { BestScore = best });
-                    Log($"New best score: {best}. Keeping changes.");
+                    UpdateState(state => state with { BestScore = passed });
+                    Log($"New best score: {passed}. Keeping changes.");
                 }
-                else if (passed < best)
+                else if (passed < State.BestScore)
                 {
-                    Log($"Regression: {passed} < {best}. Reverting with 'git checkout -- .'.");
+                    Log($"Regression: {passed} < {State.BestScore}. Reverting with 'git checkout -- .'.");
                     await RevertAsync(options.TargetFolder, cancellationToken).ConfigureAwait(false);
                 }
                 else
@@ -247,12 +244,13 @@ public sealed class HillClimberService : IHillClimberService
                 }
             }
 
+            var finalBest = State.BestScore;
             UpdateState(state => state with
             {
                 Status = ClimberStatus.Completed,
-                Message = $"Completed {maxIterations} iteration(s). Best score: {best}.",
+                Message = $"Completed {maxIterations} iteration(s). Best score: {finalBest}.",
             });
-            Log($"===== Completed. Best score: {best} =====");
+            Log($"===== Completed. Best score: {finalBest} =====");
         }
         catch (OperationCanceledException)
         {
