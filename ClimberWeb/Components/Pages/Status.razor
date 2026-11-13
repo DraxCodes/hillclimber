@@ -182,6 +182,7 @@ else
                 @foreach (var issue in _report.Issues)
                 {
                     <li class="issue">
+                        <span class="issue-num mono">@issue.Number.ToString("00")</span>
                         <span class="issue-title">@issue.Title</span>
                         <span class="chip issue-feature">@issue.Feature</span>
                         <span class="issue-status">@issue.Status</span>

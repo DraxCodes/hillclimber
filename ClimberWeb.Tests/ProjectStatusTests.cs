@@ -217,6 +217,7 @@ public class ProjectStatusTests
         Assert.Equal("Track something important", issue!.Title);
         Assert.Equal("open", issue.Status);
         Assert.Equal("backlog", issue.Feature);
+        Assert.Equal(1, issue.Number);
     }
 
     [Fact]
@@ -230,6 +231,7 @@ public class ProjectStatusTests
     {
         var issue = IssueScanner.Parse("# No status here", "backlog", "02-thing.md");
         Assert.Equal("open", issue!.Status);
+        Assert.Equal(2, issue.Number);
     }
 
     [Fact]

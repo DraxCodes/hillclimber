@@ -163,7 +163,7 @@ public static partial class GitHistory
 
         var min = times.Min();
         var max = times.Max();
-        var unit = max - min < TimeSpan.FromHours(36) ? CadenceUnit.Hour : CadenceUnit.Day;
+        var unit = max - min < TimeSpan.FromHours(48) ? CadenceUnit.Hour : CadenceUnit.Day;
 
         var counts = new Dictionary<DateTimeOffset, int>();
         foreach (var time in times)

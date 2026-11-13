@@ -63,10 +63,11 @@ public sealed record CoverageSummary(
 
 /// <summary>A tracked issue that has not been resolved yet.</summary>
 /// <param name="Feature">The <c>.scratch/&lt;feature&gt;</c> directory the issue lives in.</param>
+/// <param name="Number">The leading number of the issue file name, or 0 when it has none.</param>
 /// <param name="FileName">File name of the issue markdown.</param>
 /// <param name="Title">The issue's first <c>#</c> heading.</param>
 /// <param name="Status">The value of the issue's <c>Status:</c> line.</param>
-public sealed record TrackedIssue(string Feature, string FileName, string Title, string Status);
+public sealed record TrackedIssue(string Feature, int Number, string FileName, string Title, string Status);
 
 /// <summary>One agent role in the workflow, from its front-matter.</summary>
 /// <param name="Name">Agent id, e.g. <c>plan-architect</c>.</param>

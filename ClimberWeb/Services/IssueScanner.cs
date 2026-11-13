@@ -85,6 +85,12 @@ public static partial class IssueScanner
             ? heading.Groups[1].Value.Trim()
             : Path.GetFileNameWithoutExtension(fileName);
 
-        return new TrackedIssue(feature, fileName, title, status);
+        return new TrackedIssue(feature, NumberFromFileName(fileName), fileName, title, status);
+    }
+
+    private static int NumberFromFileName(string fileName)
+    {
+        var digits = new string(fileName.TakeWhile(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var number) ? number : 0;
     }
 }

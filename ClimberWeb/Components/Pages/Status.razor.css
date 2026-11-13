@@ -225,6 +225,12 @@ code {
     font-size: 0.86rem;
 }
 
+.issue-num {
+    flex: none;
+    font-size: 0.72rem;
+    color: var(--ink-3);
+}
+
 .issue-title {
     flex: 1;
     min-width: 0;
