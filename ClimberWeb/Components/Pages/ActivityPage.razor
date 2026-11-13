@@ -32,8 +32,8 @@ else
             <span class="panel-meta">@_report.Connection.KeyLabel</span>
         </div>
         <div class="conn-line">
-            <span class="dot @DotClass" aria-hidden="true"></span>
-            <span class="conn-state">@ConnectionLabel</span>
+            <span class="dot dot-@_report.Connection.StateTone" aria-hidden="true"></span>
+            <span class="conn-state">@_report.Connection.StateLabel</span>
             @if (_report.Connection.IsFreeTier && _report.Connection.Connected)
             {
                 <span class="chip">free tier</span>
@@ -44,15 +44,15 @@ else
         {
             <div class="spend-row">
                 <div class="spend-stat">
-                    <span class="spend-num">@Usd(_report.Connection.Usage)</span>
+                    <span class="spend-num">@SpendFormat.Usd(_report.Connection.Usage)</span>
                     <span class="spend-lbl">key spend</span>
                 </div>
                 <div class="spend-stat">
-                    <span class="spend-num">@Usd(_report.Connection.Limit)</span>
+                    <span class="spend-num">@SpendFormat.Usd(_report.Connection.Limit)</span>
                     <span class="spend-lbl">key limit</span>
                 </div>
                 <div class="spend-stat">
-                    <span class="spend-num">@Usd(_report.Connection.LimitRemaining)</span>
+                    <span class="spend-num">@SpendFormat.Usd(_report.Connection.LimitRemaining)</span>
                     <span class="spend-lbl">remaining</span>
                 </div>
             </div>
@@ -76,15 +76,15 @@ else
         {
             <div class="spend-row">
                 <div class="spend-stat">
-                    <span class="spend-num">@Usd(account.TotalUsage)</span>
+                    <span class="spend-num">@SpendFormat.Usd(account.TotalUsage)</span>
                     <span class="spend-lbl">total spent</span>
                 </div>
                 <div class="spend-stat">
-                    <span class="spend-num">@Usd(account.TotalCredits)</span>
+                    <span class="spend-num">@SpendFormat.Usd(account.TotalCredits)</span>
                     <span class="spend-lbl">credits purchased</span>
                 </div>
                 <div class="spend-stat">
-                    <span class="spend-num">@Usd(account.Remaining)</span>
+                    <span class="spend-num">@SpendFormat.Usd(account.Remaining)</span>
                     <span class="spend-lbl">remaining</span>
                 </div>
             </div>
@@ -117,7 +117,7 @@ else
                         var x = i * Step + BarGap;
                         var y = Baseline - barHeight;
                         <g class="bar-group">
-                            <title>@($"{bucket.Label}: {Usd(bucket.Usage)}")</title>
+                            <title>@($"{bucket.Label}: {SpendFormat.Usd(bucket.Usage)}")</title>
                             <rect class="bar" x="@x" y="@y" width="@BarWidth" height="@barHeight" rx="2" />
                         </g>
                     }
@@ -150,8 +150,8 @@ else
                     <li class="model">
                         <span class="model-name mono">@model.Model</span>
                         <span class="model-metric">@model.Requests req</span>
-                        <span class="model-metric">@Tokens(model.PromptTokens + model.CompletionTokens) tok</span>
-                        <span class="model-cost mono">@Usd(model.Usage)</span>
+                        <span class="model-metric">@SpendFormat.Tokens(model.PromptTokens + model.CompletionTokens) tok</span>
+                        <span class="model-cost mono">@SpendFormat.Usd(model.Usage)</span>
                     </li>
                 }
             </ul>
@@ -166,7 +166,7 @@ else
         </div>
         <div class="spend-row">
             <div class="spend-stat">
-                <span class="spend-num">@Usd((double)ClimbSpend)</span>
+                <span class="spend-num">@SpendFormat.Usd((double)ClimbSpend)</span>
                 <span class="spend-lbl">spent this climb</span>
             </div>
             <div class="spend-stat">
@@ -174,6 +174,7 @@ else
                 <span class="spend-lbl">best score</span>
             </div>
         </div>
+        <p class="tokens dim">tokens: @ClimbTokens</p>
         <p class="footnote dim">
             Summed live from opencode's own <code class="mono">step_finish</code> costs. Runs are not
             persisted, so this reflects the current/last run only.
@@ -210,13 +211,7 @@ else
 
     private string ClimbStatusLabel => _climb.Status.ToString().ToLowerInvariant();
 
-    private string DotClass => !_report!.Connection.Configured
-        ? "dot-off"
-        : _report.Connection.Connected ? "dot-ok" : "dot-bad";
-
-    private string ConnectionLabel => !_report!.Connection.Configured
-        ? "not configured"
-        : _report.Connection.Connected ? "connected" : "not connected";
+    private string ClimbTokens => $"{SpendFormat.Tokens(_climb.InputTokens)} in / {SpendFormat.Tokens(_climb.OutputTokens)} out";
 
     private IReadOnlyList<DailySpend> _daily = Array.Empty<DailySpend>();
 
@@ -266,15 +261,6 @@ else
         var every = Math.Max(1, (int)Math.Ceiling(_daily.Count / 8d));
         return index % every == 0 || index == _daily.Count - 1;
     }
-
-    private static string Usd(double? value) =>
-        value is not { } amount ? "—" : "$" + FormatAmount(amount);
-
-    private static string FormatAmount(double amount) =>
-        amount is > 0 and < 1 ? amount.ToString("0.######") : amount.ToString("0.00");
-
-    private static string Tokens(long value) =>
-        value >= 1000 ? $"{value / 1000.0:0.#}k" : value.ToString();
 
     public void Dispose() => Climber.StateChanged -= OnStateChanged;
 

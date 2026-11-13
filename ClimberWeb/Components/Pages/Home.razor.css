@@ -114,16 +114,6 @@
     color: var(--ink-3);
 }
 
-.spend-more {
-    margin-left: auto;
-    color: var(--accent);
-    text-decoration: none;
-}
-
-.spend-more:hover {
-    text-decoration: underline;
-}
-
 /* Telemetry --------------------------------------------------------------- */
 
 .telemetry {

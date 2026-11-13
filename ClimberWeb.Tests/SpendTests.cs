@@ -64,6 +64,8 @@ public class SpendTests
         await service.StartAsync(new ClimberOptions(@"C:\work\repo", "goal", 1));
 
         Assert.Equal(0.0035m, service.State.SpendUsd);
+        Assert.Equal(30, service.State.InputTokens);
+        Assert.Equal(6, service.State.OutputTokens);
         Assert.Contains(service.State.Logs, line => line.Contains("Spend this run"));
     }
 

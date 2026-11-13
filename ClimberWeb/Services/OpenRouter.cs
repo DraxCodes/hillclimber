@@ -62,7 +62,14 @@ public sealed record OpenRouterConnection(
     double? Usage,
     double? Limit,
     double? LimitRemaining,
-    string? Message);
+    string? Message)
+{
+    /// <summary>Short human label for the connection state.</summary>
+    public string StateLabel => !Configured ? "not configured" : Connected ? "connected" : "not connected";
+
+    /// <summary>CSS tone for the connection dot: <c>ok</c>, <c>bad</c>, or <c>off</c>.</summary>
+    public string StateTone => !Configured ? "off" : Connected ? "ok" : "bad";
+}
 
 /// <summary>Account-wide credit totals from <c>GET /api/v1/credits</c>.</summary>
 /// <param name="TotalCredits">Total credits purchased, USD.</param>

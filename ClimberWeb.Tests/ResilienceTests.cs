@@ -81,6 +81,25 @@ public class ResilienceTests
         Assert.Equal(ClimberStatus.Completed, service.State.Status);
     }
 
+    [Fact]
+    public async Task Climb_MissingGitDuringRevert_IsReportedAsNotFound()
+    {
+        var dotnetCalls = 0;
+        var runner = new FakeCommandRunner((request, _) => request.FileName switch
+        {
+            "opencode" => CannedResults.OpenCode(),
+            "dotnet" => CannedResults.Tests(dotnetCalls++ == 0 ? 5 : 1),
+            "git" => CannedResults.Raw(string.Empty, 127),
+            _ => CannedResults.Raw(string.Empty, 1),
+        });
+
+        var service = new HillClimberService(runner);
+        await service.StartAsync(new ClimberOptions(@"C:\work\repo", "goal", 2));
+
+        Assert.Contains(service.State.Logs, line => line.Contains("git not found"));
+        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+    }
+
     private static string RepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

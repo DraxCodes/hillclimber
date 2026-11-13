@@ -61,14 +61,13 @@ else
 
     <section class="spendline" aria-label="OpenRouter connection and spend">
         <span class="conn">
-            <span class="dot @SpendDotClass" aria-hidden="true"></span>
-            <span>openrouter: @SpendConnLabel</span>
+            <span class="dot dot-@SpendTone" aria-hidden="true"></span>
+            <span>openrouter: @SpendLabel</span>
         </span>
         <span class="spend-sep" aria-hidden="true">/</span>
-        <span class="spend-item">this climb <b>@Usd((double)_state.SpendUsd)</b></span>
+        <span class="spend-item">this climb <b>@SpendFormat.Usd((double)_state.SpendUsd)</b></span>
         <span class="spend-sep" aria-hidden="true">/</span>
         <span class="spend-item">total <b>@TotalSpendLabel</b></span>
-        <a class="spend-more" href="/activity">activity →</a>
     </section>
 
     <dl class="telemetry" aria-label="Climb telemetry">
@@ -301,20 +300,11 @@ else
     private string DefaultFolder =>
         Config["Climber:DefaultFolder"] is { Length: > 0 } folder ? folder : @"C:\Users\joelp\code";
 
-    private string SpendDotClass => _spend is null || !_spend.Connection.Configured
-        ? "dot-off"
-        : _spend.Connection.Connected ? "dot-ok" : "dot-bad";
+    private string SpendTone => _spend?.Connection.StateTone ?? "off";
 
-    private string SpendConnLabel => _spend is null
-        ? "checking…"
-        : !_spend.Connection.Configured
-            ? "not configured"
-            : _spend.Connection.Connected ? "connected" : "not connected";
+    private string SpendLabel => _spend?.Connection.StateLabel ?? "checking…";
 
-    private string TotalSpendLabel => _spend?.Account is { } account ? Usd(account.TotalUsage) : "—";
-
-    private static string Usd(double? value) =>
-        value is not { } amount ? "—" : "$" + (amount is > 0 and < 1 ? amount.ToString("0.######") : amount.ToString("0.00"));
+    private string TotalSpendLabel => _spend?.Account is { } account ? SpendFormat.Usd(account.TotalUsage) : "—";
 
     private string StatusText => _state.Status switch
     {
@@ -543,13 +533,24 @@ else
     private void Start()
     {
         _error = null;
+        _preflightWarnings = Array.Empty<string>();
+
+        var folder = _folderPath.Trim();
+        var preflight = Preflight.Check(folder);
+        if (!preflight.CanRun)
+        {
+            _error = preflight.Warnings.FirstOrDefault() ?? "The target folder is not usable.";
+            return;
+        }
+
+        _preflightWarnings = preflight.Warnings;
 
         try
         {
             // StartAsync throws synchronously for invalid input / concurrent runs and
             // returns a task that completes when the loop finishes; we don't await it here.
             _ = Climber.StartAsync(new ClimberOptions(
-                _folderPath.Trim(),
+                folder,
                 _goalPrompt.Trim(),
                 Math.Max(1, _maxIterations)));
         }

@@ -181,6 +181,12 @@ code {
 
 /* Misc -------------------------------------------------------------------- */
 
+.tokens {
+    margin: 0.6rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+}
+
 .footnote {
     margin: 0.9rem 0 0;
     font-size: 0.74rem;

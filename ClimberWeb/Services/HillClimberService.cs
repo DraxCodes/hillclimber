@@ -50,6 +50,18 @@ public sealed record ClimberState
     /// cost events. Runs are not persisted, so this covers the current/last run only.
     /// </summary>
     public decimal SpendUsd { get; init; }
+
+    /// <summary>Prompt tokens consumed this run, from <c>step_finish</c> events.</summary>
+    public long InputTokens { get; init; }
+
+    /// <summary>Completion tokens produced this run.</summary>
+    public long OutputTokens { get; init; }
+
+    /// <summary>Prompt-cache read tokens this run.</summary>
+    public long CacheReadTokens { get; init; }
+
+    /// <summary>Prompt-cache write tokens this run.</summary>
+    public long CacheWriteTokens { get; init; }
 }
 
 /// <summary>Inputs for a climb run.</summary>
@@ -299,7 +311,11 @@ public sealed class HillClimberService : IHillClimberService
             Log,
             cancellationToken).ConfigureAwait(false);
 
-        if (result.ExitCode != 0)
+        if (result.ExitCode == 127)
+        {
+            Log("[git not found — is it installed and on PATH?]");
+        }
+        else if (result.ExitCode != 0)
         {
             Log($"[git checkout exited with code {result.ExitCode}]");
         }
@@ -317,11 +333,18 @@ public sealed class HillClimberService : IHillClimberService
     {
         Log(line);
 
-        if (OpenCodeEvents.TryReadStepUsage(line) is { Cost: > 0 } usage)
+        if (OpenCodeEvents.TryReadStepUsage(line) is { } usage)
         {
             // Round after converting to decimal so summing doubles does not accumulate noise.
             var cost = Math.Round((decimal)usage.Cost, 8);
-            UpdateState(state => state with { SpendUsd = state.SpendUsd + cost });
+            UpdateState(state => state with
+            {
+                SpendUsd = state.SpendUsd + cost,
+                InputTokens = state.InputTokens + usage.Input,
+                OutputTokens = state.OutputTokens + usage.Output,
+                CacheReadTokens = state.CacheReadTokens + usage.CacheRead,
+                CacheWriteTokens = state.CacheWriteTokens + usage.CacheWrite,
+            });
         }
     }
 
