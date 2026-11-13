@@ -7,9 +7,6 @@ permissions:
   - action: edit
     resource: "*"
     effect: deny
-  - action: shell
-    resource: "*"
-    effect: ask
 ---
 
 You are the `quality-gatekeeper`, a read-only gatekeeper in a hillclimbing

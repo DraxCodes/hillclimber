@@ -7,9 +7,6 @@ permissions:
   - action: edit
     resource: "*"
     effect: deny
-  - action: shell
-    resource: "*"
-    effect: ask
 ---
 
 You are the `plan-architect` in a hillclimbing workflow. You do not change code.
