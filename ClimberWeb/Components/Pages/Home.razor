@@ -77,7 +77,7 @@ else
         <span class="spend-sep" aria-hidden="true">/</span>
         <span class="spend-item">@ActiveSpendNoun <b>@SpendFormat.Usd((double)ActiveSpendUsd)</b></span>
         <span class="spend-sep" aria-hidden="true">/</span>
-        <span class="spend-item">total <b>@MonthlySpendLabel</b></span>
+        <span class="spend-item" title="Rolling 30-day spend; all-time total until 30 days of activity exist">total <b>@TotalSpendLabel</b></span>
     </section>
 
     @if (_method == RunMethod.Run)
@@ -394,15 +394,8 @@ else
 
     private string SpendLabel => _spend?.Connection.StateLabel ?? "checking…";
 
-    /// <summary>Rolling 30-day spend, or null when no activity is available to sum.</summary>
-    private double? MonthlyUsage => _spend switch
-    {
-        null => null,
-        { Account: null, Activity.Count: 0 } => null,
-        var report => SpendSummary.Monthly(report.Activity),
-    };
-
-    private string MonthlySpendLabel => SpendFormat.UsdPerMonth(MonthlyUsage);
+    /// <summary>Rolling 30-day spend as <c>$/pm</c>, falling back to the all-time total until activity exists.</summary>
+    private string TotalSpendLabel => SpendSummary.Headline(_spend);
 
     private string AgentLineLabel => _method == RunMethod.Run ? "agent" : "agents";
 

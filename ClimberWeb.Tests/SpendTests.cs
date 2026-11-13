@@ -91,6 +91,20 @@ public class SpendTests
         Assert.Equal("—/pm", SpendFormat.UsdPerMonth(null));
     }
 
+    [Fact]
+    public void Headline_PrefersMonthly_ThenGlobal_ThenDash()
+    {
+        var connection = new OpenRouterConnection(true, true, "k", false, null, null, null, null);
+        var account = new OpenRouterAccount(10d, 4.18d);
+        var rows = new[] { new OpenRouterActivityRow(new DateOnly(2026, 11, 12), "m", 1, 1, 1, 2.80) };
+        var noActivity = Array.Empty<OpenRouterActivityRow>();
+
+        Assert.Equal("$2.80/pm", SpendSummary.Headline(new SpendReport(connection, account, rows, Array.Empty<string>())));
+        Assert.Equal("$4.18", SpendSummary.Headline(new SpendReport(connection, account, noActivity, Array.Empty<string>())));
+        Assert.Equal("—", SpendSummary.Headline(new SpendReport(connection, null, noActivity, Array.Empty<string>())));
+        Assert.Equal("—", SpendSummary.Headline(null));
+    }
+
     // ---- OpenRouter parsing --------------------------------------------------
 
     [Fact]
