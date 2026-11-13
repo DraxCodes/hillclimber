@@ -59,6 +59,28 @@
     gap: 0.5rem;
 }
 
+.nav-link {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--ink-2);
+    text-decoration: none;
+    padding: 0.34rem 0.6rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.nav-link:hover {
+    color: var(--ink);
+    border-color: var(--line);
+    background: var(--surface-2);
+}
+
+.nav-link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus);
+}
+
 .build-tag {
     font-family: var(--font-mono);
     font-size: 0.68rem;

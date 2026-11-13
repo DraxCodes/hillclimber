@@ -1,0 +1,337 @@
+/* Status page — self-contained styles on the shared tokens in app.css. */
+
+.lede {
+    margin: 0 0 0.9rem;
+    color: var(--ink-2);
+    font-size: 0.9rem;
+}
+
+code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.05rem 0.3rem;
+}
+
+.panel,
+.telemetry {
+    margin-bottom: 0.9rem;
+}
+
+/* Repository telemetry ---------------------------------------------------- */
+
+.telemetry {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    padding: 0.7rem 0.85rem;
+    background: var(--surface);
+}
+
+.cell dt {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-3);
+}
+
+.cell dd {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 1.35rem;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+}
+
+.cell dd.sm {
+    font-size: 0.92rem;
+}
+
+.g { color: var(--green); }
+.r { color: var(--red); }
+
+/* Changelog --------------------------------------------------------------- */
+
+.changes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.change {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.84rem;
+}
+
+.change:last-child {
+    border-bottom: 0;
+}
+
+.change-hash {
+    flex: none;
+    font-size: 0.72rem;
+    color: var(--ink-3);
+}
+
+.change-desc {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink);
+}
+
+.change-src {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.02rem 0.28rem;
+}
+
+.change-when {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Coverage ---------------------------------------------------------------- */
+
+.cov-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+}
+
+.cov-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.cov-num {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.cov-lbl {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-3);
+}
+
+.meter {
+    height: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.meter-fill {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+}
+
+/* Cadence chart ----------------------------------------------------------- */
+
+.chart {
+    overflow-x: auto;
+}
+
+.chart svg {
+    display: block;
+}
+
+.chart-labels {
+    display: flex;
+    margin-top: 0.25rem;
+}
+
+.chart-tick {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--ink-3);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.axis {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+
+.bar {
+    fill: var(--accent);
+    opacity: 0.85;
+}
+
+.bar-group:hover .bar {
+    opacity: 1;
+}
+
+/* Issues ------------------------------------------------------------------ */
+
+.issues {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.issue {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.86rem;
+}
+
+.issue-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.issue-feature {
+    flex: none;
+}
+
+.issue-status {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--orange);
+}
+
+.chip {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    color: var(--ink-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.12rem 0.4rem;
+}
+
+/* Models & workflow ------------------------------------------------------- */
+
+.model-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.8rem;
+}
+
+.model-label {
+    margin: 0;
+}
+
+.workflow-text {
+    margin: 0 0 0.5rem;
+    font-size: 0.86rem;
+    color: var(--ink-2);
+}
+
+.roles {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.role {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+.role-name {
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+
+.role-tag {
+    color: var(--ink-3);
+}
+
+.role-desc {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8rem;
+    color: var(--ink-2);
+}
+
+.role-model {
+    flex: none;
+    font-size: 0.7rem;
+}
+
+.footnote {
+    margin: 0.9rem 0 0;
+    font-size: 0.74rem;
+    line-height: 1.5;
+}
+
+.empty {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-3);
+}
+
+@media (min-width: 620px) {
+    .telemetry {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}

@@ -1,0 +1,269 @@
+@page "/status"
+@rendermode InteractiveServer
+@inject IProjectStatusService ProjectStatus
+
+<PageTitle>status · hillclimber</PageTitle>
+
+@if (_report is null)
+{
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[00]</span>
+            <span class="panel-title">status</span>
+        </div>
+        <p class="lede">Reading the repository…</p>
+    </section>
+}
+else
+{
+    <p class="lede">Project health and history for this repository — read-only.</p>
+
+    @foreach (var warning in _report.Warnings)
+    {
+        <p class="notice notice-info" role="status">@warning</p>
+    }
+
+    <dl class="telemetry" aria-label="Repository">
+        <div class="cell">
+            <dt>branch</dt>
+            <dd class="sm">@(_report.Repo?.Branch ?? "—")</dd>
+        </div>
+        <div class="cell">
+            <dt>head</dt>
+            <dd class="sm mono">@(_report.Repo?.Head ?? "—")</dd>
+        </div>
+        <div class="cell">
+            <dt>tree</dt>
+            <dd class="sm">
+                @if (_report.Repo is null)
+                {
+                    <span class="dim">—</span>
+                }
+                else if (_report.Repo.Dirty)
+                {
+                    <span class="r">dirty</span>
+                }
+                else
+                {
+                    <span class="g">clean</span>
+                }
+            </dd>
+        </div>
+        <div class="cell">
+            <dt>commits</dt>
+            <dd class="sm">@_report.Changes.Count</dd>
+        </div>
+    </dl>
+
+    <section class="panel panel-flush">
+        <div class="panel-head">
+            <span class="idx">[01]</span>
+            <span class="panel-title">changelog</span>
+            <span class="panel-meta">@_report.Changes.Count changes</span>
+        </div>
+        @if (_report.Changes.Count == 0)
+        {
+            <p class="empty">No history to show.</p>
+        }
+        else
+        {
+            <ol class="changes">
+                @foreach (var change in _report.Changes)
+                {
+                    <li class="change">
+                        <span class="change-hash mono" title="@change.RawSubject">@change.Hash</span>
+                        <span class="change-desc" title="@change.RawSubject">@change.Description</span>
+                        @if (!change.Authored)
+                        {
+                            <span class="change-src dim" title="Derived from the commit subject">auto</span>
+                        }
+                        <time class="change-when dim">@WhenLabel(change.When)</time>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[02]</span>
+            <span class="panel-title">coverage &amp; tests</span>
+            @if (_report.Coverage?.Generated is { } generated)
+            {
+                <span class="panel-meta">@WhenLabel(generated)</span>
+            }
+        </div>
+        @if (_report.Coverage is not { } coverage)
+        {
+            <p class="empty">
+                Not measured yet. Run <code class="mono">scripts/status.ps1</code> to write
+                <code class="mono">status/coverage.json</code>.
+            </p>
+        }
+        else
+        {
+            <div class="cov-row">
+                <div class="cov-stat">
+                    <span class="cov-num">@coverage.Passed<span class="dim">/@coverage.Total</span></span>
+                    <span class="cov-lbl">tests passing</span>
+                </div>
+                <div class="cov-stat">
+                    <span class="cov-num @(coverage.Passing ? "g" : "r")">@coverage.Failed</span>
+                    <span class="cov-lbl">failing</span>
+                </div>
+                <div class="cov-stat">
+                    <span class="cov-num">@(coverage.LinePercent is int percent ? $"{percent}%" : "—")</span>
+                    <span class="cov-lbl">line coverage</span>
+                </div>
+            </div>
+            @if (coverage.LinePercent is int linePercent)
+            {
+                <div class="meter" role="img" aria-label="@($"{linePercent}% line coverage")">
+                    <span class="meter-fill" style="@($"width: {linePercent}%")"></span>
+                </div>
+            }
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[03]</span>
+            <span class="panel-title">iteration cadence</span>
+            <span class="panel-meta">commits per @(_report.CadenceUnit == CadenceUnit.Hour ? "hour" : "day")</span>
+        </div>
+        @if (_report.Cadence.Count == 0)
+        {
+            <p class="empty">No commits to plot.</p>
+        }
+        else
+        {
+            <div class="chart">
+                <svg viewBox="@($"0 0 {ChartWidth} {ChartHeight}")"
+                     width="@ChartWidth" height="@ChartHeight"
+                     preserveAspectRatio="xMidYMid meet"
+                     role="img"
+                     aria-label="@CadenceLabel">
+                    <line class="axis" x1="0" y1="@Baseline" x2="@ChartWidth" y2="@Baseline" />
+                    @for (var i = 0; i < _report.Cadence.Count; i++)
+                    {
+                        var bucket = _report.Cadence[i];
+                        var barHeight = CadenceMax == 0 ? 0 : (double)bucket.Count / CadenceMax * (Baseline - TopPad);
+                        var x = i * Step + BarGap;
+                        var y = Baseline - barHeight;
+                        <g class="bar-group">
+                            <title>@($"{bucket.Label}: {bucket.Count} commit{(bucket.Count == 1 ? "" : "s")}")</title>
+                            <rect class="bar" x="@x" y="@y" width="@BarWidth" height="@barHeight" rx="2" />
+                        </g>
+                    }
+                </svg>
+                <div class="chart-labels" style="@($"width: {ChartWidth}px")">
+                    @for (var i = 0; i < _report.Cadence.Count; i++)
+                    {
+                        <span class="chart-tick" style="@($"width: {Step}px")">@(ShowLabel(i) ? _report.Cadence[i].Label : string.Empty)</span>
+                    }
+                </div>
+            </div>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[04]</span>
+            <span class="panel-title">tracked issues</span>
+            <span class="panel-meta">@_report.Issues.Count open</span>
+        </div>
+        @if (_report.Issues.Count == 0)
+        {
+            <p class="empty">Nothing tracked and unstarted.</p>
+        }
+        else
+        {
+            <ul class="issues">
+                @foreach (var issue in _report.Issues)
+                {
+                    <li class="issue">
+                        <span class="issue-title">@issue.Title</span>
+                        <span class="chip issue-feature">@issue.Feature</span>
+                        <span class="issue-status">@issue.Status</span>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[05]</span>
+            <span class="panel-title">models &amp; workflow</span>
+            <span class="panel-meta">@_report.Workflow.Roles.Count agents</span>
+        </div>
+
+        <div class="model-row">
+            <span class="label model-label">base model</span>
+            <span class="chip mono">@_report.Workflow.BaseModel</span>
+        </div>
+
+        <p class="workflow-text">@_report.Workflow.BaseWorkflow</p>
+        <p class="workflow-text dim">@WorkflowCatalogReader.HillclimbWorkflow</p>
+
+        @if (_report.Workflow.Roles.Count > 0)
+        {
+            <ul class="roles">
+                @foreach (var role in _report.Workflow.Roles)
+                {
+                    <li class="role">
+                        <span class="role-name mono">@role.Name</span>
+                        @if (role.ReadOnly)
+                        {
+                            <span class="chip role-tag">read-only</span>
+                        }
+                        <span class="role-desc">@role.Description</span>
+                        @if (!string.IsNullOrEmpty(role.Model))
+                        {
+                            <span class="role-model mono dim">@role.Model</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        <p class="footnote dim">
+            Per-change model is the base default. git records no model per commit, so it is not fabricated here.
+        </p>
+    </section>
+}
+
+@code {
+    private const int BarWidth = 22;
+    private const int Step = 34;
+    private const int BarGap = 3;
+    private const int TopPad = 8;
+    private const int Baseline = 96;
+    private const int ChartHeight = 104;
+
+    private StatusReport? _report;
+
+    private int ChartWidth => Math.Max(1, (_report?.Cadence.Count ?? 0) * Step + BarGap * 2);
+
+    private int CadenceMax => _report?.Cadence.Count > 0 ? _report.Cadence.Max(b => b.Count) : 0;
+
+    private string CadenceLabel =>
+        $"Commit cadence: {_report?.Cadence.Sum(b => b.Count) ?? 0} commits across {_report?.Cadence.Count ?? 0} buckets";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _report = await ProjectStatus.GetStatusAsync();
+    }
+
+    private bool ShowLabel(int index)
+    {
+        var total = _report?.Cadence.Count ?? 0;
+        var every = Math.Max(1, (int)Math.Ceiling(total / 8d));
+        return index % every == 0 || index == total - 1;
+    }
+
+    private static string WhenLabel(DateTimeOffset when) =>
+        when == DateTimeOffset.MinValue
+            ? "—"
+            : when.ToLocalTime().ToString("MMM d, HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+}
