@@ -59,7 +59,13 @@
                 if (meta) meta.setAttribute("content", resolved === "dark" ? "#0c0c0c" : "#fbfbfb");
                 var icons = document.querySelectorAll("[data-theme-icon]");
                 for (var i = 0; i < icons.length; i++) {
-                    icons[i].hidden = icons[i].getAttribute("data-theme-icon") !== p;
+                    // <svg> has no reflected `hidden` IDL property, so toggle the
+                    // attribute directly; app.css hides [hidden] with !important.
+                    if (icons[i].getAttribute("data-theme-icon") === p) {
+                        icons[i].removeAttribute("hidden");
+                    } else {
+                        icons[i].setAttribute("hidden", "");
+                    }
                 }
                 var btn = document.getElementById("theme-toggle");
                 if (btn) btn.setAttribute("aria-label", "Theme: " + p + " (activate to change)");
