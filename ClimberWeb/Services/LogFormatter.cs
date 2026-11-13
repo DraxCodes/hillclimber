@@ -59,7 +59,6 @@ public sealed class LogFormatter
 {
     private const int MaxCachedLines = 6000;
     private const int MaxSummaryLength = 100;
-    private const int MaxErrorLength = 500;
 
     private static readonly Regex StampRegex = new(@"^\[(\d{2}:\d{2}:\d{2})\]\s?", RegexOptions.Compiled);
 
@@ -183,6 +182,7 @@ public sealed class LogFormatter
         var output = 0;
         var reasoning = 0;
         var cacheRead = 0;
+        var cacheWrite = 0;
 
         if (part.TryGetProperty("tokens", out var tokens) && tokens.ValueKind == JsonValueKind.Object)
         {
@@ -193,6 +193,7 @@ public sealed class LogFormatter
             if (tokens.TryGetProperty("cache", out var cache) && cache.ValueKind == JsonValueKind.Object)
             {
                 cacheRead = GetInt(cache, "read");
+                cacheWrite = GetInt(cache, "write");
             }
         }
 
@@ -201,9 +202,9 @@ public sealed class LogFormatter
             .Append(" · $").Append(cost.ToString("0.######"))
             .Append(" · in ").Append(input);
 
-        if (cacheRead > 0)
+        if (cacheRead > 0 || cacheWrite > 0)
         {
-            summary.Append(" (cache ").Append(cacheRead).Append(')');
+            summary.Append(" (cache ").Append(cacheRead).Append(" read / ").Append(cacheWrite).Append(" write)");
         }
 
         summary.Append(" / out ").Append(output);
@@ -227,9 +228,7 @@ public sealed class LogFormatter
             message = error.ValueKind == JsonValueKind.String ? error.GetString() : error.GetRawText();
         }
 
-        return string.IsNullOrWhiteSpace(message)
-            ? "error"
-            : Truncate(Flatten(message), MaxErrorLength);
+        return string.IsNullOrWhiteSpace(message) ? "error" : Flatten(message);
     }
 
     private static string SummarizeInput(JsonElement input)

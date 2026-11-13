@@ -89,6 +89,29 @@ public class LogFormatterTests
         Assert.Contains("221", finish.Text);
         Assert.Contains("116", finish.Text);
         Assert.Contains("reasoning 17", finish.Text);
+        Assert.Contains("cache 7296 read", finish.Text);
+    }
+
+    [Fact]
+    public void ShowsCacheWriteTokensWhenPresent()
+    {
+        var line = Stamped("{\"type\":\"step_finish\",\"part\":{\"type\":\"step-finish\",\"reason\":\"stop\",\"tokens\":{\"input\":1,\"output\":2,\"cache\":{\"read\":3,\"write\":4}}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Contains("cache 3 read / 4 write", entry.Text);
+    }
+
+    [Fact]
+    public void KeepsFullErrorTextWithoutTruncating()
+    {
+        var message = new string('x', 1200);
+        var line = Stamped($"{{\"type\":\"error\",\"part\":{{\"type\":\"error\",\"error\":\"{message}\"}}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Error, entry.Kind);
+        Assert.Equal(message, entry.Text);
     }
 
     [Fact]
