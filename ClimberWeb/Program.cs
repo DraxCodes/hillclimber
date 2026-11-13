@@ -3,6 +3,12 @@ using ClimberWeb.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Optional, gitignored local overrides (e.g. OpenRouter keys). Added before environment
+// variables are re-applied so env vars still win, and nothing here is ever committed.
+builder.Configuration
+    .AddJsonFile(Path.Combine(builder.Environment.ContentRootPath, "appsettings.local.json"), optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables();
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -16,6 +22,14 @@ builder.Services.AddSingleton<IFileBrowser, FileBrowser>();
 // Project status page: git history is read live, coverage/test status comes from the
 // committed artifact under status/.
 builder.Services.AddSingleton<IProjectStatusService, ProjectStatusService>();
+
+// Pre-flight checks for a climb target (folder exists, is a git repo, tools on PATH).
+builder.Services.AddSingleton<IClimbPreflight, ClimbPreflight>();
+
+// OpenRouter spend/connection surfaces. A single short-timeout client keeps a stalled
+// API from hanging a page render; parsing is defensive so a bad key is never fatal.
+builder.Services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(10) });
+builder.Services.AddSingleton<IOpenRouterClient, OpenRouterClient>();
 
 // PIN gate: unlock persists for the browser session and slides with activity,
 // expiring after Climber:SessionMinutes (default 30) of inactivity.

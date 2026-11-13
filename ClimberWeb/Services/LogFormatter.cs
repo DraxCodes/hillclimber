@@ -174,44 +174,23 @@ public sealed class LogFormatter
     private static string SummarizeFinish(JsonElement part)
     {
         var reason = GetString(part, "reason") ?? "stop";
-        var cost = part.TryGetProperty("cost", out var costElement) && costElement.ValueKind == JsonValueKind.Number
-            ? costElement.GetDouble()
-            : 0d;
-
-        var input = 0;
-        var output = 0;
-        var reasoning = 0;
-        var cacheRead = 0;
-        var cacheWrite = 0;
-
-        if (part.TryGetProperty("tokens", out var tokens) && tokens.ValueKind == JsonValueKind.Object)
-        {
-            input = GetInt(tokens, "input");
-            output = GetInt(tokens, "output");
-            reasoning = GetInt(tokens, "reasoning");
-
-            if (tokens.TryGetProperty("cache", out var cache) && cache.ValueKind == JsonValueKind.Object)
-            {
-                cacheRead = GetInt(cache, "read");
-                cacheWrite = GetInt(cache, "write");
-            }
-        }
+        var usage = OpenCodeEvents.ReadUsage(part);
 
         var summary = new StringBuilder()
             .Append("step finish · ").Append(reason)
-            .Append(" · $").Append(cost.ToString("0.######"))
-            .Append(" · in ").Append(input);
+            .Append(" · $").Append(usage.Cost.ToString("0.######"))
+            .Append(" · in ").Append(usage.Input);
 
-        if (cacheRead > 0 || cacheWrite > 0)
+        if (usage.CacheRead > 0 || usage.CacheWrite > 0)
         {
-            summary.Append(" (cache ").Append(cacheRead).Append(" read / ").Append(cacheWrite).Append(" write)");
+            summary.Append(" (cache ").Append(usage.CacheRead).Append(" read / ").Append(usage.CacheWrite).Append(" write)");
         }
 
-        summary.Append(" / out ").Append(output);
+        summary.Append(" / out ").Append(usage.Output);
 
-        if (reasoning > 0)
+        if (usage.Reasoning > 0)
         {
-            summary.Append(" · reasoning ").Append(reasoning);
+            summary.Append(" · reasoning ").Append(usage.Reasoning);
         }
 
         return summary.ToString();
@@ -278,9 +257,6 @@ public sealed class LogFormatter
         && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
-
-    private static int GetInt(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.TryGetInt32(out var number) ? number : 0;
 
     private static string Flatten(string value) =>
         value.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ').Trim();

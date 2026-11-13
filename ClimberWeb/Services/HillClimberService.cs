@@ -44,6 +44,12 @@ public sealed record ClimberState
 
     /// <summary>Live log feed, oldest first.</summary>
     public IReadOnlyList<string> Logs { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Total spend in USD for this run, summed from opencode's own <c>step_finish</c>
+    /// cost events. Runs are not persisted, so this covers the current/last run only.
+    /// </summary>
+    public decimal SpendUsd { get; init; }
 }
 
 /// <summary>Inputs for a climb run.</summary>
@@ -190,12 +196,16 @@ public sealed class HillClimberService : IHillClimberService
                 Log($"$ opencode run \"{options.GoalPrompt}\" --format json");
                 var opencode = await _runner.RunAsync(
                     new CommandRequest("opencode", new[] { "run", options.GoalPrompt, "--format", "json" }, options.TargetFolder),
-                    Log,
+                    OnOpenCodeLine,
                     cancellationToken).ConfigureAwait(false);
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (opencode.ExitCode != 0)
+                if (opencode.ExitCode == 127)
+                {
+                    Log("[opencode not found — is it installed and on PATH?]");
+                }
+                else if (opencode.ExitCode != 0)
                 {
                     Log($"[opencode exited with code {opencode.ExitCode}]");
                 }
@@ -209,7 +219,11 @@ public sealed class HillClimberService : IHillClimberService
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (testRun.ExitCode != 0)
+                if (testRun.ExitCode == 127)
+                {
+                    Log("[dotnet not found — is it installed and on PATH?]");
+                }
+                else if (testRun.ExitCode != 0)
                 {
                     Log($"[dotnet test exited with code {testRun.ExitCode}]");
                 }
@@ -247,12 +261,14 @@ public sealed class HillClimberService : IHillClimberService
             }
 
             var finalBest = State.BestScore;
+            var finalSpend = State.SpendUsd;
             UpdateState(state => state with
             {
                 Status = ClimberStatus.Completed,
                 Message = $"Completed {maxIterations} iteration(s). Best score: {finalBest}.",
             });
             Log($"===== Completed. Best score: {finalBest} =====");
+            Log($"Spend this run: ${finalSpend:0.######}.");
         }
         catch (OperationCanceledException)
         {
@@ -291,6 +307,23 @@ public sealed class HillClimberService : IHillClimberService
 
     private static string Combine(CommandResult result) =>
         string.Concat(result.StandardOutput, "\n", result.StandardError);
+
+    /// <summary>
+    /// Handles one line of opencode's JSON stream: logs it verbatim (the renderer decides
+    /// how to show it) and accumulates the cost reported by <c>step_finish</c> events so
+    /// "this climb's spend" is exact without persisting anything.
+    /// </summary>
+    private void OnOpenCodeLine(string line)
+    {
+        Log(line);
+
+        if (OpenCodeEvents.TryReadStepUsage(line) is { Cost: > 0 } usage)
+        {
+            // Round after converting to decimal so summing doubles does not accumulate noise.
+            var cost = Math.Round((decimal)usage.Cost, 8);
+            UpdateState(state => state with { SpendUsd = state.SpendUsd + cost });
+        }
+    }
 
     private void Log(string line)
     {
