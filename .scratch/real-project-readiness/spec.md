@@ -141,7 +141,7 @@ or committing a secret.
   limit / remaining, account totals, a 30-day bar graph, a per-model breakdown, this-climb
   spend, and the "saved with skills — not measured" state. The default no-key state renders
   "not configured" plus explicit unavailable messages.
-- `dotnet test --nologo` → **134 passing** (was 109).
+- `dotnet test --nologo` → **135 passing** (was 109).
 
 ## Fixed point for review
 
