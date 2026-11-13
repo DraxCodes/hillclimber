@@ -44,6 +44,20 @@ public class HillClimberServiceTests
     }
 
     [Fact]
+    public async Task WaitForCompletionAsync_ReturnsTheSameRunTask()
+    {
+        var runner = RunnerWithScores(1);
+        var service = new HillClimberService(runner);
+
+        var run = service.StartAsync(Options(max: 1));
+        var awaited = service.WaitForCompletionAsync();
+
+        Assert.Same(run, awaited);
+        await awaited;
+        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+    }
+
+    [Fact]
     public async Task RegressingIteration_RevertsWorkingChanges()
     {
         var runner = RunnerWithScores(5, 3);
