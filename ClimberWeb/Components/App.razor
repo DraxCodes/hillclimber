@@ -83,6 +83,16 @@
                 if (pref() === "system") apply("system");
             });
 
+            // Blazor's enhanced navigation patches the document, which overwrites the
+            // <html> data-theme / data-theme-pref attributes with the server-rendered
+            // defaults. Re-apply the stored preference whenever a navigation completes,
+            // so the theme survives moving between pages (current and future).
+            function reapply() { apply(pref()); }
+            document.addEventListener("enhancedload", reapply);
+            if (window.Blazor && typeof window.Blazor.addEventListener === "function") {
+                window.Blazor.addEventListener("enhancedload", reapply);
+            }
+
             apply(pref());
         })();
     </script>
