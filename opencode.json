@@ -20,6 +20,12 @@
     { "action": "shell", "resource": "rm -rf *", "effect": "ask" },
     { "action": "shell", "resource": "Remove-Item *", "effect": "ask" },
     { "action": "shell", "resource": "git reset --hard *", "effect": "ask" },
-    { "action": "shell", "resource": "git clean *", "effect": "ask" }
+    { "action": "shell", "resource": "git clean *", "effect": "ask" },
+
+    { "action": "skill", "resource": "*", "effect": "allow" },
+    { "action": "skill", "resource": "codebase-design", "effect": "deny" },
+    { "action": "skill", "resource": "documentation-and-adrs", "effect": "deny" },
+    { "action": "skill", "resource": "setup-pre-commit", "effect": "deny" },
+    { "action": "skill", "resource": "context-engineering", "effect": "deny" }
   ]
 }
