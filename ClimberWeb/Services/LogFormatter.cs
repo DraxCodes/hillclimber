@@ -30,8 +30,10 @@ public enum LogKind
 /// <param name="Raw">The original line exactly as it lives in <c>ClimberState.Logs</c>.</param>
 /// <param name="Timestamp">The <c>HH:mm:ss</c> stamp, or empty when the line carries none.</param>
 /// <param name="Kind">How the line should be rendered.</param>
-/// <param name="Text">The primary display text (meaning depends on <paramref name="Kind"/>).</param>
-/// <param name="ToolName">Tool name for <see cref="LogKind.Tool"/> lines.</param>
+/// <param name="Text">
+/// The primary display text: the message for <see cref="LogKind.Text"/>, the tool name for
+/// <see cref="LogKind.Tool"/>, and the marker/summary for the step and error kinds.
+/// </param>
 /// <param name="ToolInput">One-line summary of the tool input; may be empty.</param>
 /// <param name="ToolOutput">Tool output; may be null.</param>
 public sealed record LogEntry(
@@ -39,7 +41,6 @@ public sealed record LogEntry(
     string Timestamp,
     LogKind Kind,
     string Text,
-    string? ToolName = null,
     string? ToolInput = null,
     string? ToolOutput = null);
 
@@ -133,7 +134,7 @@ public sealed class LogFormatter
             return typeElement.GetString() switch
             {
                 "text" => TextEntry(plain, part),
-                "tool_use" or "tool" => ToolEntry(plain, part),
+                "tool_use" => ToolEntry(plain, part),
                 "step_start" => plain with { Kind = LogKind.StepStart, Text = "step start" },
                 "step_finish" => plain with { Kind = LogKind.StepFinish, Text = SummarizeFinish(part) },
                 "error" => plain with { Kind = LogKind.Error, Text = SummarizeError(root, part) },
@@ -166,7 +167,6 @@ public sealed class LogFormatter
         {
             Kind = LogKind.Tool,
             Text = tool,
-            ToolName = tool,
             ToolInput = input,
             ToolOutput = output,
         };
@@ -181,12 +181,14 @@ public sealed class LogFormatter
 
         var input = 0;
         var output = 0;
+        var reasoning = 0;
         var cacheRead = 0;
 
         if (part.TryGetProperty("tokens", out var tokens) && tokens.ValueKind == JsonValueKind.Object)
         {
             input = GetInt(tokens, "input");
             output = GetInt(tokens, "output");
+            reasoning = GetInt(tokens, "reasoning");
 
             if (tokens.TryGetProperty("cache", out var cache) && cache.ValueKind == JsonValueKind.Object)
             {
@@ -204,16 +206,23 @@ public sealed class LogFormatter
             summary.Append(" (cache ").Append(cacheRead).Append(')');
         }
 
-        return summary.Append(" / out ").Append(output).ToString();
+        summary.Append(" / out ").Append(output);
+
+        if (reasoning > 0)
+        {
+            summary.Append(" · reasoning ").Append(reasoning);
+        }
+
+        return summary.ToString();
     }
 
     private static string SummarizeError(JsonElement root, JsonElement part)
     {
-        var message = GetString(part, "error")
-            ?? GetString(part, "message")
-            ?? GetString(root, "error");
+        var message = GetString(part, "error") ?? GetString(part, "message");
 
-        if (string.IsNullOrWhiteSpace(message) && root.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null)
+        if (string.IsNullOrWhiteSpace(message)
+            && root.TryGetProperty("error", out var error)
+            && error.ValueKind != JsonValueKind.Null)
         {
             message = error.ValueKind == JsonValueKind.String ? error.GetString() : error.GetRawText();
         }

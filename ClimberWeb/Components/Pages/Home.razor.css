@@ -200,8 +200,6 @@
 .log-tool-out {
     margin: 0.2rem 0 0.4rem;
     padding: 0.4rem 0.55rem;
-    max-height: 14rem;
-    overflow-y: auto;
     border-left: 2px solid var(--line-2);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -213,6 +211,10 @@
 .log-event.log-step_start,
 .log-event.log-step_finish {
     color: var(--ink-3);
+}
+
+.log-event.log-error {
+    color: var(--red);
 }
 
 .log::-webkit-scrollbar {

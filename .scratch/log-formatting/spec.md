@@ -90,8 +90,9 @@ rendered exactly as they are today.
 
 - a plain loop line keeps its text and no structured fields;
 - a `text` event yields the text and kind `Text`;
-- a `tool_use` event yields tool name, a non-empty input summary, and the tool
-  output — and does **not** expose `metadata.content` / `rawInput`;
+- a `tool_use` event yields the tool name, a one-line input summary when the event
+  carries primitive input values, and the tool output — and does **not** expose
+  `metadata.content` / `rawInput`;
 - `step_start` and `step_finish` yield their kinds and a non-empty summary;
 - an `error` event yields kind `Error`;
 - malformed JSON, a JSON array, a JSON object without `type`/`part`, and an

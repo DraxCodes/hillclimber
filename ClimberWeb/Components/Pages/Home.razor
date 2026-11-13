@@ -165,7 +165,7 @@ else
                         <span class="log-time">@entry.Timestamp</span>
                         @if (entry.Kind == LogKind.Tool)
                         {
-                            <span class="log-tool-name">⚙ @entry.ToolName</span>
+                            <span class="log-tool-name">⚙ @entry.Text</span>
                             @if (!string.IsNullOrEmpty(entry.ToolInput))
                             {
                                 <span class="log-tool-input">@entry.ToolInput</span>

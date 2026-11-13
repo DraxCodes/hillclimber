@@ -53,7 +53,7 @@ public class LogFormatterTests
         var entry = LogFormatter.Parse(line);
 
         Assert.Equal(LogKind.Tool, entry.Kind);
-        Assert.Equal("shell", entry.ToolName);
+        Assert.Equal("shell", entry.Text);
         Assert.Contains("command=Get-ChildItem -Force", entry.ToolInput);
         Assert.Equal("total 4\ndir A\n", entry.ToolOutput);
     }
@@ -67,7 +67,7 @@ public class LogFormatterTests
 
         var entry = LogFormatter.Parse(line);
 
-        var displayed = string.Concat(entry.Text, entry.ToolName, entry.ToolInput, entry.ToolOutput);
+        var displayed = string.Concat(entry.Text, entry.ToolInput, entry.ToolOutput);
         Assert.DoesNotContain("metadata", displayed);
         Assert.DoesNotContain("rawInput", displayed);
         Assert.DoesNotContain("partID", displayed);
@@ -79,7 +79,7 @@ public class LogFormatterTests
     {
         var start = LogFormatter.Parse(Stamped("{\"type\":\"step_start\",\"part\":{\"type\":\"step-start\"}}"));
         var finish = LogFormatter.Parse(Stamped("""
-            {"type":"step_finish","part":{"type":"step-finish","reason":"stop","cost":0.000208371,"tokens":{"input":221,"output":116,"reasoning":0,"cache":{"read":7296,"write":0}}}}
+            {"type":"step_finish","part":{"type":"step-finish","reason":"stop","cost":0.000208371,"tokens":{"input":221,"output":116,"reasoning":17,"cache":{"read":7296,"write":0}}}}
             """));
 
         Assert.Equal(LogKind.StepStart, start.Kind);
@@ -88,6 +88,21 @@ public class LogFormatterTests
         Assert.Contains("stop", finish.Text);
         Assert.Contains("221", finish.Text);
         Assert.Contains("116", finish.Text);
+        Assert.Contains("reasoning 17", finish.Text);
+    }
+
+    [Fact]
+    public void ToolUseWithOnlyNestedInputLeavesSummaryEmpty()
+    {
+        var line = Stamped("""
+            {"type":"tool_use","part":{"type":"tool","tool":"task","state":{"input":{"options":{"a":1},"list":[1,2]}}}}
+            """);
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Tool, entry.Kind);
+        Assert.Equal("task", entry.Text);
+        Assert.Equal(string.Empty, entry.ToolInput);
     }
 
     [Fact]
@@ -101,6 +116,17 @@ public class LogFormatterTests
         Assert.Equal("boom", entry.Text);
     }
 
+    [Fact]
+    public void ParsesErrorObjectAtTheRoot()
+    {
+        var line = Stamped("{\"type\":\"error\",\"part\":{\"type\":\"error\"},\"error\":{\"message\":\"root failure\"}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Error, entry.Kind);
+        Assert.Contains("root failure", entry.Text);
+    }
+
     [Theory]
     [InlineData("[12:34:56] { not json")]
     [InlineData("[12:34:56] {")]
@@ -109,6 +135,7 @@ public class LogFormatterTests
     [InlineData("[12:34:56] {\"type\":\"text\"}")]
     [InlineData("[12:34:56] {\"type\":\"text\",\"part\":{}}")]
     [InlineData("[12:34:56] {\"type\":\"mystery\",\"part\":{\"type\":\"mystery\"}}")]
+    [InlineData("[12:34:56] {\"type\":\"tool\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\"}}")]
     [InlineData("[12:34:56] completely plain")]
     [InlineData("")]
     public void FallsBackToPlainForAnythingNotAnOpencodeEvent(string line)
