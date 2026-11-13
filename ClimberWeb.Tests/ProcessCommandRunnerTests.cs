@@ -26,6 +26,37 @@ public class ProcessCommandRunnerTests
     }
 
     [Fact]
+    public async Task CancelDuringRun_KillsProcess_AndThrows()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return; // exercises cmd.exe and ping, which are Windows-only
+        }
+
+        using var cts = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var run = _runner.RunAsync(
+            new CommandRequest(
+                "cmd.exe",
+                new[] { "/c", "echo ready & ping -n 30 127.0.0.1 >nul" },
+                Directory.GetCurrentDirectory()),
+            line =>
+            {
+                if (line.Contains("ready", StringComparison.OrdinalIgnoreCase))
+                {
+                    started.TrySetResult();
+                }
+            },
+            cts.Token);
+
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+    }
+
+    [Fact]
     public async Task WorksFromNonExistentWorkingDirectory_ReportsStartFailure()
     {
         // A missing working directory surfaces as an exception from Process.Start.
