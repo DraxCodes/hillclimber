@@ -13,6 +13,10 @@ builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 builder.Services.AddSingleton<IHillClimberService, HillClimberService>();
 builder.Services.AddSingleton<IFileBrowser, FileBrowser>();
 
+// Project status page: git history is read live, coverage/test status comes from the
+// committed artifact under status/.
+builder.Services.AddSingleton<IProjectStatusService, ProjectStatusService>();
+
 // PIN gate: unlock persists for the browser session and slides with activity,
 // expiring after Climber:SessionMinutes (default 30) of inactivity.
 builder.Services.AddSingleton<IClimberAuth>(sp =>
