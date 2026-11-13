@@ -52,6 +52,23 @@ public class ResilienceTests
         }
     }
 
+    [Fact]
+    public void Preflight_RunMethod_DoesNotRequireAGitRepository()
+    {
+        var dir = Directory.CreateTempSubdirectory("climber-preflight-run").FullName;
+        try
+        {
+            var result = new ClimbPreflight().Check(dir, RunMethod.Run);
+
+            Assert.True(result.CanRun);
+            Assert.DoesNotContain(result.Warnings, w => w.Contains("git repository", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     // ---- PATH lookup ---------------------------------------------------------
 
     [Fact]

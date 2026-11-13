@@ -13,9 +13,11 @@ builder.Configuration
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Command execution + hill-climbing loop. Registered as a singleton so a climb keeps
-// running (and stays observable) across page reloads and mobile reconnects.
+// Command execution + runs. Both are singletons so a run keeps running (and stays
+// observable) across page reloads and mobile reconnects: the general opencode run is the
+// default method, and the hillclimb loop wraps the same opencode step.
 builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
+builder.Services.AddSingleton<IRunService, RunService>();
 builder.Services.AddSingleton<IHillClimberService, HillClimberService>();
 builder.Services.AddSingleton<IFileBrowser, FileBrowser>();
 

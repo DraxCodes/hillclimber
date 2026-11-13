@@ -8,24 +8,29 @@ namespace ClimberWeb.Services;
 /// <param name="Warnings">Human-readable problems to surface in the configure panel.</param>
 public sealed record ClimbPreflightResult(bool CanRun, IReadOnlyList<string> Warnings);
 
-/// <summary>Checks a target folder and the required tools before a climb starts.</summary>
+/// <summary>Checks a target folder and the required tools before a run starts.</summary>
 public interface IClimbPreflight
 {
-    /// <summary>Assesses <paramref name="folder"/>. Never throws.</summary>
-    ClimbPreflightResult Check(string? folder);
+    /// <summary>
+    /// Assesses <paramref name="folder"/> for the given <paramref name="method"/>. Never throws.
+    /// Defaults to a hillclimb, which needs the git-repository check and every tool; a plain
+    /// run needs only <c>opencode</c>.
+    /// </summary>
+    ClimbPreflightResult Check(string? folder, RunMethod method = RunMethod.Hillclimb);
 }
 
 /// <summary>
-/// Filesystem + <c>PATH</c> checks that catch the common ways a climb quietly fails:
-/// a folder that does not exist, a target that is not a git repository (so losing
-/// iterations cannot be reverted), and tools that are not installed.
+/// Filesystem + <c>PATH</c> checks that catch the common ways a run quietly fails:
+/// a folder that does not exist, a hillclimb target that is not a git repository (so
+/// losing iterations cannot be reverted), and tools that are not installed.
 /// </summary>
 public sealed class ClimbPreflight : IClimbPreflight
 {
-    private static readonly string[] RequiredTools = ["opencode", "dotnet", "git"];
+    private static readonly string[] RunTools = ["opencode"];
+    private static readonly string[] HillclimbTools = ["opencode", "dotnet", "git"];
 
     /// <inheritdoc />
-    public ClimbPreflightResult Check(string? folder)
+    public ClimbPreflightResult Check(string? folder, RunMethod method = RunMethod.Hillclimb)
     {
         if (string.IsNullOrWhiteSpace(folder))
         {
@@ -39,12 +44,12 @@ public sealed class ClimbPreflight : IClimbPreflight
 
         var warnings = new List<string>();
 
-        if (!LooksLikeGitRepository(folder))
+        if (method == RunMethod.Hillclimb && !LooksLikeGitRepository(folder))
         {
             warnings.Add("Target is not a git repository — a losing iteration cannot be reverted.");
         }
 
-        foreach (var tool in RequiredTools)
+        foreach (var tool in method == RunMethod.Hillclimb ? HillclimbTools : RunTools)
         {
             if (ProcessCommandRunner.FindOnPath(tool) is null)
             {
