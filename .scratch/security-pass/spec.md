@@ -42,7 +42,7 @@ that leak repo and spend data.
 | 2 | HIGH | `/status` and `/activity` unauthenticated; leak git history, paths, issues, key label, spend (`Status.razor:1-3`; `ActivityPage.razor:1-5`) | **Fix inline**: gate both behind the same PIN session. |
 | 3 | MEDIUM | Tool output and prompts logged verbatim at `Information` (`RunService.cs:241`; `HillClimberService.cs:348`) | File issue. |
 | 4 | MEDIUM | PIN and session id travel in cleartext over the LAN (`Program.cs:63`; `App.razor:103-120`) | File issue (TLS out of scope per decision 2). |
-| 5 | LOW | Personal path `C:\Users\joelp\code` committed (`appsettings.json:12`; `Home.razor:425`) | File issue. |
+| 5 | LOW | Personal path `C:\Users\joelp\code` committed (`appsettings.json:12`; `Home.razor:425`) | **Fix inline** (after review): remove the committed path; fall back to the user profile. |
 | 6 | LOW | Unbounded filesystem browse + arbitrary working directory + destructive `git checkout -- .` (`FileBrowser.cs:38-109`; `ProcessCommandRunner.cs:22`; `HillClimberService.cs:293`) | File issue. |
 | 7 | LOW | Configurable OpenRouter base URL can exfiltrate the key (`OpenRouter.cs:36-41`; `OpenRouterClient.cs:167-171`) | File issue. |
 
@@ -50,6 +50,19 @@ Sound (checked, no action): no shell injection (`ArgumentList`, `UseShellExecute
 XSS sinks (no `MarkupString`/`Html.Raw`); no CORS policy (same-origin default); defensive JSON
 parsing; minimal, current dependencies; no real secret in the working tree or git history;
 `appsettings.local.json` gitignored and untracked.
+
+## Best-practice lookup (checked 13 Nov 2026)
+
+- **OWASP Authentication Cheat Sheet** — login throttling, lockout/backoff, avoid default
+  credentials; ASVS V6.1.1/V6.3.1 require anti-automation controls. Supports Finding 1 and
+  the filed throttling issue.
+- **Microsoft Learn — "Threat mitigation guidance for ASP.NET Core Blazor interactive
+  server-side rendering"** — logging/sensitive data, HTTPS in transit, XSS, cross-origin.
+  Supports Findings 3 and 4.
+- **Microsoft Learn — "Configure endpoints for Kestrel"** — `0.0.0.0` binds all IPv4/IPv6
+  interfaces; `localhost` is the safe default. Supports Finding 1.
+- **dotnet/aspnetcore issue #65272 (Feb 2026)** — Blazor Server circuits and identity
+  binding; relevant to the client-supplied session-id model (Finding 4).
 
 ## What it should do
 
@@ -86,29 +99,34 @@ parsing; minimal, current dependencies; no real secret in the working tree or gi
 
 - `dotnet test --nologo` green, with new tests for `ClimberBinding.Resolve` /
   `ResolvePin` / `IsLoopbackOnly`.
-- The free `node scripts/ui/theme-nav.mjs` still passes; the token-spending
+- The free `node scripts/ui/security.mjs` proves the `/status` and `/activity` gate; the
+  free `node scripts/ui/theme-nav.mjs` still passes. The token-spending
   `node scripts/ui/surfaces.mjs` is **not run** unless we choose to spend.
 - Visual check of the locked `/status` and `/activity` panels with the app running.
-- Findings 3–7 (and PIN throttling) exist as tracked issues under
-  `.scratch/security-pass/issues/`.
+- Findings 3, 4, 6, 7 and PIN throttling exist as tracked issues under
+  `.scratch/security-pass/issues/`; Finding 5 is fixed inline.
 
 ## Evidence
 
-- **Tests:** `dotnet test --nologo` → **185 passing** (was 165), 0 failed, 0 skipped. New
-  `ClimberBindingTests` cover the default-PIN fallback, the loopback downgrade, a real PIN
-  keeping the LAN bind, loopback-only lists, unparseable URLs failing closed, and host
-  classification.
-- **Coverage:** `powershell -File scripts/status.ps1` → 185/185, line 63.18%
+- **Tests:** `dotnet test --nologo` → **190 passing** (was 165), 0 failed, 0 skipped. New
+  `ClimberBindingTests` cover the default-PIN fallback, whitespace-padded default PINs, the
+  loopback downgrade, a real PIN keeping the LAN bind, loopback-only lists, unparseable URLs
+  failing closed, and host classification.
+- **Coverage:** `powershell -File scripts/status.ps1` → 190/190, line 62.42%
   (`status/coverage.json` regenerated).
 - **Bind:** starting with the shipped config logs
   `Climber:Pin is the default; listening on http://localhost:5179 only. Set a real PIN to
   expose the dashboard on the LAN.` and listens on `localhost` only.
-- **Browser (free):** `node scripts/ui/theme-nav.mjs` → 3 pages, 0 failures, 0 console
-  errors. A temporary Playwright check (deleted after use) confirmed `/status` and
-  `/activity` show the PIN gate in a fresh context, render no content before unlock, and
-  reveal their content after the PIN. The token-spending `node scripts/ui/surfaces.mjs` was
-  **not run**.
-- **Filed:** findings 3–7 and PIN throttling are tracked under
+- **Browser (free):** `node scripts/ui/security.mjs` → `/status` and `/activity` show the
+  PIN gate in a fresh context, render no content before unlock, and reveal their content
+  after the PIN. `node scripts/ui/theme-nav.mjs` → 3 pages, 0 failures, 0 console errors.
+  The token-spending `node scripts/ui/surfaces.mjs` was **not run**.
+- **Review follow-ups:** the first review found a whitespace-PIN bypass, a gate that did not
+  re-lock on idle, no committed gate test, an undocumented real-PIN path, and the committed
+  personal path. All five are fixed: `ResolvePin` trims, `AuthGate` runs the same heartbeat
+  and expiry watcher as `/`, `scripts/ui/security.mjs` is a committed free check,
+  `appsettings.local.example.json` documents `Climber:Pin`, and the personal path is gone.
+- **Filed:** findings 3, 4, 6, 7 and PIN throttling are tracked under
   `.scratch/security-pass/issues/`.
 
 ## Fixed point for review
