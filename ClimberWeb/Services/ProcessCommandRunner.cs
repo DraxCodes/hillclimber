@@ -18,7 +18,7 @@ public sealed class ProcessCommandRunner : ICommandRunner
 
         var startInfo = new ProcessStartInfo
         {
-            FileName = request.FileName,
+            FileName = ResolveExecutable(request.FileName),
             WorkingDirectory = request.WorkingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -94,6 +94,54 @@ public sealed class ProcessCommandRunner : ICommandRunner
         }
 
         return new CommandResult(process.ExitCode, output, error);
+    }
+
+    /// <summary>
+    /// Turns a bare command name into a full path on Windows. <see cref="Process.Start(ProcessStartInfo)"/>
+    /// only appends <c>.exe</c> when resolving a name, so command-line shims such as the npm-installed
+    /// <c>opencode.cmd</c> are invisible to it even though they are on <c>PATH</c>. We search
+    /// <c>PATH</c> with <c>PATHEXT</c> ourselves so those shims launch.
+    /// </summary>
+    private static string ResolveExecutable(string fileName)
+    {
+        if (!OperatingSystem.IsWindows()
+            || Path.IsPathRooted(fileName)
+            || fileName.Contains(Path.DirectorySeparatorChar)
+            || fileName.Contains(Path.AltDirectorySeparatorChar))
+        {
+            return fileName;
+        }
+
+        var path = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrEmpty(path))
+        {
+            return fileName;
+        }
+
+        var extensions = (Environment.GetEnvironmentVariable("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        // A name that already ends in a known executable extension is passed through;
+        // anything else (including dotted names with no real extension) is searched.
+        if (extensions.Any(extension => fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase)))
+        {
+            return fileName;
+        }
+
+        foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var folder = directory.Trim('"');
+            foreach (var extension in extensions)
+            {
+                var candidate = Path.Combine(folder, fileName + extension);
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return fileName;
     }
 
     private static void TryKill(Process process)
