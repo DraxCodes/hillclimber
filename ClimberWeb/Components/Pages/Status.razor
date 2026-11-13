@@ -4,6 +4,7 @@
 
 <PageTitle>status · hillclimber</PageTitle>
 
+<AuthGate OnUnlocked="LoadAsync">
 @if (_report is null)
 {
     <section class="panel">
@@ -233,6 +234,7 @@ else
         </p>
     </section>
 }
+</AuthGate>
 
 @code {
     private const int BarWidth = 22;
@@ -251,7 +253,7 @@ else
     private string CadenceLabel =>
         $"Commit cadence: {_report?.Cadence.Sum(b => b.Count) ?? 0} commits across {_report?.Cadence.Count ?? 0} buckets";
 
-    protected override async Task OnInitializedAsync()
+    private async Task LoadAsync()
     {
         _report = await ProjectStatus.GetStatusAsync();
     }

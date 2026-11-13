@@ -1,0 +1,107 @@
+@inject IClimberAuth Auth
+@inject IJSRuntime JS
+
+@if (!_checked)
+{
+    <section class="panel auth">
+        <div class="panel-head">
+            <span class="idx">[00]</span>
+            <span class="panel-title">session</span>
+        </div>
+        <p class="lede">Establishing session…</p>
+    </section>
+}
+else if (!_unlocked)
+{
+    <section class="panel auth">
+        <div class="panel-head">
+            <span class="idx">[01]</span>
+            <span class="panel-title">authenticate</span>
+        </div>
+        <p class="lede">Enter the access PIN to view this page.</p>
+
+        <label class="label" for="pin">pin</label>
+        <input id="pin"
+               class="input"
+               type="password"
+               inputmode="numeric"
+               autocomplete="off"
+               @bind="_pin"
+               @bind:event="oninput"
+               @onkeydown="OnPinKeyDown" />
+
+        @if (_error is not null)
+        {
+            <p class="notice notice-bad" role="alert">@_error</p>
+        }
+
+        <button class="btn btn-primary btn-wide auth-go" @onclick="Unlock">unlock →</button>
+    </section>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Invoked once the session is unlocked, so the page can load its data.</summary>
+    [Parameter] public EventCallback OnUnlocked { get; set; }
+
+    private bool _checked;
+    private bool _unlocked;
+    private string? _sessionId;
+    private string _pin = string.Empty;
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            _sessionId = await JS.InvokeAsync<string>("climberAuth.sessionId");
+        }
+        catch (JSDisconnectedException)
+        {
+            return;
+        }
+
+        _unlocked = Auth.IsUnlocked(_sessionId);
+        _checked = true;
+
+        if (_unlocked)
+        {
+            await OnUnlocked.InvokeAsync();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task Unlock()
+    {
+        if (_sessionId is not null && Auth.TryUnlock(_sessionId, _pin))
+        {
+            _unlocked = true;
+            _error = null;
+            _pin = string.Empty;
+            await OnUnlocked.InvokeAsync();
+        }
+        else
+        {
+            _error = "Incorrect PIN.";
+        }
+    }
+
+    private async Task OnPinKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await Unlock();
+        }
+    }
+}

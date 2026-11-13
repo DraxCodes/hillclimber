@@ -6,6 +6,7 @@
 
 <PageTitle>activity · hillclimber</PageTitle>
 
+<AuthGate OnUnlocked="LoadAsync">
 @if (_report is null)
 {
     <section class="panel">
@@ -193,6 +194,7 @@ else
         </p>
     </section>
 }
+</AuthGate>
 
 @code {
     private const int BarWidth = 18;
@@ -221,10 +223,14 @@ else
 
     private double DailyMax => _daily.Count > 0 ? _daily.Max(b => b.Usage) : 0d;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         _climb = Climber.State;
         Climber.StateChanged += OnStateChanged;
+    }
+
+    private async Task LoadAsync()
+    {
         _report = await OpenRouter.GetSpendAsync();
         (_daily, _models) = Summarize(_report.Activity);
     }
