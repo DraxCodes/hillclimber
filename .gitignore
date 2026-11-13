@@ -64,3 +64,9 @@ secrets/
 *.key
 *.pfx
 *.p12
+
+# ---------------------------------------------------------------------------
+# OpenCode engineering pack (generated; reinstall with the pack script)
+# ---------------------------------------------------------------------------
+.agents/skills/
+skills-lock.json
