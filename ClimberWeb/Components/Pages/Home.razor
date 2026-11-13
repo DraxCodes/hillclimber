@@ -5,6 +5,8 @@
 @inject IConfiguration Config
 @inject IFileBrowser Browser
 @inject IClimberAuth Auth
+@inject IOpenRouterClient OpenRouter
+@inject IClimbPreflight Preflight
 @inject IJSRuntime JS
 
 <PageTitle>hillclimber</PageTitle>
@@ -55,6 +57,18 @@ else
         {
             <span class="status-msg">@_state.Message</span>
         }
+    </section>
+
+    <section class="spendline" aria-label="OpenRouter connection and spend">
+        <span class="conn">
+            <span class="dot @SpendDotClass" aria-hidden="true"></span>
+            <span>openrouter: @SpendConnLabel</span>
+        </span>
+        <span class="spend-sep" aria-hidden="true">/</span>
+        <span class="spend-item">this climb <b>@Usd((double)_state.SpendUsd)</b></span>
+        <span class="spend-sep" aria-hidden="true">/</span>
+        <span class="spend-item">total <b>@TotalSpendLabel</b></span>
+        <a class="spend-more" href="/activity">activity →</a>
     </section>
 
     <dl class="telemetry" aria-label="Climb telemetry">
@@ -136,6 +150,11 @@ else
         @if (_error is not null)
         {
             <p class="notice notice-bad" role="alert">@_error</p>
+        }
+
+        @foreach (var warning in _preflightWarnings)
+        {
+            <p class="notice notice-info" role="status">@warning</p>
         }
 
         <div class="btn-row">
@@ -272,6 +291,8 @@ else
     private string? _sessionId;
     private DotNetObjectReference<Home>? _selfRef;
     private CancellationTokenSource? _expiryCts;
+    private SpendReport? _spend;
+    private IReadOnlyList<string> _preflightWarnings = Array.Empty<string>();
 
     private bool IsRunning => _state.Status == ClimberStatus.Running;
 
@@ -279,6 +300,21 @@ else
 
     private string DefaultFolder =>
         Config["Climber:DefaultFolder"] is { Length: > 0 } folder ? folder : @"C:\Users\joelp\code";
+
+    private string SpendDotClass => _spend is null || !_spend.Connection.Configured
+        ? "dot-off"
+        : _spend.Connection.Connected ? "dot-ok" : "dot-bad";
+
+    private string SpendConnLabel => _spend is null
+        ? "checking…"
+        : !_spend.Connection.Configured
+            ? "not configured"
+            : _spend.Connection.Connected ? "connected" : "not connected";
+
+    private string TotalSpendLabel => _spend?.Account is { } account ? Usd(account.TotalUsage) : "—";
+
+    private static string Usd(double? value) =>
+        value is not { } amount ? "—" : "$" + (amount is > 0 and < 1 ? amount.ToString("0.######") : amount.ToString("0.00"));
 
     private string StatusText => _state.Status switch
     {
@@ -329,7 +365,7 @@ else
         return string.Empty;
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _state = Climber.State;
         Climber.StateChanged += OnStateChanged;
@@ -338,14 +374,40 @@ else
         {
             _folderPath = DefaultFolder;
         }
+
+        _spend = await OpenRouter.GetSpendAsync();
     }
 
     private void OnStateChanged(ClimberState state)
     {
+        var wasRunning = _state.Status == ClimberStatus.Running;
         _state = state;
         try
         {
             _ = InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The circuit is gone; nothing left to update.
+        }
+
+        // The account total moves once a run spends something; refresh when it finishes.
+        if (wasRunning && state.Status != ClimberStatus.Running)
+        {
+            _ = RefreshSpendAsync();
+        }
+    }
+
+    private async Task RefreshSpendAsync()
+    {
+        var report = await OpenRouter.GetSpendAsync();
+        try
+        {
+            await InvokeAsync(() =>
+            {
+                _spend = report;
+                StateHasChanged();
+            });
         }
         catch (ObjectDisposedException)
         {

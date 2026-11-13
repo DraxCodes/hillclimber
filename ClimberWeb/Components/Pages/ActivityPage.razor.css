@@ -1,0 +1,195 @@
+/* Activity page — self-contained styles on the shared tokens in app.css. */
+
+.lede {
+    margin: 0 0 0.9rem;
+    color: var(--ink-2);
+    font-size: 0.9rem;
+}
+
+code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.05rem 0.3rem;
+}
+
+.panel {
+    margin-bottom: 0.9rem;
+}
+
+/* Connection -------------------------------------------------------------- */
+
+.conn-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+}
+
+.dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    flex: none;
+    background: var(--ink-3);
+}
+
+.dot-ok {
+    background: var(--green);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent);
+}
+
+.dot-bad {
+    background: var(--red);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent);
+}
+
+.dot-off {
+    background: var(--ink-3);
+}
+
+.conn-state {
+    color: var(--ink);
+}
+
+.chip {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    color: var(--ink-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.12rem 0.4rem;
+}
+
+/* Spend figures ----------------------------------------------------------- */
+
+.spend-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.9rem;
+}
+
+.spend-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.spend-num {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 1.4rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.spend-lbl {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-3);
+}
+
+/* Chart ------------------------------------------------------------------- */
+
+.chart {
+    overflow-x: auto;
+}
+
+.chart svg {
+    display: block;
+}
+
+.chart-labels {
+    display: flex;
+    margin-top: 0.25rem;
+}
+
+.chart-tick {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--ink-3);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.axis {
+    stroke: var(--line);
+    stroke-width: 1;
+}
+
+.bar {
+    fill: var(--accent);
+    opacity: 0.85;
+}
+
+.bar-group:hover .bar {
+    opacity: 1;
+}
+
+/* Per-model --------------------------------------------------------------- */
+
+.models {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.model {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.84rem;
+}
+
+.model:last-child {
+    border-bottom: 0;
+}
+
+.model-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.model-metric {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.model-cost {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Misc -------------------------------------------------------------------- */
+
+.footnote {
+    margin: 0.9rem 0 0;
+    font-size: 0.74rem;
+    line-height: 1.5;
+}
+
+.empty {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-3);
+}

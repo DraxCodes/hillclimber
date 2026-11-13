@@ -1,0 +1,284 @@
+@page "/activity"
+@rendermode InteractiveServer
+@implements IDisposable
+@inject IOpenRouterClient OpenRouter
+@inject IHillClimberService Climber
+
+<PageTitle>activity · hillclimber</PageTitle>
+
+@if (_report is null)
+{
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[00]</span>
+            <span class="panel-title">activity</span>
+        </div>
+        <p class="lede">Checking OpenRouter…</p>
+    </section>
+}
+else
+{
+    <p class="lede">OpenRouter connection and spend — read-only.</p>
+
+    @foreach (var note in _report.Notes)
+    {
+        <p class="notice notice-info" role="status">@note</p>
+    }
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[00]</span>
+            <span class="panel-title">connection</span>
+            <span class="panel-meta">@_report.Connection.KeyLabel</span>
+        </div>
+        <div class="conn-line">
+            <span class="dot @DotClass" aria-hidden="true"></span>
+            <span class="conn-state">@ConnectionLabel</span>
+            @if (_report.Connection.IsFreeTier && _report.Connection.Connected)
+            {
+                <span class="chip">free tier</span>
+            }
+        </div>
+
+        @if (_report.Connection.Connected)
+        {
+            <div class="spend-row">
+                <div class="spend-stat">
+                    <span class="spend-num">@Usd(_report.Connection.Usage)</span>
+                    <span class="spend-lbl">key spend</span>
+                </div>
+                <div class="spend-stat">
+                    <span class="spend-num">@Usd(_report.Connection.Limit)</span>
+                    <span class="spend-lbl">key limit</span>
+                </div>
+                <div class="spend-stat">
+                    <span class="spend-num">@Usd(_report.Connection.LimitRemaining)</span>
+                    <span class="spend-lbl">remaining</span>
+                </div>
+            </div>
+        }
+        else if (_report.Connection.Message is { } message)
+        {
+            <p class="empty">@message</p>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[01]</span>
+            <span class="panel-title">account spend</span>
+        </div>
+        @if (_report.Account is not { } account)
+        {
+            <p class="empty">Account total is unavailable — a management key is required.</p>
+        }
+        else
+        {
+            <div class="spend-row">
+                <div class="spend-stat">
+                    <span class="spend-num">@Usd(account.TotalUsage)</span>
+                    <span class="spend-lbl">total spent</span>
+                </div>
+                <div class="spend-stat">
+                    <span class="spend-num">@Usd(account.TotalCredits)</span>
+                    <span class="spend-lbl">credits purchased</span>
+                </div>
+                <div class="spend-stat">
+                    <span class="spend-num">@Usd(account.Remaining)</span>
+                    <span class="spend-lbl">remaining</span>
+                </div>
+            </div>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[02]</span>
+            <span class="panel-title">activity</span>
+            <span class="panel-meta">@_report.Activity.Count rows</span>
+        </div>
+        @if (_daily.Count == 0)
+        {
+            <p class="empty">No activity in the last 30 days.</p>
+        }
+        else
+        {
+            <div class="chart">
+                <svg viewBox="@($"0 0 {ChartWidth} {ChartHeight}")"
+                     width="@ChartWidth" height="@ChartHeight"
+                     preserveAspectRatio="xMidYMid meet"
+                     role="img"
+                     aria-label="@($"OpenRouter spend across {_daily.Count} day(s)")">
+                    <line class="axis" x1="0" y1="@Baseline" x2="@ChartWidth" y2="@Baseline" />
+                    @for (var i = 0; i < _daily.Count; i++)
+                    {
+                        var bucket = _daily[i];
+                        var barHeight = DailyMax == 0 ? 0 : bucket.Usage / DailyMax * (Baseline - TopPad);
+                        var x = i * Step + BarGap;
+                        var y = Baseline - barHeight;
+                        <g class="bar-group">
+                            <title>@($"{bucket.Label}: {Usd(bucket.Usage)}")</title>
+                            <rect class="bar" x="@x" y="@y" width="@BarWidth" height="@barHeight" rx="2" />
+                        </g>
+                    }
+                </svg>
+                <div class="chart-labels" style="@($"width: {ChartWidth}px")">
+                    @for (var i = 0; i < _daily.Count; i++)
+                    {
+                        <span class="chart-tick" style="@($"width: {Step}px")">@(ShowLabel(i) ? _daily[i].Label : string.Empty)</span>
+                    }
+                </div>
+            </div>
+        }
+    </section>
+
+    <section class="panel panel-flush">
+        <div class="panel-head">
+            <span class="idx">[03]</span>
+            <span class="panel-title">by model</span>
+            <span class="panel-meta">@_models.Count models</span>
+        </div>
+        @if (_models.Count == 0)
+        {
+            <p class="empty" style="padding: 0.9rem 1rem;">No per-model activity.</p>
+        }
+        else
+        {
+            <ul class="models">
+                @foreach (var model in _models)
+                {
+                    <li class="model">
+                        <span class="model-name mono">@model.Model</span>
+                        <span class="model-metric">@model.Requests req</span>
+                        <span class="model-metric">@Tokens(model.PromptTokens + model.CompletionTokens) tok</span>
+                        <span class="model-cost mono">@Usd(model.Usage)</span>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[04]</span>
+            <span class="panel-title">this climb</span>
+            <span class="panel-meta">@ClimbStatusLabel</span>
+        </div>
+        <div class="spend-row">
+            <div class="spend-stat">
+                <span class="spend-num">@Usd((double)ClimbSpend)</span>
+                <span class="spend-lbl">spent this climb</span>
+            </div>
+            <div class="spend-stat">
+                <span class="spend-num">@ClimbBest</span>
+                <span class="spend-lbl">best score</span>
+            </div>
+        </div>
+        <p class="footnote dim">
+            Summed live from opencode's own <code class="mono">step_finish</code> costs. Runs are not
+            persisted, so this reflects the current/last run only.
+        </p>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[05]</span>
+            <span class="panel-title">saved with skills</span>
+        </div>
+        <p class="empty">Not measured.</p>
+        <p class="footnote dim">
+            There is no honest baseline for what the same work would have cost without the skills,
+            so no number is invented here. Matches how <a href="/status">status</a> treats per-change model.
+        </p>
+    </section>
+}
+
+@code {
+    private const int BarWidth = 18;
+    private const int Step = 30;
+    private const int BarGap = 3;
+    private const int TopPad = 8;
+    private const int Baseline = 96;
+    private const int ChartHeight = 104;
+
+    private SpendReport? _report;
+    private ClimberState _climb = new();
+
+    private decimal ClimbSpend => _climb.SpendUsd;
+
+    private int ClimbBest => _climb.BestScore;
+
+    private string ClimbStatusLabel => _climb.Status.ToString().ToLowerInvariant();
+
+    private string DotClass => !_report!.Connection.Configured
+        ? "dot-off"
+        : _report.Connection.Connected ? "dot-ok" : "dot-bad";
+
+    private string ConnectionLabel => !_report!.Connection.Configured
+        ? "not configured"
+        : _report.Connection.Connected ? "connected" : "not connected";
+
+    private IReadOnlyList<DailySpend> _daily = Array.Empty<DailySpend>();
+
+    private IReadOnlyList<ModelSpend> _models = Array.Empty<ModelSpend>();
+
+    private int ChartWidth => Math.Max(1, _daily.Count * Step + BarGap * 2);
+
+    private double DailyMax => _daily.Count > 0 ? _daily.Max(b => b.Usage) : 0d;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _climb = Climber.State;
+        Climber.StateChanged += OnStateChanged;
+        _report = await OpenRouter.GetSpendAsync();
+        (_daily, _models) = Summarize(_report.Activity);
+    }
+
+    private void OnStateChanged(ClimberState state)
+    {
+        _climb = state;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>Aggregates rows into a contiguous daily series and a per-model rollup.</summary>
+    private static (IReadOnlyList<DailySpend> Days, IReadOnlyList<ModelSpend> Models) Summarize(
+        IReadOnlyList<OpenRouterActivityRow> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return (Array.Empty<DailySpend>(), Array.Empty<ModelSpend>());
+        }
+
+        var byDay = rows.GroupBy(r => r.Date).OrderBy(g => g.Key)
+            .Select(g => new DailySpend(g.Key, g.Key.ToString("MMM d", System.Globalization.CultureInfo.InvariantCulture), g.Sum(r => r.Usage)))
+            .ToArray();
+
+        var byModel = rows.GroupBy(r => r.Model)
+            .Select(g => new ModelSpend(g.Key, g.Sum(r => r.Requests), g.Sum(r => r.PromptTokens), g.Sum(r => r.CompletionTokens), g.Sum(r => r.Usage)))
+            .OrderByDescending(m => m.Usage)
+            .ToArray();
+
+        return (byDay, byModel);
+    }
+
+    private bool ShowLabel(int index)
+    {
+        var every = Math.Max(1, (int)Math.Ceiling(_daily.Count / 8d));
+        return index % every == 0 || index == _daily.Count - 1;
+    }
+
+    private static string Usd(double? value) =>
+        value is not { } amount ? "—" : "$" + FormatAmount(amount);
+
+    private static string FormatAmount(double amount) =>
+        amount is > 0 and < 1 ? amount.ToString("0.######") : amount.ToString("0.00");
+
+    private static string Tokens(long value) =>
+        value >= 1000 ? $"{value / 1000.0:0.#}k" : value.ToString();
+
+    public void Dispose() => Climber.StateChanged -= OnStateChanged;
+
+    private sealed record DailySpend(DateOnly Date, string Label, double Usage);
+
+    private sealed record ModelSpend(string Model, int Requests, long PromptTokens, long CompletionTokens, double Usage);
+}
