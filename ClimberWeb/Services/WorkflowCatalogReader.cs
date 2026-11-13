@@ -29,6 +29,21 @@ public static partial class WorkflowCatalogReader
     [GeneratedRegex(@"^\s*mode\s*:\s*(\S+)", RegexOptions.Multiline)]
     private static partial Regex ModeLine();
 
+    [GeneratedRegex(@"^\s*display_name\s*:\s*(.+)$", RegexOptions.Multiline)]
+    private static partial Regex DisplayNameLine();
+
+    /// <summary>Friendly name for an agent id: the id title-cased (e.g. <c>plan-architect</c> → <c>Plan Architect</c>), or <c>Main</c> when empty.</summary>
+    public static string DisplayName(string? agentId)
+    {
+        if (string.IsNullOrWhiteSpace(agentId))
+        {
+            return "Main";
+        }
+
+        var words = agentId.Split('-', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', words.Select(word => char.ToUpperInvariant(word[0]) + word[1..]));
+    }
+
     /// <summary>Builds the catalog from the repository at <paramref name="repoRoot"/>.</summary>
     public static WorkflowCatalog Read(string repoRoot)
     {
@@ -107,7 +122,11 @@ public static partial class WorkflowCatalogReader
             ? modeMatch.Groups[1].Value.Trim()
             : string.Empty;
 
-        return new WorkflowRole(name, description, model, DeniesEdits(content), mode);
+        var displayName = DisplayNameLine().Match(content) is { Success: true } displayMatch
+            ? displayMatch.Groups[1].Value.Trim()
+            : DisplayName(name);
+
+        return new WorkflowRole(name, description, model, DeniesEdits(content), mode, displayName);
     }
 
     /// <summary>

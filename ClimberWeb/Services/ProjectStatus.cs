@@ -75,7 +75,8 @@ public sealed record TrackedIssue(string Feature, int Number, string FileName, s
 /// <param name="Model">Model id from the front-matter, or empty when unset.</param>
 /// <param name="ReadOnly">True when the agent denies edits.</param>
 /// <param name="Mode">Front-matter <c>mode</c> (e.g. <c>primary</c>, <c>subagent</c>), or empty when unset.</param>
-public sealed record WorkflowRole(string Name, string Description, string Model, bool ReadOnly, string Mode)
+/// <param name="DisplayName">Friendly name for the UI (front-matter <c>display_name</c>, else a title-cased id).</param>
+public sealed record WorkflowRole(string Name, string Description, string Model, bool ReadOnly, string Mode, string DisplayName)
 {
     /// <summary>True when the front-matter marks the agent <c>mode: primary</c>.</summary>
     public bool IsPrimary => string.Equals(Mode, "primary", StringComparison.OrdinalIgnoreCase);

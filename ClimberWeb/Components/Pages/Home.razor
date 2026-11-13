@@ -234,18 +234,15 @@ else
             <span class="panel-title">output</span>
             <span class="panel-meta">@ActiveLogs.Count lines</span>
         </div>
-        @if (SubAgentNames.Count > 0)
-        {
-            <div class="outtabs" role="tablist" aria-label="Output stream">
-                <button class="outtab @(_outputTab == MainTab ? "active" : string.Empty)" type="button"
-                        role="tab" aria-selected="@(_outputTab == MainTab)" @onclick="() => SelectOutputTab(MainTab)">main</button>
-                @foreach (var name in SubAgentNames)
-                {
-                    <button class="outtab @(_outputTab == name ? "active" : string.Empty)" type="button"
-                            role="tab" aria-selected="@(_outputTab == name)" @onclick="() => SelectOutputTab(name)">@name</button>
-                }
-            </div>
-        }
+        <div class="outtabs" role="tablist" aria-label="Output stream">
+            <button class="outtab @(_outputTab == PrimaryTab ? "active" : string.Empty)" type="button"
+                    role="tab" aria-selected="@(_outputTab == PrimaryTab)" @onclick="() => SelectOutputTab(PrimaryTab)">@PrimaryTabLabel</button>
+            @foreach (var name in SubAgentNames)
+            {
+                <button class="outtab @(_outputTab == name ? "active" : string.Empty)" type="button"
+                        role="tab" aria-selected="@(_outputTab == name)" @onclick="() => SelectOutputTab(name)">@SubLabel(name)</button>
+            }
+        </div>
         <div class="log" id="log-feed">
             @foreach (var entry in VisibleEntries)
             {
@@ -254,7 +251,7 @@ else
                 {
                     <div class="log-line @css">@entry.Raw</div>
                 }
-                else if (entry.Kind == LogKind.Subagent && _outputTab == MainTab)
+                else if (entry.Kind == LogKind.Subagent && _outputTab == PrimaryTab)
                 {
                     <div class="log-line @css log-event log-subagent-ref">
                         <span class="log-time">@entry.Timestamp</span>
@@ -383,7 +380,7 @@ else
     private string _prompt = string.Empty;
     private AgentSelection _agents = new(Array.Empty<WorkflowRole>(), null);
     private IReadOnlyList<LogEntry> _entries = Array.Empty<LogEntry>();
-    private string _outputTab = MainTab;
+    private string _outputTab = PrimaryTab;
     private int _maxIterations = 5;
     private string _pinInput = string.Empty;
     private string? _pinError;
@@ -475,8 +472,19 @@ else
         _ => ActiveStatus.ToString(),
     };
 
-    /// <summary>The tab that shows the combined stream; subagent tabs are named by agent.</summary>
-    private const string MainTab = "main";
+    /// <summary>The tab that shows the combined stream; subagent tabs are keyed by agent id.</summary>
+    private const string PrimaryTab = "primary";
+
+    /// <summary>Friendly label for the primary tab: the running agent's name, or "Main" when none resolved.</summary>
+    private string PrimaryTabLabel =>
+        _agents.DefaultAgent is { Length: > 0 } agent ? RoleLabel(agent) : "Main";
+
+    /// <summary>Friendly label for a subagent tab, from the resolved role or a title-cased id.</summary>
+    private string SubLabel(string agentId) => RoleLabel(agentId);
+
+    private string RoleLabel(string agentId) =>
+        _agents.Roles.FirstOrDefault(role => string.Equals(role.Name, agentId, StringComparison.OrdinalIgnoreCase))?.DisplayName
+        ?? WorkflowCatalogReader.DisplayName(agentId);
 
     /// <summary>Subagent names seen in this run, in first-seen order; one tab each.</summary>
     private IReadOnlyList<string> SubAgentNames => _entries
@@ -485,8 +493,8 @@ else
         .Distinct(StringComparer.Ordinal)
         .ToArray();
 
-    /// <summary>The entries for the selected tab: everything for "main", one agent's calls otherwise.</summary>
-    private IReadOnlyList<LogEntry> VisibleEntries => _outputTab == MainTab
+    /// <summary>The entries for the selected tab: everything for the primary tab, one agent's calls otherwise.</summary>
+    private IReadOnlyList<LogEntry> VisibleEntries => _outputTab == PrimaryTab
         ? _entries
         : _entries
             .Where(entry => entry.Kind == LogKind.Subagent && string.Equals(entry.Text, _outputTab, StringComparison.Ordinal))
@@ -620,7 +628,7 @@ else
         _method = method;
         _error = null;
         _preflightWarnings = Array.Empty<string>();
-        _outputTab = MainTab;
+        _outputTab = PrimaryTab;
         RebuildEntries();
     }
 
@@ -754,7 +762,7 @@ else
     {
         _error = null;
         _preflightWarnings = Array.Empty<string>();
-        _outputTab = MainTab;
+        _outputTab = PrimaryTab;
 
         var folder = _folderPath.Trim();
         var preflight = Preflight.Check(folder, _method);

@@ -150,6 +150,8 @@ await start();
 await settle();
 check('run starts and settles', ['running', 'completed', 'stopped', 'failed'].includes(await status()), await status());
 check('run live output panel fills', (await page.locator('.log-line').count()) > 0);
+const primaryTab = (await page.locator('.outtab').first().innerText()).toLowerCase();
+check('output labels the running agent', primaryTab.includes('orchestrator') || primaryTab.includes('main'), primaryTab);
 await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});
 await page.waitForTimeout(1200);
 check('run stop returns to a settled state', ['stopped', 'completed', 'failed', 'idle'].includes(await status()));

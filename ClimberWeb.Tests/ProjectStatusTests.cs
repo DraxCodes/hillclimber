@@ -285,6 +285,17 @@ public class ProjectStatusTests
         Assert.False(subagent.IsPrimary);
     }
 
+    [Fact]
+    public void WorkflowReader_ReadsDisplayNameFallingBackToTitleCase()
+    {
+        var named = WorkflowCatalogReader.ParseAgent("task-orchestrator", "display_name: Orchestrator\nmode: primary");
+        var derived = WorkflowCatalogReader.ParseAgent("security-auditor", "mode: subagent");
+
+        Assert.Equal("Orchestrator", named.DisplayName);
+        Assert.Equal("Security Auditor", derived.DisplayName);
+        Assert.Equal("Main", WorkflowCatalogReader.DisplayName(null));
+    }
+
     // ---- root resolution -----------------------------------------------------
 
     [Fact]
