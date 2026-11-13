@@ -97,7 +97,22 @@ without changing the visual design or the existing hillclimb behaviour.
 
 ## Evidence
 
-_(filled after implementation.)_
+- **Tests:** `dotnet test --nologo` → **148 passing** (was 135): 12 new `RunServiceTests`
+  cases (streaming, spend, cancel, one-at-a-time, empty input, missing tool, non-zero exit,
+  exception, log trim, event sequence) plus 1 method-aware pre-flight case.
+- **Shared plumbing:** the loop's tests are unchanged and still pass, and `RunMetrics.Add`
+  is covered directly; the loop now maps `RunMetrics` into `ClimberState`.
+- **Browser:** `node scripts/ui/surfaces.mjs` → **39 checks, 0 failures, 0 console errors**,
+  now covering the method switch (run is default, hillclimb reveals max iterations, prompts
+  validate per method) and a real short run that completed
+  (`step_finish` `Hello!`, spend `$0.008654`), plus the existing climb start/stop.
+  `node scripts/ui/theme-nav.mjs` → theme preserved across `/`, `/activity`, `/status`,
+  0 failures.
+- **Visual:** `home.png` and `hillclimb.png` screenshots confirm the design is unchanged —
+  run mode shows status · this run's spend · tokens · elapsed with a model chip, hillclimb
+  mode keeps iteration / best score / last run. Sample data was real short runs, so there
+  was no seed to remove.
+- **Coverage:** `powershell -File scripts/status.ps1` → 148/148, ~62% line.
 
 ## Fixed point for review
 
