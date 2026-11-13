@@ -58,6 +58,23 @@ public class HillClimberServiceTests
     }
 
     [Fact]
+    public async Task OpenCodeNonZeroExit_IsLogged_AndRunCompletes()
+    {
+        var runner = new FakeCommandRunner((request, _) => request.FileName switch
+        {
+            "opencode" => CannedResults.OpenCode(exitCode: 1),
+            "dotnet" => CannedResults.Tests(2),
+            _ => CannedResults.Git(),
+        });
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(Options(max: 1));
+
+        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Contains(service.State.Logs, line => line.Contains("opencode exited with code 1"));
+    }
+
+    [Fact]
     public async Task RegressingIteration_RevertsWorkingChanges()
     {
         var runner = RunnerWithScores(5, 3);
