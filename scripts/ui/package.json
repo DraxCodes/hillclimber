@@ -1,0 +1,14 @@
+{
+  "name": "climberweb-ui-checks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser regression checks for ClimberWeb, run against a live server.",
+  "type": "module",
+  "scripts": {
+    "theme-nav": "node theme-nav.mjs"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "playwright": "^1.65.0"
+  }
+}
