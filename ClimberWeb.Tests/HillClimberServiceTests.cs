@@ -75,6 +75,23 @@ public class HillClimberServiceTests
     }
 
     [Fact]
+    public async Task DotnetNonZeroExit_IsLogged_AndRunCompletes()
+    {
+        var runner = new FakeCommandRunner((request, _) => request.FileName switch
+        {
+            "opencode" => CannedResults.OpenCode(),
+            "dotnet" => CannedResults.Tests(2, exitCode: 1),
+            _ => CannedResults.Git(),
+        });
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(Options(max: 1));
+
+        Assert.Equal(ClimberStatus.Completed, service.State.Status);
+        Assert.Contains(service.State.Logs, line => line.Contains("dotnet test exited with code 1"));
+    }
+
+    [Fact]
     public async Task UnexpectedException_MarksRunAsFailed()
     {
         var runner = new FakeCommandRunner((request, _) =>

@@ -211,6 +211,11 @@ public sealed class HillClimberService : IHillClimberService
 
                 cancellationToken.ThrowIfCancellationRequested();
 
+                if (testRun.ExitCode != 0)
+                {
+                    Log($"[dotnet test exited with code {testRun.ExitCode}]");
+                }
+
                 var parsed = TestResultParser.Parse(Combine(testRun));
                 if (parsed is null)
                 {
