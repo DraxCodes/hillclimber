@@ -5,10 +5,10 @@
 //   node surfaces.mjs
 //   BASE_URL=http://localhost:5179 node surfaces.mjs
 //
-// It drives the PIN gate, folder picker, climb controls, theme toggle, the live output
-// panel, and the /status and /activity pages, and writes one screenshot per page. The
-// climb it starts is stopped immediately, so it does not spend meaningfully. Exit code
-// is non-zero on any failure.
+// It drives the PIN gate, the run|hillclimb method switch, the folder picker, the run
+// and climb controls, the theme toggle, the live output panel, and the /status and
+// /activity pages, and writes one screenshot per page. The runs it starts are stopped
+// immediately, so they do not spend meaningfully. Exit code is non-zero on any failure.
 
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -41,6 +41,9 @@ const setField = async (sel, value) => {
   await page.locator(sel).blur();
   await page.waitForTimeout(120);
 };
+const status = async () => (await page.locator('.status-word').innerText()).toLowerCase();
+const start = async () => page.locator('.btn-row .btn', { hasText: 'start' }).first().click();
+const settle = async () => page.waitForTimeout(2500);
 
 // --- PIN gate -------------------------------------------------------------
 await page.goto(BASE, { waitUntil: 'networkidle' });
@@ -60,27 +63,46 @@ check('correct PIN unlocks the dashboard', (await page.locator('.telemetry').cou
 check('spend line is present', (await page.locator('.spendline').count()) === 1);
 check('spend line shows a connection state', (await page.locator('.spendline .conn').innerText()).toLowerCase().includes('openrouter'));
 
-// --- controls: existence + labels ----------------------------------------
-for (const sel of ['#folder', '#goal', '#max']) {
+// --- method switch --------------------------------------------------------
+check('method switch is present', (await page.locator('.methodbar .method').count()) === 2);
+check('run is the default method', (await page.locator('.method.active').innerText()).toLowerCase() === 'run');
+
+// --- run-mode controls ----------------------------------------------------
+for (const sel of ['#folder', '#prompt']) {
   check(`control ${sel} exists`, (await page.locator(sel).count()) === 1);
 }
+check('run mode hides max iterations', (await page.locator('#max').count()) === 0);
+check('model is displayed', (await page.locator('.model-line .chip').count()) === 1);
 check('start/stop/lock buttons exist', (await page.locator('.btn-row .btn').count()) >= 3);
 
-// --- empty goal validation -----------------------------------------------
+// --- empty prompt validation (run) ---------------------------------------
 await setField('#folder', FIXTURE);
-await setField('#goal', '  ');
-await page.locator('.btn-row .btn', { hasText: 'start' }).first().click();
+await setField('#prompt', '  ');
+await start();
+await page.waitForTimeout(400);
+check('empty prompt shows a clean error', (await page.locator('.notice-bad').innerText()) === 'A prompt is required.');
+
+// --- switch to hillclimb --------------------------------------------------
+await page.click('button.method:has-text("hillclimb")');
+await page.waitForTimeout(300);
+check('hillclimb becomes the active method', (await page.locator('.method.active').innerText()).toLowerCase() === 'hillclimb');
+check('hillclimb reveals max iterations', (await page.locator('#max').count()) === 1);
+await setField('#prompt', '  ');
+await start();
 await page.waitForTimeout(400);
 check('empty goal shows a clean error', (await page.locator('.notice-bad').innerText()) === 'A goal prompt is required.');
+await page.click('button.method:has-text("run")');
+await page.waitForTimeout(300);
+check('run mode hides max iterations again', (await page.locator('#max').count()) === 0);
 
 // --- pre-flight: an impossible target is blocked -------------------------
 await setField('#folder', 'C:\\definitely-not-a-real-folder-xyz');
-await setField('#goal', 'make tests pass');
-await page.locator('.btn-row .btn', { hasText: 'start' }).first().click();
+await setField('#prompt', 'do a small thing');
+await start();
 await page.waitForTimeout(400);
 const preflightError = await page.locator('.notice-bad').innerText();
 check('missing target folder is blocked', preflightError.includes('does not exist'), preflightError);
-check('blocked start does not run', (await page.locator('.status-word').innerText()).toLowerCase() !== 'running');
+check('blocked start does not run', (await status()) !== 'running');
 
 // --- folder picker: open / navigate / choose / cancel ---------------------
 await setField('#folder', FIXTURE);
@@ -109,17 +131,31 @@ const themeAfter = await page.evaluate(() => document.documentElement.getAttribu
 check('theme toggle changes the preference', themeBefore !== themeAfter, `${themeBefore} -> ${themeAfter}`);
 await shot(page, 'home.png');
 
-// --- start / live output / stop ------------------------------------------
+// --- run mode: start / live output / stop --------------------------------
 await setField('#folder', FIXTURE);
-await setField('#goal', 'Implement the unimplemented methods in Calculator.cs so all tests pass.');
-await setField('#max', '1');
-await page.locator('.btn-row .btn', { hasText: 'start' }).first().click();
-await page.waitForTimeout(1500);
-check('run starts', ['running', 'completed', 'stopped'].includes((await page.locator('.status-word').innerText()).toLowerCase()));
-check('live output panel fills', (await page.locator('.log-line').count()) > 0);
+await setField('#prompt', 'Say hello in one short line.');
+await start();
+await settle();
+check('run starts and settles', ['running', 'completed', 'stopped', 'failed'].includes(await status()), await status());
+check('run live output panel fills', (await page.locator('.log-line').count()) > 0);
 await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});
 await page.waitForTimeout(1200);
-check('stop returns to a settled state', ['stopped', 'completed', 'failed', 'idle'].includes((await page.locator('.status-word').innerText()).toLowerCase()));
+check('run stop returns to a settled state', ['stopped', 'completed', 'failed', 'idle'].includes(await status()));
+
+// --- hillclimb mode: start / stop ----------------------------------------
+await page.click('button.method:has-text("hillclimb")');
+await page.waitForTimeout(300);
+await setField('#folder', FIXTURE);
+await setField('#max', '1');
+await setField('#prompt', 'Implement the unimplemented methods in Calculator.cs so all tests pass.');
+await start();
+await settle();
+check('climb starts and settles', ['running', 'completed', 'stopped', 'failed'].includes(await status()), await status());
+check('climb live output panel fills', (await page.locator('.log-line').count()) > 0);
+await shot(page, 'hillclimb.png');
+await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});
+await page.waitForTimeout(1200);
+check('climb stop returns to a settled state', ['stopped', 'completed', 'failed', 'idle'].includes(await status()));
 
 // --- lock ----------------------------------------------------------------
 await page.locator('.btn-row .btn', { hasText: 'lock' }).first().click();
