@@ -1,7 +1,7 @@
 ---
 description: Designs the plan and defines measurable quality gates for a hillclimb run
 mode: subagent
-model: openrouter/anthropic/claude-fable-5.2#high
+model: openrouter/deepseek/deepseek-v4.1-flash#low
 color: "#6ea8fe"
 permissions:
   - action: edit

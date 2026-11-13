@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openrouter/anthropic/claude-fable-5.2",
+  "model": "openrouter/deepseek/deepseek-v4.1-flash",
   "plugins": [],
   "permissions": [
     { "action": "read", "resource": "**/.env*", "effect": "ask" },
