@@ -4,137 +4,140 @@
 @inject IHillClimberService Climber
 @inject IConfiguration Config
 
-<PageTitle>Hill Climber</PageTitle>
+<PageTitle>hillclimber</PageTitle>
 
-<div class="climber">
+@if (!_unlocked)
+{
+    <section class="panel auth">
+        <div class="panel-head">
+            <span class="idx">[01]</span>
+            <span class="panel-title">authenticate</span>
+        </div>
+        <p class="lede">Enter the access PIN to control the climb loop.</p>
 
-    @if (!_unlocked)
-    {
-        <section class="card pin-card">
-            <h1>🔒 Hill Climber</h1>
-            <p class="muted">Enter the PIN to control the climb loop.</p>
+        <label class="label" for="pin">pin</label>
+        <input id="pin"
+               class="input"
+               type="password"
+               inputmode="numeric"
+               autocomplete="off"
+               @bind="_pinInput"
+               @bind:event="oninput"
+               @onkeydown="OnPinKeyDown" />
 
-            <label class="field-label" for="pin">PIN</label>
-            <input id="pin"
-                   class="form-control"
-                   type="password"
-                   inputmode="numeric"
-                   autocomplete="off"
-                   @bind="_pinInput"
-                   @bind:event="oninput"
-                   @onkeydown="OnPinKeyDown" />
-
-            @if (_pinError is not null)
-            {
-                <div class="alert alert-danger mt-2" role="alert">@_pinError</div>
-            }
-
-            <button class="btn btn-primary btn-block mt-3" @onclick="Unlock">Unlock</button>
-        </section>
-    }
-    else
-    {
-        <section class="status-grid" aria-label="Climb status">
-            <div class="stat">
-                <span class="stat-label">Status</span>
-                <span class="stat-value status-@_state.Status.ToString().ToLowerInvariant()">@StatusText</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Iteration</span>
-                <span class="stat-value">@_state.CurrentIteration <span class="muted">/ @_state.MaxIterations</span></span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Best score</span>
-                <span class="stat-value">@_state.BestScore</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Last run</span>
-                <span class="stat-value">
-                    @if (_state.LastPassed is int passed)
-                    {
-                        <span class="ok">@passed</span> <span class="muted">/</span> <span class="bad">@_state.LastFailed</span>
-                    }
-                    else
-                    {
-                        <span class="muted">—</span>
-                    }
-                </span>
-            </div>
-        </section>
-
-        <section class="card">
-            <div class="field">
-                <label class="field-label" for="folder">Target folder path</label>
-                <input id="folder"
-                       class="form-control"
-                       type="text"
-                       placeholder="C:\path\to\your\repo"
-                       disabled="@IsRunning"
-                       @bind="_folderPath" />
-            </div>
-
-            <div class="field">
-                <label class="field-label" for="goal">Goal prompt</label>
-                <textarea id="goal"
-                          class="form-control"
-                          rows="3"
-                          placeholder="Describe what each iteration should try to accomplish…"
-                          disabled="@IsRunning"
-                          @bind="_goalPrompt"></textarea>
-            </div>
-
-            <div class="field field-narrow">
-                <label class="field-label" for="max">Max iterations</label>
-                <input id="max"
-                       class="form-control"
-                       type="number"
-                       min="1"
-                       disabled="@IsRunning"
-                       @bind="_maxIterations" />
-            </div>
-
-            @if (_error is not null)
-            {
-                <div class="alert alert-danger" role="alert">@_error</div>
-            }
-
-            <div class="actions">
-                <button class="btn btn-primary btn-block" disabled="@IsRunning" @onclick="Start">
-                    ▶ Start
-                </button>
-                <button class="btn btn-danger btn-block" disabled="@(!IsRunning)" @onclick="Stop">
-                    ■ Stop
-                </button>
-                <button class="btn btn-outline-secondary btn-block" @onclick="Lock">
-                    Lock
-                </button>
-            </div>
-        </section>
-
-        @if (_state.Message is not null)
+        @if (_pinError is not null)
         {
-            <p class="message">@_state.Message</p>
+            <p class="notice notice-bad" role="alert">@_pinError</p>
         }
 
-        <section class="card logs-card">
-            <div class="logs-header">
-                <h2>Live log</h2>
-                <span class="muted">@_state.Logs.Count line(s)</span>
-            </div>
-            <div class="log-feed" id="log-feed">
-                @foreach (var line in _state.Logs.Reverse())
-                {
-                    <div class="log-line">@line</div>
-                }
-                @if (_state.Logs.Count == 0)
-                {
-                    <div class="log-line muted">No output yet.</div>
-                }
-            </div>
-        </section>
-    }
+        <button class="btn btn-primary btn-wide auth-go" @onclick="Unlock">unlock →</button>
+    </section>
+}
+else
+{
+    <section class="statusline" aria-live="polite">
+        <span class="pulse pulse-@StatusKey" aria-hidden="true"></span>
+        <span class="status-word st-@StatusKey">@StatusText</span>
+        @if (_state.Message is not null)
+        {
+            <span class="status-msg">@_state.Message</span>
+        }
+    </section>
 
-</div>
+    <dl class="telemetry" aria-label="Climb telemetry">
+        <div class="cell">
+            <dt>status</dt>
+            <dd class="st-@StatusKey">@StatusText</dd>
+        </div>
+        <div class="cell">
+            <dt>iteration</dt>
+            <dd>@_state.CurrentIteration<span class="slash dim">/@_state.MaxIterations</span></dd>
+        </div>
+        <div class="cell">
+            <dt>best score</dt>
+            <dd>@_state.BestScore</dd>
+        </div>
+        <div class="cell">
+            <dt>last run</dt>
+            <dd class="last">
+                @if (_state.LastPassed is int passed)
+                {
+                    <span class="g">@passed</span><span class="dim slash">/</span><span class="r">@_state.LastFailed</span>
+                }
+                else
+                {
+                    <span class="dim">—</span>
+                }
+            </dd>
+        </div>
+    </dl>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[02]</span>
+            <span class="panel-title">configure</span>
+        </div>
+
+        <div class="field">
+            <label class="label" for="folder">target folder</label>
+            <input id="folder"
+                   class="input"
+                   type="text"
+                   placeholder="C:\path\to\your\repo"
+                   disabled="@IsRunning"
+                   @bind="_folderPath" />
+        </div>
+
+        <div class="field">
+            <label class="label" for="goal">goal prompt</label>
+            <textarea id="goal"
+                      class="input"
+                      rows="3"
+                      placeholder="What should each iteration try to accomplish?"
+                      disabled="@IsRunning"
+                      @bind="_goalPrompt"></textarea>
+        </div>
+
+        <div class="field field-narrow">
+            <label class="label" for="max">max iterations</label>
+            <input id="max"
+                   class="input"
+                   type="number"
+                   min="1"
+                   disabled="@IsRunning"
+                   @bind="_maxIterations" />
+        </div>
+
+        @if (_error is not null)
+        {
+            <p class="notice notice-bad" role="alert">@_error</p>
+        }
+
+        <div class="btn-row">
+            <button class="btn btn-primary" disabled="@IsRunning" @onclick="Start">start</button>
+            <button class="btn btn-danger" disabled="@(!IsRunning)" @onclick="Stop">stop</button>
+            <button class="btn btn-ghost" @onclick="Lock">lock</button>
+        </div>
+    </section>
+
+    <section class="panel panel-flush">
+        <div class="panel-head">
+            <span class="idx">[03]</span>
+            <span class="panel-title">output</span>
+            <span class="panel-meta">@_state.Logs.Count lines</span>
+        </div>
+        <div class="log" id="log-feed">
+            @foreach (var line in _state.Logs.Reverse())
+            {
+                <div class="log-line @LineClass(line)">@line</div>
+            }
+            @if (_state.Logs.Count == 0)
+            {
+                <div class="log-line dim">awaiting output…</div>
+            }
+        </div>
+    </section>
+}
 
 @code {
     private ClimberState _state = new();
@@ -148,18 +151,45 @@
 
     private bool IsRunning => _state.Status == ClimberStatus.Running;
 
+    private string StatusKey => _state.Status.ToString().ToLowerInvariant();
+
     private static string ExpectedPin(IConfiguration config) =>
         config["Climber:Pin"] is { Length: > 0 } pin ? pin : "1234";
 
     private string StatusText => _state.Status switch
     {
-        ClimberStatus.Idle => "Idle",
-        ClimberStatus.Running => "Running",
-        ClimberStatus.Completed => "Completed",
-        ClimberStatus.Stopped => "Stopped",
-        ClimberStatus.Failed => "Failed",
+        ClimberStatus.Idle => "idle",
+        ClimberStatus.Running => "running",
+        ClimberStatus.Completed => "completed",
+        ClimberStatus.Stopped => "stopped",
+        ClimberStatus.Failed => "failed",
         _ => _state.Status.ToString(),
     };
+
+    private static string LineClass(string line)
+    {
+        if (line.Contains("ERROR", StringComparison.Ordinal))
+        {
+            return "err";
+        }
+
+        if (line.Contains("Revert", StringComparison.Ordinal) || line.Contains("Regression", StringComparison.Ordinal))
+        {
+            return "warn";
+        }
+
+        if (line.Contains("New best", StringComparison.Ordinal) || line.Contains("Completed", StringComparison.Ordinal))
+        {
+            return "ok";
+        }
+
+        if (line.Contains("$ ", StringComparison.Ordinal) || line.Contains("=====", StringComparison.Ordinal))
+        {
+            return "cmd";
+        }
+
+        return string.Empty;
+    }
 
     protected override void OnInitialized()
     {
