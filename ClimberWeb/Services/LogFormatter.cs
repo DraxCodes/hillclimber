@@ -16,6 +16,12 @@ public enum LogKind
     /// <summary>An opencode <c>tool_use</c> event; tool name, input summary and output are populated.</summary>
     Tool,
 
+    /// <summary>
+    /// An opencode <c>subagent</c> tool call; <see cref="LogEntry.Text"/> is the agent name,
+    /// the input is its prompt, and the output is its (unwrapped) result.
+    /// </summary>
+    Subagent,
+
     /// <summary>An opencode <c>step_start</c> event.</summary>
     StepStart,
 
@@ -59,6 +65,7 @@ public sealed class LogFormatter
 {
     private const int MaxCachedLines = 6000;
     private const int MaxSummaryLength = 100;
+    private const int MaxPromptLength = 500;
 
     private static readonly Regex StampRegex = new(@"^\[(\d{2}:\d{2}:\d{2})\]\s?", RegexOptions.Compiled);
 
@@ -159,16 +166,68 @@ public sealed class LogFormatter
         }
 
         var hasState = part.TryGetProperty("state", out var state) && state.ValueKind == JsonValueKind.Object;
-        var input = hasState && state.TryGetProperty("input", out var rawInput) ? SummarizeInput(rawInput) : string.Empty;
+        var input = hasState && state.TryGetProperty("input", out var rawInput) ? rawInput : default;
         var output = hasState ? GetString(state, "output") : null;
+
+        if (string.Equals(tool, "subagent", StringComparison.Ordinal))
+        {
+            return SubagentEntry(plain, input, output);
+        }
 
         return plain with
         {
             Kind = LogKind.Tool,
             Text = tool,
-            ToolInput = input,
+            ToolInput = SummarizeInput(input),
             ToolOutput = output,
         };
+    }
+
+    /// <summary>
+    /// A <c>subagent</c> call: the agent name, its (flattened) prompt, and its result with
+    /// opencode's <c>&lt;subagent …&gt;…&lt;/subagent&gt;</c> wrapper removed.
+    /// </summary>
+    private static LogEntry SubagentEntry(LogEntry plain, JsonElement input, string? output)
+    {
+        var isObject = input.ValueKind == JsonValueKind.Object;
+        var agent = isObject ? GetString(input, "agent") : null;
+        var prompt = isObject ? GetString(input, "prompt") : null;
+        var result = StripSubagentWrapper(output);
+
+        return plain with
+        {
+            Kind = LogKind.Subagent,
+            Text = string.IsNullOrEmpty(agent) ? "subagent" : agent,
+            ToolInput = string.IsNullOrEmpty(prompt) ? null : Truncate(Flatten(prompt), MaxPromptLength),
+            ToolOutput = string.IsNullOrEmpty(result) ? null : result,
+        };
+    }
+
+    /// <summary>Removes the <c>&lt;subagent …&gt;…&lt;/subagent&gt;</c> wrapper from a subagent result.</summary>
+    private static string? StripSubagentWrapper(string? output)
+    {
+        if (string.IsNullOrEmpty(output))
+        {
+            return output;
+        }
+
+        var value = output.Trim();
+        if (value.StartsWith("<subagent", StringComparison.Ordinal))
+        {
+            var open = value.IndexOf('>');
+            if (open >= 0)
+            {
+                value = value[(open + 1)..];
+            }
+        }
+
+        var close = value.LastIndexOf("</subagent>", StringComparison.Ordinal);
+        if (close >= 0)
+        {
+            value = value[..close];
+        }
+
+        return value.Trim();
     }
 
     private static string SummarizeFinish(JsonElement part)

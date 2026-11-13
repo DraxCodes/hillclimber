@@ -59,6 +59,22 @@ public class LogFormatterTests
     }
 
     [Fact]
+    public void ParsesSubagentCall_WithAgentPromptAndUnwrappedResult()
+    {
+        var line = Stamped("""
+            {"type":"tool_use","part":{"type":"tool","tool":"subagent","state":{"status":"completed","input":{"agent":"plan-architect","description":"Two-step plan","prompt":"Produce a two-step plan."},"output":"<subagent sessionID=\"ses_child\" state=\"completed\">\n1. Do the thing.\n</subagent>","title":"subagent"}}}
+            """);
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Subagent, entry.Kind);
+        Assert.Equal("plan-architect", entry.Text);
+        Assert.Equal("Produce a two-step plan.", entry.ToolInput);
+        Assert.Equal("1. Do the thing.", entry.ToolOutput);
+        Assert.DoesNotContain("subagent sessionID", entry.ToolOutput);
+    }
+
+    [Fact]
     public void ToolUseEventDoesNotExposeJsonBoilerplate()
     {
         var line = Stamped("""
