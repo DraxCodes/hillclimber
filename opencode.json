@@ -3,11 +3,15 @@
   "model": "openrouter/deepseek/deepseek-v4.1-flash",
   "warming": true,
   "permissions": [
+    { "action": "shell", "resource": "*", "effect": "allow" },
     { "action": "read", "resource": "**/.env*", "effect": "ask" },
     { "action": "read", "resource": "**/*.pem", "effect": "ask" },
     { "action": "read", "resource": "**/*.key", "effect": "ask" },
     { "action": "shell", "resource": "git push *", "effect": "ask" },
     { "action": "shell", "resource": "git push", "effect": "ask" },
-    { "action": "shell", "resource": "rm -rf *", "effect": "ask" }
+    { "action": "shell", "resource": "rm -rf *", "effect": "ask" },
+    { "action": "shell", "resource": "Remove-Item *", "effect": "ask" },
+    { "action": "shell", "resource": "git reset --hard *", "effect": "ask" },
+    { "action": "shell", "resource": "git clean *", "effect": "ask" }
   ]
 }
