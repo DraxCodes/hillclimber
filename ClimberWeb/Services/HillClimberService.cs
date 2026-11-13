@@ -177,7 +177,9 @@ public sealed class HillClimberService : IHillClimberService
 
     private async Task RunLoopAsync(ClimberOptions options, int maxIterations, CancellationToken cancellationToken)
     {
-        var best = -1;
+        // Start from 0 to match the run's initial ClimberState.BestScore, so the first
+        // iteration is reported as a new best only when it actually beats what we carried in.
+        var best = 0;
 
         try
         {
@@ -228,7 +230,7 @@ public sealed class HillClimberService : IHillClimberService
                 Log($"Result: {passed} passed, {failed} failed.");
                 UpdateState(state => state with { LastPassed = passed, LastFailed = failed });
 
-                if (best < 0 || passed > best)
+                if (passed > best)
                 {
                     best = passed;
                     UpdateState(state => state with { BestScore = best });

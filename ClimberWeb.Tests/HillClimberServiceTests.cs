@@ -181,6 +181,44 @@ public class HillClimberServiceTests
     }
 
     [Fact]
+    public async Task FirstIteration_MeasuringZero_IsNotLoggedAsNewBest()
+    {
+        var runner = RunnerWithScores(0);
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(Options(max: 1));
+
+        Assert.Empty(runner.RequestsFor("git"));
+        Assert.Equal(0, service.State.BestScore);
+        Assert.DoesNotContain(service.State.Logs, line => line.Contains("New best score"));
+    }
+
+    [Fact]
+    public async Task FirstIteration_BeatingZero_IsLoggedAsNewBest()
+    {
+        var runner = RunnerWithScores(3);
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(Options(max: 1));
+
+        Assert.Equal(3, service.State.BestScore);
+        Assert.Contains(service.State.Logs, line => line.Contains("New best score: 3"));
+    }
+
+    [Fact]
+    public async Task EqualIteration_IsNotLoggedAsNewBest()
+    {
+        var runner = RunnerWithScores(3, 3);
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(Options(max: 2));
+
+        var newBestLines = service.State.Logs.Count(line => line.Contains("New best score"));
+        Assert.Equal(1, newBestLines);
+        Assert.Equal(3, service.State.BestScore);
+    }
+
+    [Fact]
     public async Task Loop_StopsAtMaxIterations()
     {
         var runner = RunnerWithScores(2);
