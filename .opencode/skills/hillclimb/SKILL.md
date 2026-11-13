@@ -53,9 +53,9 @@ score, reliability) with a `plan-architect` agent and a read-only
 
 ## Related skills
 
-- `grilling` (and its `grill-me` wrapper): sharpen a fuzzy objective into settled
-  decisions before planning. Optional and token-heavy — use it only when the
-  goal is genuinely unclear, to keep costs down.
+- `grilling`: sharpen a fuzzy objective into settled decisions before planning.
+  Optional and token-heavy — use it only when the goal is genuinely unclear, to
+  keep costs down. Invoke it with `/grill-me`.
 - `find-skills`: discover and install more skills when the loop needs a
   capability this project does not have yet.
 
