@@ -124,7 +124,24 @@ or committing a secret.
 
 ## Evidence
 
-_(filled in during implementation: fixture path, climb result, harness output.)_
+- **Fixture:** `fixtures/simple-climb/` — 6 tests, 3 failing initially
+  (`dotnet test`: `Failed: 3, Passed: 3`). `scripts/climb-fixture.ps1` materialised
+  `C:\Users\joelp\AppData\Local\Temp\climber-fixture` as a clean git repo.
+- **Climb (real):** dashboard run against the fixture, max 2 iterations → **Completed**,
+  iteration 2/2, best score **6** (baseline 3). Iteration 1 kept the fix
+  (`New best score: 6`); iteration 2 measured the same (`Score unchanged at 6. Keeping
+  changes.`), demonstrating keep-on-equal. Run spend accumulated live from
+  `step_finish` (~$0.003–0.009/step). No console errors.
+- **UI checks:** `node scripts/ui/surfaces.mjs` → **27 checks, 0 failures, 0 console
+  errors** (also passes with no OpenRouter key configured). `node scripts/ui/theme-nav.mjs`
+  → theme preserved across `/`, `/activity`, `/status`.
+- **Spend surfaces:** verified with a temporary, gitignored `appsettings.local.json`
+  pointing at a throwaway fake OpenRouter (temp harness only, since removed): `/` showed
+  `openrouter: connected / this climb $… / total $4.18`; `/activity` rendered key spend /
+  limit / remaining, account totals, a 30-day bar graph, a per-model breakdown, this-climb
+  spend, and the "saved with skills — not measured" state. The default no-key state renders
+  "not configured" plus explicit unavailable messages.
+- `dotnet test --nologo` → **134 passing** (was 109).
 
 ## Fixed point for review
 
