@@ -422,7 +422,11 @@ else
     private string StatusKey => ActiveStatus.ToString().ToLowerInvariant();
 
     private string DefaultFolder =>
-        Config["Climber:DefaultFolder"] is { Length: > 0 } folder ? folder : @"C:\Users\joelp\code";
+        Config["Climber:DefaultFolder"] is { Length: > 0 } folder
+            ? folder
+            : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) is { Length: > 0 } home
+                ? home
+                : Directory.GetCurrentDirectory();
 
     private string SpendTone => _spend?.Connection.StateTone ?? "off";
 

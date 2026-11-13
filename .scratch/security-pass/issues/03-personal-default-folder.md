@@ -1,12 +1,13 @@
 # Personal path committed as the default folder
 
-Status: open
+Status: resolved
 Type: task
 
-`appsettings.json:12` hard-codes `C:\Users\joelp\code`; `Home.razor:425` repeats it as a
+`appsettings.json:12` hard-coded `C:\Users\joelp\code`; `Home.razor:425` repeated it as a
 fallback. `AGENTS.md:50-51` says never commit personal data.
 
 ## Fix
 
-Drop `DefaultFolder` from committed config (empty/placeholder), and fall back to the user
-profile or an empty field.
+Dropped `DefaultFolder` from committed config; `Home.razor` now falls back to the user
+profile, then the current directory. Fixed inline during the security pass after review
+flagged it as a hard standards breach in a file the pass already touched.
