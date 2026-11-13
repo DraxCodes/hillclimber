@@ -1,0 +1,50 @@
+# ---------------------------------------------------------------------------
+# .NET build output and tooling
+# ---------------------------------------------------------------------------
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+build/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.rsuser
+
+# Test results & coverage
+[Tt]est[Rr]esult*/
+*.trx
+coverage/
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+.project/
+
+# Publishing
+publish/
+*.publishsettings
+PublishProfiles/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*~
+*.swp
