@@ -13,11 +13,13 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5179';
 const PIN = process.env.PIN || '1234';
 const FIXTURE = process.env.FIXTURE || 'C:/Users/joelp/AppData/Local/Temp/climber-fixture';
+const REPO = process.env.REPO || join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHOTS = process.env.SHOTS_DIR || join(tmpdir(), 'climber-ui-shots');
 mkdirSync(SHOTS, { recursive: true });
 
@@ -66,17 +68,23 @@ check('spend line shows a connection state', (await page.locator('.spendline .co
 // --- method switch --------------------------------------------------------
 check('method switch is present', (await page.locator('.methodbar .method').count()) === 2);
 check('run is the default method', (await page.locator('.method.active').innerText()).toLowerCase() === 'run');
+check('spend line shows a monthly figure', (await page.locator('.spendline').innerText()).includes('/pm'));
 
 // --- run-mode controls ----------------------------------------------------
 for (const sel of ['#folder', '#prompt']) {
   check(`control ${sel} exists`, (await page.locator(sel).count()) === 1);
 }
 check('run mode hides max iterations', (await page.locator('#max').count()) === 0);
-check('model is displayed', (await page.locator('.model-line .chip').count()) === 1);
+check('agent line is displayed', (await page.locator('.agent-line .chip').count()) >= 1);
 check('start/stop/lock buttons exist', (await page.locator('.btn-row .btn').count()) >= 3);
 
+// --- agents resolved from the target folder's .opencode/agents -----------
+await setField('#folder', REPO);
+await page.waitForTimeout(400);
+const runAgent = (await page.locator('.agent-line').innerText()).toLowerCase();
+check('run mode shows the repo default agent', runAgent.includes('task-orchestrator'), runAgent);
+
 // --- empty prompt validation (run) ---------------------------------------
-await setField('#folder', FIXTURE);
 await setField('#prompt', '  ');
 await start();
 await page.waitForTimeout(400);
@@ -87,6 +95,10 @@ await page.click('button.method:has-text("hillclimb")');
 await page.waitForTimeout(300);
 check('hillclimb becomes the active method', (await page.locator('.method.active').innerText()).toLowerCase() === 'hillclimb');
 check('hillclimb reveals max iterations', (await page.locator('#max').count()) === 1);
+const climbAgents = (await page.locator('.agent-line').innerText()).toLowerCase();
+check('hillclimb shows the agent trio',
+  climbAgents.includes('task-orchestrator') && climbAgents.includes('plan-architect') && climbAgents.includes('quality-gatekeeper'),
+  climbAgents);
 await setField('#prompt', '  ');
 await start();
 await page.waitForTimeout(400);
@@ -174,7 +186,9 @@ check('/status has panels', (await page.locator('.panel').count()) >= 4);
 await shot(page, 'status.png');
 
 await page.click('a.nav-link[href="/activity"]');
-await page.waitForTimeout(1200);
+await page.waitForTimeout(1000);
+// The page fetches OpenRouter on load; wait for the report rather than a fixed delay.
+await page.waitForSelector('text=OpenRouter connection and spend', { timeout: 20000 }).catch(() => {});
 check('/activity loads', page.url().endsWith('/activity'));
 const activityTitles = (await page.locator('.panel-title').allInnerTexts()).map((t) => t.toLowerCase());
 check('/activity shows connection', activityTitles.some((t) => t.includes('connection')));
