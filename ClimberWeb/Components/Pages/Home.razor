@@ -188,7 +188,7 @@ else
             <span class="label">@AgentLineLabel</span>
             @if (_agents.Roles.Count == 0)
             {
-                <span class="chip mono">opencode default</span>
+                <span class="chip mono">@AgentCatalog.WorkflowName</span>
             }
             else if (_method == RunMethod.Hillclimb)
             {
@@ -203,7 +203,7 @@ else
             }
             else
             {
-                <span class="chip mono chip-primary">@(_agents.DefaultAgent ?? "opencode default")</span>
+                <span class="chip mono chip-primary">@(_agents.DefaultAgent ?? AgentCatalog.WorkflowName)</span>
             }
             @if (AgentNote.Length > 0)
             {
@@ -234,13 +234,48 @@ else
             <span class="panel-title">output</span>
             <span class="panel-meta">@ActiveLogs.Count lines</span>
         </div>
+        @if (SubAgentNames.Count > 0)
+        {
+            <div class="outtabs" role="tablist" aria-label="Output stream">
+                <button class="outtab @(_outputTab == MainTab ? "active" : string.Empty)" type="button"
+                        role="tab" aria-selected="@(_outputTab == MainTab)" @onclick="() => SelectOutputTab(MainTab)">main</button>
+                @foreach (var name in SubAgentNames)
+                {
+                    <button class="outtab @(_outputTab == name ? "active" : string.Empty)" type="button"
+                            role="tab" aria-selected="@(_outputTab == name)" @onclick="() => SelectOutputTab(name)">@name</button>
+                }
+            </div>
+        }
         <div class="log" id="log-feed">
-            @foreach (var entry in Entries)
+            @foreach (var entry in VisibleEntries)
             {
                 var css = LineClass(entry.Raw);
                 if (entry.Kind == LogKind.Plain)
                 {
                     <div class="log-line @css">@entry.Raw</div>
+                }
+                else if (entry.Kind == LogKind.Subagent && _outputTab == MainTab)
+                {
+                    <div class="log-line @css log-event log-subagent-ref">
+                        <span class="log-time">@entry.Timestamp</span>
+                        <span class="log-subagent-name">◆ @entry.Text</span>
+                        <span class="dim">— see its tab</span>
+                    </div>
+                }
+                else if (entry.Kind == LogKind.Subagent)
+                {
+                    <div class="log-line @css log-event log-subagent">
+                        <span class="log-time">@entry.Timestamp</span>
+                        <span class="log-subagent-name">◆ @entry.Text</span>
+                        @if (!string.IsNullOrEmpty(entry.ToolInput))
+                        {
+                            <pre class="log-subagent-prompt dim">@entry.ToolInput</pre>
+                        }
+                        @if (!string.IsNullOrEmpty(entry.ToolOutput))
+                        {
+                            <pre class="log-tool-out">@entry.ToolOutput</pre>
+                        }
+                    </div>
                 }
                 else
                 {
@@ -265,7 +300,7 @@ else
                     </div>
                 }
             }
-            @if (ActiveLogs.Count == 0)
+            @if (VisibleEntries.Count == 0)
             {
                 <div class="log-line dim">awaiting output…</div>
             }
@@ -347,6 +382,8 @@ else
     private string _folderPath = string.Empty;
     private string _prompt = string.Empty;
     private AgentSelection _agents = new(Array.Empty<WorkflowRole>(), null);
+    private IReadOnlyList<LogEntry> _entries = Array.Empty<LogEntry>();
+    private string _outputTab = MainTab;
     private int _maxIterations = 5;
     private string _pinInput = string.Empty;
     private string? _pinError;
@@ -408,9 +445,9 @@ else
         ? string.Empty
         : _method == RunMethod.Run
             ? Delegates.Count == 0
-                ? string.Empty
-                : $"delegates to {string.Join(" / ", Delegates.Select(role => role.Name))} as needed"
-            : "gated loop";
+                ? AgentCatalog.WorkflowName
+                : $"{AgentCatalog.WorkflowName} — delegates to {string.Join(" / ", Delegates.Select(role => role.Name))} as needed"
+            : $"{AgentCatalog.WorkflowName} — gated loop";
 
     private string ElapsedLabel
     {
@@ -438,8 +475,26 @@ else
         _ => ActiveStatus.ToString(),
     };
 
-    /// <summary>The log feed, newest first, classified for display. Parsing is cached per line.</summary>
-    private IEnumerable<LogEntry> Entries => ActiveLogs.Reverse().Select(_logFormatter.Format);
+    /// <summary>The tab that shows the combined stream; subagent tabs are named by agent.</summary>
+    private const string MainTab = "main";
+
+    /// <summary>Subagent names seen in this run, in first-seen order; one tab each.</summary>
+    private IReadOnlyList<string> SubAgentNames => _entries
+        .Where(entry => entry.Kind == LogKind.Subagent)
+        .Select(entry => entry.Text)
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    /// <summary>The entries for the selected tab: everything for "main", one agent's calls otherwise.</summary>
+    private IReadOnlyList<LogEntry> VisibleEntries => _outputTab == MainTab
+        ? _entries
+        : _entries
+            .Where(entry => entry.Kind == LogKind.Subagent && string.Equals(entry.Text, _outputTab, StringComparison.Ordinal))
+            .ToArray();
+
+    private void SelectOutputTab(string tab) => _outputTab = tab;
+
+    private void RebuildEntries() => _entries = ActiveLogs.Reverse().Select(_logFormatter.Format).ToArray();
 
     /// <summary>CSS hook for a structured row; mirrors the kind names styled in Home.razor.css.</summary>
     private static string KindClass(LogKind kind) => kind switch
@@ -490,13 +545,14 @@ else
         }
 
         ResolveAgents();
-        _spend = await OpenRouter.GetSpendAsync();
+        RebuildEntries();        _spend = await OpenRouter.GetSpendAsync();
     }
 
     private void OnRunStateChanged(RunState state)
     {
         var wasRunning = _run.Status == RunStatus.Running;
         _run = state;
+        RebuildEntries();
         Rerender();
 
         if (wasRunning && state.Status != RunStatus.Running)
@@ -509,6 +565,7 @@ else
     {
         var wasRunning = _climb.Status == RunStatus.Running;
         _climb = state;
+        RebuildEntries();
         Rerender();
 
         // The account total moves once a run spends something; refresh when it finishes.
@@ -550,8 +607,7 @@ else
     /// <summary>Reads the target folder's agents and the default one to run (config override + conventional default).</summary>
     private void ResolveAgents()
     {
-        var folder = _folderPath.Trim();
-        _agents = AgentCatalog.Resolve(folder, Config["Climber:DefaultAgent"]);
+        _agents = AgentCatalog.Resolve(_folderPath.Trim(), Config["Climber:DefaultAgent"], AgentCatalog.GlobalAgentsDirectory());
     }
 
     private void SetMethod(RunMethod method)
@@ -564,6 +620,8 @@ else
         _method = method;
         _error = null;
         _preflightWarnings = Array.Empty<string>();
+        _outputTab = MainTab;
+        RebuildEntries();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -696,6 +754,7 @@ else
     {
         _error = null;
         _preflightWarnings = Array.Empty<string>();
+        _outputTab = MainTab;
 
         var folder = _folderPath.Trim();
         var preflight = Preflight.Check(folder, _method);

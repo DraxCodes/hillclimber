@@ -329,6 +329,49 @@
     color: var(--red);
 }
 
+/* Output tabs: the main stream plus one tab per subagent used */
+.outtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    padding: 0.4rem 1rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.outtab {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--ink-3);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+}
+
+.outtab:hover:not(.active) {
+    color: var(--ink-2);
+}
+
+.outtab.active {
+    color: var(--ink);
+    border-bottom-color: var(--accent);
+}
+
+.log-subagent-name {
+    color: var(--accent);
+    font-weight: 600;
+    margin-right: 0.4rem;
+}
+
+.log-subagent-prompt {
+    margin: 0.2rem 0 0.3rem;
+    padding-left: 0.6rem;
+    border-left: 2px solid var(--line-2);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .log::-webkit-scrollbar {
     width: 10px;
     height: 10px;
