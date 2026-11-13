@@ -178,6 +178,7 @@ public class HillClimberServiceTests
         Assert.Equal(0, service.State.LastPassed);
         Assert.Equal(ClimberStatus.Completed, service.State.Status);
         Assert.Contains(service.State.Logs, line => line.Contains("could not parse", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(service.State.Logs, line => line.Contains("New best score"));
     }
 
     [Fact]
