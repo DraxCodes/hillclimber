@@ -26,7 +26,8 @@ public sealed record RunState
 /// <summary>Inputs for a single OpenCode run.</summary>
 /// <param name="TargetFolder">Absolute path of the folder <c>opencode run</c> executes in.</param>
 /// <param name="Prompt">Instruction handed to <c>opencode run</c>.</param>
-public sealed record RunOptions(string TargetFolder, string Prompt);
+/// <param name="Agent">Agent to run with, or null to use opencode's own default.</param>
+public sealed record RunOptions(string TargetFolder, string Prompt, string? Agent = null);
 
 /// <summary>The general single-shot opencode run, as consumed by the UI.</summary>
 public interface IRunService
@@ -149,9 +150,9 @@ public sealed class RunService : IRunService
     {
         try
         {
-            Log($"$ {OpenCodeRun.CommandLine(options.Prompt)}");
+            Log($"$ {OpenCodeRun.CommandLine(options.Prompt, options.Agent)}");
             var result = await _runner.RunAsync(
-                OpenCodeRun.Request(options.Prompt, options.TargetFolder),
+                OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent),
                 OnOpenCodeLine,
                 cancellationToken).ConfigureAwait(false);
 

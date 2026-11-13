@@ -39,6 +39,19 @@ public class RunServiceTests
     }
 
     [Fact]
+    public async Task Run_PassesTheAgentToOpencode()
+    {
+        var runner = new FakeCommandRunner((_, _) => CannedResults.Raw(string.Empty));
+        var service = new RunService(runner);
+
+        await service.StartAsync(new RunOptions(@"C:\repo", "go", "task-orchestrator"));
+
+        var request = Assert.Single(runner.RequestsFor("opencode"));
+        Assert.Contains("--agent", request.Arguments);
+        Assert.Contains("task-orchestrator", request.Arguments);
+    }
+
+    [Fact]
     public async Task Run_NonZeroExit_IsFailed_WithReason()
     {
         var runner = new FakeCommandRunner((_, _) => CannedResults.Raw("boom", exitCode: 1));

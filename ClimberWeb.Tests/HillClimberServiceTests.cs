@@ -367,4 +367,17 @@ public class HillClimberServiceTests
         Assert.Single(runner.RequestsFor("opencode"));
         Assert.Equal(1, service.State.MaxIterations);
     }
+
+    [Fact]
+    public async Task Climb_PassesTheAgentToOpencode()
+    {
+        var runner = RunnerWithScores(1);
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(new ClimberOptions(@"C:\repo", "goal", 1, "task-orchestrator"));
+
+        var request = Assert.Single(runner.RequestsFor("opencode"));
+        Assert.Contains("--agent", request.Arguments);
+        Assert.Contains("task-orchestrator", request.Arguments);
+    }
 }

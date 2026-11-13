@@ -26,6 +26,9 @@ public static partial class WorkflowCatalogReader
     [GeneratedRegex(@"^\s*description\s*:\s*(.+)$", RegexOptions.Multiline)]
     private static partial Regex DescriptionLine();
 
+    [GeneratedRegex(@"^\s*mode\s*:\s*(\S+)", RegexOptions.Multiline)]
+    private static partial Regex ModeLine();
+
     /// <summary>Builds the catalog from the repository at <paramref name="repoRoot"/>.</summary>
     public static WorkflowCatalog Read(string repoRoot)
     {
@@ -100,7 +103,11 @@ public static partial class WorkflowCatalogReader
             ? descriptionMatch.Groups[1].Value.Trim()
             : string.Empty;
 
-        return new WorkflowRole(name, description, model, DeniesEdits(content));
+        var mode = ModeLine().Match(content) is { Success: true } modeMatch
+            ? modeMatch.Groups[1].Value.Trim()
+            : string.Empty;
+
+        return new WorkflowRole(name, description, model, DeniesEdits(content), mode);
     }
 
     /// <summary>

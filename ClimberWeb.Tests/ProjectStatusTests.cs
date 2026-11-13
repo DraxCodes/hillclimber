@@ -274,6 +274,17 @@ public class ProjectStatusTests
         Assert.False(role.ReadOnly);
     }
 
+    [Fact]
+    public void WorkflowReader_ReadsAgentMode()
+    {
+        var primary = WorkflowCatalogReader.ParseAgent("task-orchestrator", "mode: primary\nmodel: m");
+        var subagent = WorkflowCatalogReader.ParseAgent("plan-architect", "mode: subagent\nmodel: m");
+
+        Assert.Equal("primary", primary.Mode);
+        Assert.True(primary.IsPrimary);
+        Assert.False(subagent.IsPrimary);
+    }
+
     // ---- root resolution -----------------------------------------------------
 
     [Fact]

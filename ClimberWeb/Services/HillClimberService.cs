@@ -49,10 +49,12 @@ public sealed record ClimberState
 /// <param name="TargetFolder">Absolute path of the git repository to hill-climb.</param>
 /// <param name="GoalPrompt">Instruction handed to <c>opencode run</c> each iteration.</param>
 /// <param name="MaxIterations">Maximum number of iterations (defaults to 5).</param>
+/// <param name="Agent">Agent to run with, or null to use opencode's own default.</param>
 public sealed record ClimberOptions(
     string TargetFolder,
     string GoalPrompt,
-    int MaxIterations = 5);
+    int MaxIterations = 5,
+    string? Agent = null);
 
 /// <summary>The hill-climbing loop, as consumed by the UI.</summary>
 public interface IHillClimberService
@@ -186,9 +188,9 @@ public sealed class HillClimberService : IHillClimberService
                 Log($"===== Iteration {iteration}/{maxIterations} =====");
 
                 // 1. Ask opencode to make a change toward the goal.
-                Log($"$ {OpenCodeRun.CommandLine(options.GoalPrompt)}");
+                Log($"$ {OpenCodeRun.CommandLine(options.GoalPrompt, options.Agent)}");
                 var opencode = await _runner.RunAsync(
-                    OpenCodeRun.Request(options.GoalPrompt, options.TargetFolder),
+                    OpenCodeRun.Request(options.GoalPrompt, options.TargetFolder, options.Agent),
                     OnOpenCodeLine,
                     cancellationToken).ConfigureAwait(false);
 

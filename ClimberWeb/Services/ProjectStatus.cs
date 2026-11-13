@@ -74,7 +74,12 @@ public sealed record TrackedIssue(string Feature, int Number, string FileName, s
 /// <param name="Description">One-line description from the front-matter.</param>
 /// <param name="Model">Model id from the front-matter, or empty when unset.</param>
 /// <param name="ReadOnly">True when the agent denies edits.</param>
-public sealed record WorkflowRole(string Name, string Description, string Model, bool ReadOnly);
+/// <param name="Mode">Front-matter <c>mode</c> (e.g. <c>primary</c>, <c>subagent</c>), or empty when unset.</param>
+public sealed record WorkflowRole(string Name, string Description, string Model, bool ReadOnly, string Mode)
+{
+    /// <summary>True when the front-matter marks the agent <c>mode: primary</c>.</summary>
+    public bool IsPrimary => string.Equals(Mode, "primary", StringComparison.OrdinalIgnoreCase);
+}
 
 /// <summary>The models in play and how a change is produced.</summary>
 /// <param name="BaseModel">The default model from <c>opencode.json</c>.</param>
