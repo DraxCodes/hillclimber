@@ -13,6 +13,16 @@ builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 builder.Services.AddSingleton<IHillClimberService, HillClimberService>();
 builder.Services.AddSingleton<IFileBrowser, FileBrowser>();
 
+// PIN gate: unlock persists for the browser session and slides with activity,
+// expiring after Climber:SessionMinutes (default 30) of inactivity.
+builder.Services.AddSingleton<IClimberAuth>(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var pin = config["Climber:Pin"] is { Length: > 0 } value ? value : "1234";
+    var minutes = int.TryParse(config["Climber:SessionMinutes"], out var parsed) && parsed > 0 ? parsed : 30;
+    return new ClimberAuth(pin, TimeSpan.FromMinutes(minutes));
+});
+
 // Listen on all interfaces so the dashboard is reachable from a phone on the same Wi-Fi.
 // ASPNETCORE_URLS (or DOTNET_URLS) still wins when explicitly set.
 var configuredUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
