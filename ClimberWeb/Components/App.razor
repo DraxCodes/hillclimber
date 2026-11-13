@@ -1,16 +1,32 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-pref="system">
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#fbfbfb" />
     <BasePath />
     <ResourcePreloader />
-    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <script>
+        // Resolve and apply the theme before first paint to avoid a flash.
+        (function () {
+            try {
+                var pref = localStorage.getItem("hillclimber-theme") || "system";
+                var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                var resolved = pref === "system" ? (dark ? "dark" : "light") : pref;
+                var el = document.documentElement;
+                el.setAttribute("data-theme", resolved);
+                el.setAttribute("data-theme-pref", pref);
+                var meta = document.querySelector('meta[name="theme-color"]');
+                if (meta) meta.setAttribute("content", resolved === "dark" ? "#0c0c0c" : "#fbfbfb");
+            } catch (e) { }
+        })();
+    </script>
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["ClimberWeb.styles.css"]" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <ImportMap />
-    <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
@@ -18,6 +34,52 @@
     <Routes />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>
+        // Theme cycle: system -> light -> dark. Uses event delegation so it keeps
+        // working across Blazor enhanced navigations.
+        (function () {
+            var order = ["system", "light", "dark"];
+            var mq = window.matchMedia("(prefers-color-scheme: dark)");
+
+            function pref() {
+                try { return localStorage.getItem("hillclimber-theme") || "system"; }
+                catch (e) { return "system"; }
+            }
+
+            function resolve(p) {
+                return p === "system" ? (mq.matches ? "dark" : "light") : p;
+            }
+
+            function apply(p) {
+                var resolved = resolve(p);
+                var el = document.documentElement;
+                el.setAttribute("data-theme-pref", p);
+                el.setAttribute("data-theme", resolved);
+                var meta = document.querySelector('meta[name="theme-color"]');
+                if (meta) meta.setAttribute("content", resolved === "dark" ? "#0c0c0c" : "#fbfbfb");
+                var icons = document.querySelectorAll("[data-theme-icon]");
+                for (var i = 0; i < icons.length; i++) {
+                    icons[i].hidden = icons[i].getAttribute("data-theme-icon") !== p;
+                }
+                var btn = document.getElementById("theme-toggle");
+                if (btn) btn.setAttribute("aria-label", "Theme: " + p + " (activate to change)");
+            }
+
+            document.addEventListener("click", function (e) {
+                var btn = e.target && e.target.closest ? e.target.closest("#theme-toggle") : null;
+                if (!btn) return;
+                var next = order[(order.indexOf(pref()) + 1) % order.length];
+                try { localStorage.setItem("hillclimber-theme", next); } catch (err) { }
+                apply(next);
+            });
+
+            mq.addEventListener("change", function () {
+                if (pref() === "system") apply("system");
+            });
+
+            apply(pref());
+        })();
+    </script>
 </body>
 
 </html>
