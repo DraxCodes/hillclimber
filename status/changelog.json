@@ -1,0 +1,13 @@
+{
+  "e23f7e3": "Recorded the standing working preferences for agents and handoffs",
+  "4000b39": "Showed cache-write tokens and kept the full error text in the feed",
+  "d43341e": "Dimmed the step markers to match their emitted CSS class names",
+  "c9964e6": "Addressed the code-review findings on structured log rendering",
+  "9a4fec3": "Rendered opencode events structurally in the output panel",
+  "64904e1": "Parsed opencode JSON log events into readable display rows",
+  "89333d5": "Speced the structured JSON rendering for the output panel",
+  "64f1f24": "Made /handoff always emit a next-session starting prompt",
+  "c0f1570": "Started the best score at 0 instead of -1",
+  "130d368": "Resolved Windows .cmd shims on PATH",
+  "1fb1d10": "Tracked the hill-climb loop spec under .scratch"
+}
