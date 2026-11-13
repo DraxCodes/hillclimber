@@ -11,6 +11,22 @@ time, bundle size, response time — ask whether to run the hillclimb workflow
 before implementing it directly. It is opt-in, so don't assume; a one-line
 question is enough.
 
+## Working preferences
+
+Two standing preferences, chosen deliberately and recorded here so fresh sessions
+and handoffs inherit them without re-asking:
+
+1. **Pick the approach before coding.** For any non-trivial feature, settle the
+   implementation approach with the user before writing code — for example
+   render-only vs. structural rendering, live data vs. a pre-generated artifact, or
+   the architecture of a new page. Offer the realistic options with a short
+   trade-off each and ask; don't assume. A one-line question is enough.
+2. **Verify visual changes with temporary sample data.** When a change is visual,
+   start the app seeded with temporary sample data that exercises the new rendering,
+   look at it (screenshot via the Playwright harness in the temp `climb-ui` folder),
+   then remove the seed. Keep the seed clearly marked, uncommitted, and confined to
+   one throwaway file plus a single hook, so it is trivial to delete.
+
 ## Session hygiene
 
 Cost is driven by how much conversation the model re-reads, so keep sessions
