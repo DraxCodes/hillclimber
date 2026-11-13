@@ -28,3 +28,27 @@ short:
 - Never commit secrets or personal data (`.env`, API keys, `*.pem`, `*.key`,
   `*.local.json`).
 - Check `git status` before committing.
+
+## Optional local models
+
+Cloud (`openrouter/deepseek/deepseek-v4.1-flash`) is the default for every agent.
+Local models are an opt-in fallback for privacy, offline work, or unlimited
+throughput — **not a cost saving**: this model is ~$0.15/M input, ~$0.60/M
+output, ~$0.003/M cached, so a busy month costs a few dollars, usually less than
+the electricity to run a local GPU for the same work.
+
+OpenCode auto-discovers Ollama at `http://127.0.0.1:11434`, so no provider config
+is needed. Install Ollama, then pull a model that fits the machine:
+
+```sh
+ollama pull qwen3:14b      # ~9 GB, ~30-47 tok/s on a 16 GB card
+ollama pull gpt-oss:20b    # ~14.5 GB, fast tool use, shorter context
+```
+
+Pulled models appear in `/models` next to the cloud ones. To send one agent to a
+local model, set its `model` in a project-level `opencode.json`; leave cloud
+everywhere else. Prefer an explicit model entry with a context `limit`, `cost: 0`,
+and `capabilities.tools: true`, because discovery may not supply a limit and
+compaction depends on it.
+
+Treat the model choice as machine-specific: pick it per project, not in the base.
