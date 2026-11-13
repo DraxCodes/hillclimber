@@ -230,16 +230,27 @@
     max-width: 170px;
 }
 
-/* Read-only base model resolved from the target folder's opencode.json */
-.model-line {
+/* Agents resolved from the target folder's .opencode/agents */
+.agent-line {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin: 0 0 0.85rem;
 }
 
-.model-line .label {
+.agent-line .label {
     margin: 0;
+}
+
+.agent-note {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+}
+
+.chip-primary {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .btn-row {
