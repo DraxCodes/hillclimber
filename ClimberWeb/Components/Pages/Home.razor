@@ -452,8 +452,19 @@ else
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = StripParameterSuffix(ex.Message);
         }
+    }
+
+    // ArgumentException messages end with a "(Parameter '...')" suffix that is noise
+    // for the person at the dashboard; keep just the human-readable part.
+    private static string StripParameterSuffix(string message)
+    {
+        const string marker = " (Parameter '";
+        var index = message.LastIndexOf(marker, StringComparison.Ordinal);
+        return index >= 0 && message.EndsWith("')", StringComparison.Ordinal)
+            ? message[..index]
+            : message;
     }
 
     private void Stop() => Climber.Stop();
