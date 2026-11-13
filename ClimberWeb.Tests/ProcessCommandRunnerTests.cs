@@ -1,0 +1,37 @@
+using ClimberWeb.Services;
+
+namespace ClimberWeb.Tests;
+
+/// <summary>
+/// Integration-level checks for the real process-based runner. These use <c>dotnet</c>,
+/// which is guaranteed to be present because the tests themselves run on it.
+/// </summary>
+public class ProcessCommandRunnerTests
+{
+    private readonly ProcessCommandRunner _runner = new();
+
+    [Fact]
+    public async Task RunsProcess_CapturesOutput_AndStreamsLines()
+    {
+        var streamed = new List<string>();
+
+        var result = await _runner.RunAsync(
+            new CommandRequest("dotnet", new[] { "--version" }, Directory.GetCurrentDirectory()),
+            line => { lock (streamed) streamed.Add(line); },
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(string.IsNullOrWhiteSpace(result.StandardOutput));
+        Assert.Contains(streamed, line => line.Trim().Length > 0);
+    }
+
+    [Fact]
+    public async Task WorksFromNonExistentWorkingDirectory_ReportsStartFailure()
+    {
+        // A missing working directory surfaces as an exception from Process.Start.
+        await Assert.ThrowsAnyAsync<Exception>(() => _runner.RunAsync(
+            new CommandRequest("dotnet", new[] { "--version" }, Path.Combine(Path.GetTempPath(), "climber-missing-" + Guid.NewGuid())),
+            null,
+            CancellationToken.None));
+    }
+}
