@@ -175,21 +175,17 @@ public sealed class RunService : IRunService
         RunOptions options;
         lock (_gate)
         {
-            if (_lastOptions is not { } last || !_state.FallbackAvailable)
-            {
-                throw new InvalidOperationException("There is no failed run awaiting fallback approval.");
-            }
-
-            var fallbacks = last.FallbackList;
-            if (fallbacks.Count == 0)
+            if (_lastOptions is not { } last
+                || !_state.FallbackAvailable
+                || last.FallbackList.Count == 0)
             {
                 throw new InvalidOperationException("There is no failed run awaiting fallback approval.");
             }
 
             options = last with
             {
-                Provider = fallbacks[0],
-                Fallbacks = fallbacks.Skip(1).ToArray(),
+                Provider = last.FallbackList[0],
+                Fallbacks = last.FallbackList.Skip(1).ToArray(),
             };
         }
 

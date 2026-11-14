@@ -29,8 +29,8 @@ public readonly record struct RunMetrics(
     /// Returns these metrics with the <c>step_finish</c> usage of <paramref name="line"/>
     /// added, or the same metrics when the line is not a step event. Cost is rounded after
     /// converting to decimal so summing doubles does not accumulate noise. When
-    /// <paramref name="pricing"/> is supplied, the tokens are also priced for a Surplus
-    /// estimate; opencode reports <c>0</c> cost for that provider.
+    /// <paramref name="pricing"/> is supplied, the tokens are also priced for a token-based
+    /// estimate; opencode reports <c>0</c> cost for providers it cannot bill.
     /// </summary>
     public RunMetrics Add(string? line, ProviderPricing? pricing = null)
     {

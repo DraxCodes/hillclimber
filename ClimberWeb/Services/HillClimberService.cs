@@ -269,19 +269,7 @@ public sealed class HillClimberService : IHillClimberService
                     {
                         // A thrown provider call is a provider failure too; ask before spending.
                         Log($"[opencode failed: {ex.Message}]");
-                        var next = await RequestFallbackAsync(current, fallbacks[0], cancellationToken).ConfigureAwait(false);
-                        fallbacks.RemoveAt(0);
-                        current = next;
-                        Volatile.Write(ref _activePricing, current.Pricing);
-                        UpdateState(state => state with
-                        {
-                            Status = RunStatus.Running,
-                            FallbackAvailable = false,
-                            FallbackMessage = null,
-                            Fallback = null,
-                            Message = $"Continuing on {current.DisplayName}.",
-                            Provider = current,
-                        });
+                        current = await AdvanceAsync(current, fallbacks, cancellationToken).ConfigureAwait(false);
                         continue;
                     }
 
@@ -305,19 +293,7 @@ public sealed class HillClimberService : IHillClimberService
                     }
 
                     // The current provider failed: pause until the user approves the next one.
-                    var approved = await RequestFallbackAsync(current, fallbacks[0], cancellationToken).ConfigureAwait(false);
-                    fallbacks.RemoveAt(0);
-                    current = approved;
-                    Volatile.Write(ref _activePricing, current.Pricing);
-                    UpdateState(state => state with
-                    {
-                        Status = RunStatus.Running,
-                        FallbackAvailable = false,
-                        FallbackMessage = null,
-                        Fallback = null,
-                        Message = $"Continuing on {current.DisplayName}.",
-                        Provider = current,
-                    });
+                    current = await AdvanceAsync(current, fallbacks, cancellationToken).ConfigureAwait(false);
                 }
 
                 // 2. Measure the result.
@@ -449,6 +425,30 @@ public sealed class HillClimberService : IHillClimberService
         }
 
         Log($"[approved: retrying with {next.DisplayName} model {next.Model ?? "opencode default"}]");
+        return next;
+    }
+
+    /// <summary>
+    /// Asks the user to approve the next provider in <paramref name="fallbacks"/> and makes
+    /// it the current one. The caller must ensure the list is non-empty.
+    /// </summary>
+    private async Task<ProviderSelection> AdvanceAsync(
+        ProviderSelection? current,
+        List<ProviderSelection> fallbacks,
+        CancellationToken cancellationToken)
+    {
+        var next = await RequestFallbackAsync(current, fallbacks[0], cancellationToken).ConfigureAwait(false);
+        fallbacks.RemoveAt(0);
+        Volatile.Write(ref _activePricing, next.Pricing);
+        UpdateState(state => state with
+        {
+            Status = RunStatus.Running,
+            FallbackAvailable = false,
+            FallbackMessage = null,
+            Fallback = null,
+            Message = $"Continuing on {next.DisplayName}.",
+            Provider = next,
+        });
         return next;
     }
 
