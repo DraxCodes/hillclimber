@@ -85,15 +85,15 @@ else
 
     <section class="providerbar" aria-label="provider">
         <span class="label">provider</span>
-        <button class="method @(_provider == AiProvider.Surplus ? "active" : string.Empty)"
+        <button class="method @(_providerId == ProviderIds.Surplus ? "active" : string.Empty)"
                 type="button"
                 disabled="@AnyRunning"
-                aria-pressed="@(_provider == AiProvider.Surplus)"
+                aria-pressed="@(_providerId == ProviderIds.Surplus)"
                 @onclick="SelectSurplus">surplus</button>
-        <button class="method @(_provider == AiProvider.OpenRouter ? "active" : string.Empty)"
+        <button class="method @(_providerId == ProviderIds.OpenRouter ? "active" : string.Empty)"
                 type="button"
                 disabled="@AnyRunning"
-                aria-pressed="@(_provider == AiProvider.OpenRouter)"
+                aria-pressed="@(_providerId == ProviderIds.OpenRouter)"
                 @onclick="SelectOpenRouter">openrouter</button>
         <span class="agent-note dim">@ProviderNote</span>
     </section>
@@ -442,7 +442,7 @@ else
     private CancellationTokenSource? _expiryCts;
     private SurplusReport? _surplus;
     private SpendReport? _spend;
-    private AiProvider _provider = AiProvider.Surplus;
+    private string _providerId = ProviderIds.Surplus;
     private bool _pendingProviderApproval;
     private bool _startFallbackOffer;
     private string _startFallbackMessage = string.Empty;
@@ -475,9 +475,9 @@ else
     /// an approved OpenRouter run keeps its exact reported cost.
     /// </summary>
     private string ActiveSpendText =>
-        SpendFormat.Spend((double)ActiveReportedSpendUsd, (double)ActiveEstimatedSpendUsd, ActiveProvider);
+        SpendFormat.Spend((double)ActiveReportedSpendUsd, (double)ActiveEstimatedSpendUsd, ActiveProvider?.SpendMode ?? SpendMode.None);
 
-    private AiProvider? ActiveProvider => _method == RunMethod.Run ? _run.Provider : _climb.Provider;
+    private ProviderSelection? ActiveProvider => _method == RunMethod.Run ? _run.Provider : _climb.Provider;
 
     private string ActiveSpendNoun => _method == RunMethod.Run ? "this run" : "this climb";
 
@@ -512,7 +512,7 @@ else
 
     private string FallbackLabel => _spend?.Connection.StateLabel ?? "checking…";
 
-    private string ProviderNote => _provider == AiProvider.Surplus
+    private string ProviderNote => _providerId == ProviderIds.Surplus
         ? "primary — spend is estimated from tokens"
         : "fallback — exact spend, approved for this run";
 
@@ -669,10 +669,10 @@ else
     private static bool IsTerminal(RunStatus status) =>
         status is RunStatus.Completed or RunStatus.Failed or RunStatus.Stopped;
 
-    /// <summary>A fallback approval applies to one run; the next start defaults to Surplus again.</summary>
+    /// <summary>A fallback approval applies to one run; the next start defaults to the primary again.</summary>
     private void ResetProvider()
     {
-        _provider = AiProvider.Surplus;
+        _providerId = ProviderIds.Surplus;
         _pendingProviderApproval = false;
         _startFallbackOffer = false;
     }
@@ -874,7 +874,7 @@ else
         _preflightWarnings = preflight.Warnings;
         ResolveAgents();
 
-        if (_provider == AiProvider.Surplus)
+        if (_providerId == ProviderIds.Surplus)
         {
             _surplus = await Surplus.GetReportAsync();
             if (_surplus is not { Reachable: true, ModelAvailable: true })
@@ -887,17 +887,13 @@ else
             }
         }
 
-        Launch(_provider, folder, prompt);
+        Launch(_providerId, folder, prompt);
     }
 
     /// <summary>Starts the selected method with an explicit provider. Never falls back silently.</summary>
-    private void Launch(AiProvider provider, string folder, string prompt)
+    private void Launch(string providerId, string folder, string prompt)
     {
-        var model = provider == AiProvider.Surplus
-            ? _surplus?.Model ?? SurplusOptions.DefaultModel
-            : FallbackModel;
-        var pricing = provider == AiProvider.Surplus ? _surplus?.Pricing : null;
-        _provider = provider;
+        var (primary, fallbacks) = Selections(providerId);
 
         try
         {
@@ -906,11 +902,11 @@ else
             if (_method == RunMethod.Hillclimb)
             {
                 _ = Climber.StartAsync(new ClimberOptions(
-                    folder, prompt, Math.Max(1, _maxIterations), _agents.DefaultAgent, model, provider, pricing));
+                    folder, prompt, Math.Max(1, _maxIterations), _agents.DefaultAgent, primary, fallbacks));
             }
             else
             {
-                _ = Run.StartAsync(new RunOptions(folder, prompt, _agents.DefaultAgent, model, provider, pricing));
+                _ = Run.StartAsync(new RunOptions(folder, prompt, _agents.DefaultAgent, primary, fallbacks));
             }
         }
         catch (Exception ex)
@@ -919,16 +915,39 @@ else
         }
     }
 
+    /// <summary>
+    /// The selected provider plus the providers after it in the configured order. This still
+    /// mirrors the shipped two-provider setup; the registry replaces it in the next change.
+    /// </summary>
+    private (ProviderSelection Primary, IReadOnlyList<ProviderSelection> Fallbacks) Selections(string providerId)
+    {
+        var surplus = new ProviderSelection(
+            ProviderIds.Surplus,
+            "Surplus",
+            _surplus?.Model ?? ProviderRegistry.SurplusDefaultModel,
+            SpendMode.Estimated,
+            _surplus?.Pricing);
+        var openRouter = new ProviderSelection(
+            ProviderIds.OpenRouter,
+            "OpenRouter",
+            FallbackModel,
+            SpendMode.Reported);
+
+        return providerId == ProviderIds.OpenRouter
+            ? (openRouter, Array.Empty<ProviderSelection>())
+            : (surplus, [openRouter]);
+    }
+
     private void SelectSurplus()
     {
         _pendingProviderApproval = false;
         _startFallbackOffer = false;
-        _provider = AiProvider.Surplus;
+        _providerId = ProviderIds.Surplus;
     }
 
     private void SelectOpenRouter()
     {
-        if (_provider != AiProvider.OpenRouter)
+        if (_providerId != ProviderIds.OpenRouter)
         {
             _pendingProviderApproval = true;
         }
@@ -938,7 +957,7 @@ else
     {
         _pendingProviderApproval = false;
         _startFallbackOffer = false;
-        _provider = AiProvider.OpenRouter;
+        _providerId = ProviderIds.OpenRouter;
     }
 
     private void CancelProviderSwitch() => _pendingProviderApproval = false;
@@ -946,13 +965,13 @@ else
     private Task StartOnOpenRouter()
     {
         _startFallbackOffer = false;
-        _provider = AiProvider.OpenRouter;
+        _providerId = ProviderIds.OpenRouter;
         return Start();
     }
 
     private void CancelStartFallback() => _startFallbackOffer = false;
 
-    private string FallbackModel => _surplus?.FallbackModel ?? SurplusOptions.DefaultFallbackModel;
+    private string FallbackModel => _surplus?.FallbackModel ?? ProviderRegistry.OpenRouterDefaultModel;
 
     private void ApproveActiveFallback()
     {
@@ -960,14 +979,14 @@ else
         {
             if (_method == RunMethod.Run)
             {
-                _ = Run.ApproveFallbackAsync(FallbackModel);
+                _ = Run.ApproveFallbackAsync();
             }
             else
             {
-                Climber.ApproveFallback(FallbackModel);
+                Climber.ApproveFallback();
             }
 
-            _provider = AiProvider.OpenRouter;
+            _providerId = ProviderIds.OpenRouter;
         }
         catch (Exception ex)
         {

@@ -276,7 +276,7 @@ else
         + _climb.InputTokens + _climb.OutputTokens + _climb.CacheReadTokens + _climb.CacheWriteTokens;
 
     private string ClimbSpendText =>
-        SpendFormat.Spend((double)_climb.SpendUsd, (double)_climb.EstimatedSpendUsd, _climb.Provider);
+        SpendFormat.Spend((double)_climb.SpendUsd, (double)_climb.EstimatedSpendUsd, _climb.Provider?.SpendMode ?? SpendMode.None);
 
     private int ClimbBest => _climb.BestScore;
 

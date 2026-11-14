@@ -27,32 +27,43 @@ public static class SpendFormat
             : value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// The dashboard's spend figure. Surplus has no reported cost, so its token estimate is
-    /// always labelled <c>est.</c> even before pricing produces a number; OpenRouter keeps its
-    /// exact reported cost. A mixed climb shows both.
+    /// The dashboard's spend figure. An <see cref="SpendMode.Estimated"/> provider keeps the
+    /// <c>est.</c> label even before pricing produces a number; a reported provider keeps its
+    /// exact cost. A mixed climb shows both; a provider with neither shows an em dash.
     /// </summary>
-    public static string Spend(double reported, double estimated, AiProvider? provider)
+    public static string Spend(double reported, double estimated, SpendMode mode)
     {
         if (estimated > 0 && reported > 0)
         {
             return $"est. {Usd(estimated)} + {Usd(reported)}";
         }
 
-        if (estimated > 0 || provider == AiProvider.Surplus)
+        if (estimated > 0 || (mode == SpendMode.Estimated && reported <= 0))
         {
             return $"est. {Usd(estimated)}";
         }
 
-        return Usd(reported);
+        return reported > 0 ? Usd(reported) : "—";
     }
 
     /// <summary>The line both services append after a run, using <see cref="Spend"/>.</summary>
-    public static string SpendLine(decimal reported, decimal estimated, AiProvider? provider) =>
-        (estimated, reported, provider) switch
+    /// <param name="reported">Exact cost reported by opencode/provider.</param>
+    /// <param name="estimated">Token-based estimate from catalogue pricing.</param>
+    /// <param name="mode">How the provider's spend is known.</param>
+    /// <param name="provider">Display name used in the pricing suffix, when known.</param>
+    public static string SpendLine(decimal reported, decimal estimated, SpendMode mode, string? provider = null) =>
+        (estimated, reported) switch
         {
-            (> 0, > 0, _) => $"Spend this run: est. ${Amount((double)estimated)} + ${Amount((double)reported)}.",
-            (> 0, _, _) => $"Spend this run: est. ${Amount((double)estimated)} (Surplus pricing).",
-            (_, _, AiProvider.Surplus) => "Spend this run: est. $0 (Surplus pricing unavailable).",
-            _ => $"Spend this run: ${Amount((double)reported)}.",
+            (> 0, > 0) => $"Spend this run: est. ${Amount((double)estimated)} + ${Amount((double)reported)}.",
+            (> 0, _) => $"Spend this run: est. ${Amount((double)estimated)}{PricingSource(provider)}.",
+            _ when mode == SpendMode.Estimated => $"Spend this run: est. $0{PricingUnavailable(provider)}.",
+            (_, > 0) => $"Spend this run: ${Amount((double)reported)}.",
+            _ => "Spend this run: no cost reported.",
         };
+
+    private static string PricingSource(string? provider) =>
+        provider is { Length: > 0 } ? $" ({provider} pricing)" : " (estimated)";
+
+    private static string PricingUnavailable(string? provider) =>
+        provider is { Length: > 0 } ? $" ({provider} pricing unavailable)" : " (pricing unavailable)";
 }

@@ -29,23 +29,28 @@ public sealed record RunState
     public string? FallbackMessage { get; init; }
 
     /// <summary>The provider this run used, when known.</summary>
-    public AiProvider? Provider { get; init; }
+    public ProviderSelection? Provider { get; init; }
+
+    /// <summary>The next provider awaiting approval, or null when no fallback is offered.</summary>
+    public ProviderSelection? Fallback { get; init; }
 }
 
 /// <summary>Inputs for a single OpenCode run.</summary>
 /// <param name="TargetFolder">Absolute path of the folder <c>opencode run</c> executes in.</param>
 /// <param name="Prompt">Instruction handed to <c>opencode run</c>.</param>
 /// <param name="Agent">Agent to run with, or null to use opencode's own default.</param>
-/// <param name="Model">Explicit model id; null lets the target folder's config decide.</param>
-/// <param name="Provider">The provider in use, when known.</param>
-/// <param name="Pricing">Surplus pricing for a token-based estimate, or null for exact cost.</param>
+/// <param name="Provider">The provider/model for this run, or null to let opencode decide.</param>
+/// <param name="Fallbacks">Providers offered, one approved step at a time, after a failure.</param>
 public sealed record RunOptions(
     string TargetFolder,
     string Prompt,
     string? Agent = null,
-    string? Model = null,
-    AiProvider? Provider = null,
-    ProviderPricing? Pricing = null);
+    ProviderSelection? Provider = null,
+    IReadOnlyList<ProviderSelection>? Fallbacks = null)
+{
+    /// <summary>Provides a non-null view of <see cref="Fallbacks"/>.</summary>
+    public IReadOnlyList<ProviderSelection> FallbackList => Fallbacks ?? Array.Empty<ProviderSelection>();
+}
 
 /// <summary>The general single-shot opencode run, as consumed by the UI.</summary>
 public interface IRunService
@@ -68,10 +73,10 @@ public interface IRunService
     void Stop();
 
     /// <summary>
-    /// Re-runs the last failed run on <paramref name="model"/> after the user approved the
-    /// OpenRouter fallback. Throws when there is no failed Surplus run to retry.
+    /// Re-runs the last failed run on the next configured provider after the user approved
+    /// the fallback. Throws when there is no failed run awaiting approval.
     /// </summary>
-    Task ApproveFallbackAsync(string model);
+    Task ApproveFallbackAsync();
 }
 
 /// <summary>
@@ -146,7 +151,7 @@ public sealed class RunService : IRunService
 
             _log.Clear();
             _metrics = RunMetrics.Zero;
-            Volatile.Write(ref _activePricing, options.Pricing);
+            Volatile.Write(ref _activePricing, options.Provider?.Pricing);
             _lastOptions = options;
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
@@ -165,19 +170,27 @@ public sealed class RunService : IRunService
     }
 
     /// <inheritdoc />
-    public Task ApproveFallbackAsync(string model)
+    public Task ApproveFallbackAsync()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(model);
-
         RunOptions options;
         lock (_gate)
         {
             if (_lastOptions is not { } last || !_state.FallbackAvailable)
             {
-                throw new InvalidOperationException("There is no failed Surplus run to retry.");
+                throw new InvalidOperationException("There is no failed run awaiting fallback approval.");
             }
 
-            options = last with { Model = model, Provider = AiProvider.OpenRouter, Pricing = null };
+            var fallbacks = last.FallbackList;
+            if (fallbacks.Count == 0)
+            {
+                throw new InvalidOperationException("There is no failed run awaiting fallback approval.");
+            }
+
+            options = last with
+            {
+                Provider = fallbacks[0],
+                Fallbacks = fallbacks.Skip(1).ToArray(),
+            };
         }
 
         return StartAsync(options);
@@ -198,9 +211,9 @@ public sealed class RunService : IRunService
     {
         try
         {
-            Log($"$ {OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Model)}");
+            Log($"$ {OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Provider?.Model)}");
             var result = await _runner.RunAsync(
-                OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Model),
+                OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model),
                 OnOpenCodeLine,
                 cancellationToken).ConfigureAwait(false);
 
@@ -208,15 +221,16 @@ public sealed class RunService : IRunService
 
             if (result.ExitCode == 127)
             {
-                // A missing binary is not a provider failure; never bill OpenRouter for it.
-                Fail("[opencode not found — is it installed and on PATH?]", "opencode not found — is it installed and on PATH?", offerFallback: false);
+                // A missing binary is not a provider failure; never bill a fallback for it.
+                Fail("[opencode not found — is it installed and on PATH?]", "opencode not found — is it installed and on PATH?", options, offerFallback: false);
             }
             else if (result.ExitCode != 0)
             {
                 Fail(
                     $"[opencode exited with code {result.ExitCode}]",
                     $"opencode exited with code {result.ExitCode}",
-                    offerFallback: options.Provider == AiProvider.Surplus);
+                    options,
+                    offerFallback: CanFallBack(options));
             }
             else
             {
@@ -227,6 +241,7 @@ public sealed class RunService : IRunService
                     Message = "Run complete.",
                     FallbackAvailable = false,
                     FallbackMessage = null,
+                    Fallback = null,
                 });
                 Log("===== Completed =====");
                 LogSpend();
@@ -241,38 +256,50 @@ public sealed class RunService : IRunService
                 Message = "Stopped by user.",
                 FallbackAvailable = false,
                 FallbackMessage = null,
+                Fallback = null,
             });
             Log("===== Stopped by user =====");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "OpenCode run failed.");
-            Fail($"ERROR: {ex.Message}", ex.Message, offerFallback: options.Provider == AiProvider.Surplus);
+            Fail($"ERROR: {ex.Message}", ex.Message, options, offerFallback: CanFallBack(options));
         }
     }
 
+    /// <summary>True when this run has a provider and at least one provider after it.</summary>
+    private static bool CanFallBack(RunOptions options) =>
+        options.Provider is not null && options.FallbackList.Count > 0;
+
     /// <summary>
-    /// Logs <paramref name="logLine"/> and records the run as failed. A failure on the
-    /// primary provider also exposes the OpenRouter fallback, which only runs after the user
-    /// approves it.
+    /// Logs <paramref name="logLine"/> and records the run as failed. A failure on a provider
+    /// with a configured fallback exposes the next provider, which only runs after approval.
     /// </summary>
-    private void Fail(string logLine, string message, bool offerFallback)
+    private void Fail(string logLine, string message, RunOptions options, bool offerFallback)
     {
+        var next = offerFallback ? options.FallbackList.FirstOrDefault() : null;
+        var current = options.Provider?.DisplayName ?? "The run";
         Log(logLine);
         UpdateState(state => state with
         {
             Status = RunStatus.Failed,
             FinishedAt = DateTimeOffset.Now,
-            Message = offerFallback ? $"{message} Retry on OpenRouter?" : message,
-            FallbackAvailable = offerFallback,
-            FallbackMessage = offerFallback ? "Surplus failed. Retry this run on OpenRouter?" : null,
+            Message = next is null ? message : $"{message} Retry on {next.DisplayName}?",
+            FallbackAvailable = next is not null,
+            FallbackMessage = next is null ? null : $"{current} failed. Retry this run on {next.DisplayName}?",
+            Fallback = next,
         });
     }
 
     private void LogSpend()
     {
         var metrics = State.Metrics;
-        Log(SpendFormat.SpendLine(metrics.SpendUsd, metrics.EstimatedSpendUsd, State.Provider));
+        var provider = State.Provider;
+        Log(SpendFormat.SpendLine(
+            metrics.SpendUsd,
+            metrics.EstimatedSpendUsd,
+            provider?.SpendMode ?? SpendMode.None,
+            provider?.DisplayName));
     }
 
     /// <summary>

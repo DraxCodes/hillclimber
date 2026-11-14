@@ -92,6 +92,30 @@ public class SpendTests
     }
 
     [Fact]
+    public void Spend_EstimatedMode_KeepsTheEstLabelEvenAtZero()
+    {
+        Assert.Equal("est. $0.00", SpendFormat.Spend(0, 0, SpendMode.Estimated));
+        Assert.Equal("est. $0.000054", SpendFormat.Spend(0, 0.0000538, SpendMode.Estimated));
+    }
+
+    [Fact]
+    public void Spend_NoModeAndNoFigures_RendersAnEmDash()
+    {
+        Assert.Equal("—", SpendFormat.Spend(0, 0, SpendMode.None));
+        Assert.Equal("—", SpendFormat.Spend(0, 0, SpendMode.Reported));
+        Assert.Equal("$0.25", SpendFormat.Spend(0.25, 0, SpendMode.Reported));
+    }
+
+    [Fact]
+    public void SpendLine_NamesTheProviderAndStaysHonestAtZero()
+    {
+        Assert.Equal("Spend this run: est. $0 (Surplus pricing unavailable).", SpendFormat.SpendLine(0, 0, SpendMode.Estimated, "Surplus"));
+        Assert.Equal("Spend this run: est. $0.000054 (Surplus pricing).", SpendFormat.SpendLine(0, 0.0000538m, SpendMode.Estimated, "Surplus"));
+        Assert.Equal("Spend this run: no cost reported.", SpendFormat.SpendLine(0, 0, SpendMode.None));
+        Assert.Equal("Spend this run: $0.25.", SpendFormat.SpendLine(0.25m, 0, SpendMode.Reported, "OpenRouter"));
+    }
+
+    [Fact]
     public void Headline_PrefersMonthly_ThenGlobal_ThenDash()
     {
         var connection = new OpenRouterConnection(true, true, "k", false, null, null, null, null);

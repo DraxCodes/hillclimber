@@ -181,18 +181,27 @@ public class RunServiceTests
 
     private static ProviderPricing Pricing => new(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
 
+    private static ProviderSelection Surplus(ProviderPricing? pricing = null) =>
+        new(ProviderIds.Surplus, "Surplus", "surplus/deepseek-v4.1-flash-1017", SpendMode.Estimated, pricing);
+
+    private static ProviderSelection OpenRouter() =>
+        new(ProviderIds.OpenRouter, "OpenRouter", "openrouter/deepseek/deepseek-v4.1-flash", SpendMode.Reported);
+
+    private static RunOptions SurplusOptions(ProviderSelection? provider = null, params ProviderSelection[] fallbacks) =>
+        new(@"C:\repo", "go", "task-orchestrator", provider ?? Surplus(Pricing), fallbacks.Length > 0 ? fallbacks : [OpenRouter()]);
+
     [Fact]
     public async Task Run_OnSurplusFailure_OffersTheFallbackWithoutSwitching()
     {
         var runner = new FakeCommandRunner((_, _) => CannedResults.Raw("boom", exitCode: 1));
         var service = new RunService(runner);
 
-        await service.StartAsync(new RunOptions(
-            @"C:\repo", "go", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing));
+        await service.StartAsync(SurplusOptions());
 
         var state = service.State;
         Assert.Equal(RunStatus.Failed, state.Status);
         Assert.True(state.FallbackAvailable);
+        Assert.Equal(ProviderIds.OpenRouter, state.Fallback?.Id);
         Assert.Contains("Retry on OpenRouter", state.Message);
         Assert.Single(runner.RequestsFor("opencode"));
         Assert.Contains("surplus/deepseek-v4.1-flash-1017", Assert.Single(runner.RequestsFor("opencode")).Arguments);
@@ -207,16 +216,16 @@ public class RunServiceTests
             : CannedResults.Raw(string.Empty));
         var service = new RunService(runner);
 
-        await service.StartAsync(new RunOptions(
-            @"C:\repo", "go", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing));
+        await service.StartAsync(SurplusOptions());
 
-        await service.ApproveFallbackAsync("openrouter/deepseek/deepseek-v4.1-flash");
+        await service.ApproveFallbackAsync();
 
         var requests = runner.RequestsFor("opencode");
         Assert.Equal(2, requests.Count);
         Assert.Contains("openrouter/deepseek/deepseek-v4.1-flash", requests[1].Arguments);
         Assert.Equal(RunStatus.Completed, service.State.Status);
         Assert.False(service.State.FallbackAvailable);
+        Assert.Equal(ProviderIds.OpenRouter, service.State.Provider?.Id);
         Assert.Equal(0.0125m, service.State.Metrics.SpendUsd);
         Assert.Equal(0m, service.State.Metrics.EstimatedSpendUsd);
     }
@@ -227,12 +236,62 @@ public class RunServiceTests
         var runner = new FakeCommandRunner((_, _) => throw new InvalidOperationException("boom"));
         var service = new RunService(runner);
 
-        await service.StartAsync(new RunOptions(
-            @"C:\repo", "go", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing));
+        await service.StartAsync(SurplusOptions());
 
         Assert.Equal(RunStatus.Failed, service.State.Status);
         Assert.True(service.State.FallbackAvailable);
         Assert.Contains("Retry on OpenRouter", service.State.Message);
+    }
+
+    [Fact]
+    public async Task Run_WithoutAFallback_DoesNotOfferOne()
+    {
+        var runner = new FakeCommandRunner((_, _) => CannedResults.Raw("boom", exitCode: 1));
+        var service = new RunService(runner);
+
+        await service.StartAsync(new RunOptions(@"C:\repo", "go", "task-orchestrator", Surplus(Pricing)));
+
+        Assert.Equal(RunStatus.Failed, service.State.Status);
+        Assert.False(service.State.FallbackAvailable);
+        Assert.Null(service.State.Fallback);
+        Assert.DoesNotContain("Retry on", service.State.Message);
+    }
+
+    [Fact]
+    public async Task Run_Exit127_NeverOffersAFallback()
+    {
+        var runner = new FakeCommandRunner((_, _) => CannedResults.Raw(string.Empty, 127));
+        var service = new RunService(runner);
+
+        await service.StartAsync(SurplusOptions());
+
+        Assert.Equal(RunStatus.Failed, service.State.Status);
+        Assert.False(service.State.FallbackAvailable);
+        Assert.DoesNotContain("Retry on", service.State.Message);
+    }
+
+    [Fact]
+    public async Task Run_ApproveFallback_AdvancesThroughTheConfiguredChain()
+    {
+        var third = new ProviderSelection("third", "Third", "third/model", SpendMode.Reported);
+        var opencodeCalls = 0;
+        var runner = new FakeCommandRunner((request, _) => request.FileName == "opencode"
+            ? ++opencodeCalls < 3 ? CannedResults.Raw("boom", exitCode: 1) : CannedResults.Raw(StepFinish)
+            : CannedResults.Raw(string.Empty));
+        var service = new RunService(runner);
+
+        await service.StartAsync(SurplusOptions(fallbacks: [OpenRouter(), third]));
+        Assert.Equal(ProviderIds.OpenRouter, service.State.Fallback?.Id);
+
+        await service.ApproveFallbackAsync();
+        Assert.Equal("third", service.State.Fallback?.Id);
+
+        await service.ApproveFallbackAsync();
+        Assert.Equal(RunStatus.Completed, service.State.Status);
+        Assert.Equal("third", service.State.Provider?.Id);
+        Assert.Equal(3, runner.RequestsFor("opencode").Count);
+        Assert.Contains("third/model", runner.RequestsFor("opencode")[2].Arguments);
+        Assert.Equal(SpendMode.Reported, service.State.Provider?.SpendMode);
     }
 
     [Fact]
@@ -268,8 +327,8 @@ public class RunServiceTests
 
         Assert.Equal(0.0011m, metrics.EstimatedSpendUsd);
         Assert.Equal(0.0025m, metrics.SpendUsd);
-        Assert.Equal("est. $0.0011 + $0.0025", SpendFormat.Spend(0.0025, 0.0011, AiProvider.OpenRouter));
-        Assert.Equal("Spend this run: est. $0.0011 + $0.0025.", SpendFormat.SpendLine(0.0025m, 0.0011m, AiProvider.OpenRouter));
+        Assert.Equal("est. $0.0011 + $0.0025", SpendFormat.Spend(0.0025, 0.0011, SpendMode.Reported));
+        Assert.Equal("Spend this run: est. $0.0011 + $0.0025.", SpendFormat.SpendLine(0.0025m, 0.0011m, SpendMode.Reported));
     }
 
     // ---- shared accumulator --------------------------------------------------

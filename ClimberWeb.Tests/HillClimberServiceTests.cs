@@ -385,8 +385,17 @@ public class HillClimberServiceTests
 
     private static ProviderPricing Pricing => new(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
 
-    private static ClimberOptions SurplusOptions(int max = 1) =>
-        new(@"C:\work\repo", "make tests pass", max, null, "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing);
+    private static ProviderSelection Surplus() =>
+        new(ProviderIds.Surplus, "Surplus", "surplus/deepseek-v4.1-flash-1017", SpendMode.Estimated, Pricing);
+
+    private static ProviderSelection OpenRouter() =>
+        new(ProviderIds.OpenRouter, "OpenRouter", "openrouter/deepseek/deepseek-v4.1-flash", SpendMode.Reported);
+
+    private static ClimberOptions SurplusOptions(int max = 1, params ProviderSelection[] fallbacks) =>
+        new(@"C:\work\repo", "make tests pass", max, null, Surplus(), fallbacks.Length > 0 ? fallbacks : [OpenRouter()]);
+
+    private static ClimberOptions SurplusWithoutFallback(int max = 1) =>
+        new(@"C:\work\repo", "make tests pass", max, null, Surplus());
 
     [Fact]
     public async Task SurplusFailure_PausesForApproval_AndDoesNotSwitchSilently()
@@ -438,7 +447,7 @@ public class HillClimberServiceTests
         var run = service.StartAsync(SurplusOptions());
         await WaitForStatus(service, RunStatus.AwaitingApproval);
 
-        service.ApproveFallback("openrouter/deepseek/deepseek-v4.1-flash");
+        service.ApproveFallback();
         await run.WaitAsync(TimeSpan.FromSeconds(5));
 
         var requests = runner.RequestsFor("opencode");
@@ -446,6 +455,7 @@ public class HillClimberServiceTests
         Assert.Contains("openrouter/deepseek/deepseek-v4.1-flash", requests[1].Arguments);
         Assert.Equal(RunStatus.Completed, service.State.Status);
         Assert.False(service.State.FallbackAvailable);
+        Assert.Equal(ProviderIds.OpenRouter, service.State.Provider?.Id);
         Assert.Contains(service.State.Logs, line => line.Contains("retrying with OpenRouter"));
     }
 
@@ -475,13 +485,73 @@ public class HillClimberServiceTests
         var run = service.StartAsync(SurplusOptions(max: 2));
         await WaitForStatus(service, RunStatus.AwaitingApproval);
 
-        service.ApproveFallback("openrouter/deepseek/deepseek-v4.1-flash");
+        service.ApproveFallback();
         await run.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(RunStatus.Completed, service.State.Status);
         Assert.Equal(0.0000538m, service.State.EstimatedSpendUsd);
         Assert.Equal(0.0025m, service.State.SpendUsd);
         Assert.Contains(service.State.Logs, line => line.Contains("Spend this run: est. $0.000054 + $0.0025."));
+    }
+
+    [Fact]
+    public async Task Climb_WithoutAFallback_DoesNotPauseForApproval()
+    {
+        var runner = new FakeCommandRunner((request, _) => request.FileName == "opencode"
+            ? CannedResults.Raw("boom", exitCode: 1)
+            : CannedResults.Tests(1));
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(SurplusWithoutFallback());
+
+        Assert.Equal(RunStatus.Completed, service.State.Status);
+        Assert.False(service.State.FallbackAvailable);
+        Assert.Single(runner.RequestsFor("opencode"));
+    }
+
+    [Fact]
+    public async Task Climb_AdvancesThroughTheConfiguredFallbackChain()
+    {
+        var second = new ProviderSelection("second", "Second", "second/model", SpendMode.Reported);
+        var third = new ProviderSelection("third", "Third", "third/model", SpendMode.Reported);
+        var opencodeCalls = 0;
+        var runner = new FakeCommandRunner((request, _) => request.FileName switch
+        {
+            "opencode" => ++opencodeCalls < 3 ? CannedResults.Raw("boom", exitCode: 1) : CannedResults.OpenCode(),
+            "dotnet" => CannedResults.Tests(1),
+            _ => CannedResults.Git(),
+        });
+        var service = new HillClimberService(runner);
+
+        var run = service.StartAsync(SurplusOptions(max: 1, fallbacks: [second, third]));
+        await WaitForFallback(service, "second");
+
+        service.ApproveFallback();
+        await WaitForFallback(service, "third");
+
+        service.ApproveFallback();
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(RunStatus.Completed, service.State.Status);
+        Assert.Equal("third", service.State.Provider?.Id);
+        Assert.Equal(3, runner.RequestsFor("opencode").Count);
+        Assert.Contains("third/model", runner.RequestsFor("opencode")[2].Arguments);
+        Assert.Equal(SpendMode.Reported, service.State.Provider?.SpendMode);
+    }
+
+    private static async Task WaitForFallback(IHillClimberService service, string id)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (service.State.Status != RunStatus.AwaitingApproval || service.State.Fallback?.Id != id)
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException(
+                    $"Expected an approval offer for '{id}', saw {service.State.Status} / {service.State.Fallback?.Id ?? "none"}.");
+            }
+
+            await Task.Delay(10);
+        }
     }
 
     private static async Task WaitForStatus(IHillClimberService service, RunStatus status)
