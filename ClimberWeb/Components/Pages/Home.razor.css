@@ -240,7 +240,7 @@
 .r { color: var(--red); }
 
 .st-idle { color: var(--ink-2); }
-.st-running { color: var(--accent); }
+.st-running { color: var(--accent-text); }
 .st-completed { color: var(--green); }
 .st-stopped { color: var(--orange); }
 .st-failed { color: var(--red); }
@@ -280,7 +280,7 @@
 }
 
 .chip-primary {
-    color: var(--accent);
+    color: var(--accent-text);
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
@@ -390,7 +390,7 @@
 }
 
 .log-subagent-name {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 600;
     margin-right: 0.4rem;
 }

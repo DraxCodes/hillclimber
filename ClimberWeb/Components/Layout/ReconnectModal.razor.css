@@ -90,8 +90,8 @@
 }
 
 #components-reconnect-modal button {
-    border: 1px solid var(--accent);
-    background-color: var(--accent);
+    border: 1px solid var(--accent-strong);
+    background-color: var(--accent-strong);
     color: var(--accent-ink);
     font-family: var(--font-mono);
     font-weight: 600;
@@ -101,11 +101,13 @@
 }
 
     #components-reconnect-modal button:hover {
-        filter: brightness(1.07);
+        border-color: var(--accent-strong-hover);
+        background-color: var(--accent-strong-hover);
     }
 
     #components-reconnect-modal button:active {
-        filter: brightness(0.95);
+        border-color: var(--accent-strong);
+        background-color: var(--accent-strong);
     }
 
 .components-rejoining-animation {
