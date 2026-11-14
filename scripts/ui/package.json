@@ -8,6 +8,7 @@
     "theme-nav": "node theme-nav.mjs",
     "security": "node security.mjs",
     "providers": "node providers.mjs",
+    "polish": "node polish.mjs",
     "surfaces": "node surfaces.mjs"
   },
   "license": "UNLICENSED",
