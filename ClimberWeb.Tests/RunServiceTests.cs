@@ -244,6 +244,34 @@ public class RunServiceTests
         Assert.Equal(0.00002294m, metrics.EstimatedSpendUsd);
     }
 
+    [Fact]
+    public void RunMetrics_PricesReasoningTokensAtTheCompletionRate()
+    {
+        const string line = """{"type":"step_finish","part":{"cost":0,"tokens":{"input":100,"output":10,"reasoning":90}}}""";
+        var pricing = new SurplusPricing(0.000001, 0.000010, 0, 0);
+
+        var metrics = RunMetrics.Zero.Add(line, pricing);
+
+        Assert.Equal(0.0011m, metrics.EstimatedSpendUsd);
+        Assert.Equal(10, metrics.OutputTokens);
+        Assert.Equal(110, metrics.TotalTokens);
+    }
+
+    [Fact]
+    public void RunMetrics_MixedProviders_KeepTheEstimateAndTheReportedCostApart()
+    {
+        const string surplusStep = """{"type":"step_finish","part":{"cost":0,"tokens":{"input":100,"output":10,"reasoning":90}}}""";
+        const string openRouterStep = """{"type":"step_finish","part":{"cost":0.0025,"tokens":{"input":50,"output":5}}}""";
+        var pricing = new SurplusPricing(0.000001, 0.000010, 0, 0);
+
+        var metrics = RunMetrics.Zero.Add(surplusStep, pricing).Add(openRouterStep);
+
+        Assert.Equal(0.0011m, metrics.EstimatedSpendUsd);
+        Assert.Equal(0.0025m, metrics.SpendUsd);
+        Assert.Equal("est. $0.0011 + $0.0025", SpendFormat.Spend(0.0025, 0.0011, AiProvider.OpenRouter));
+        Assert.Equal("Spend this run: est. $0.0011 + $0.0025.", SpendFormat.SpendLine(0.0025m, 0.0011m, AiProvider.OpenRouter));
+    }
+
     // ---- shared accumulator --------------------------------------------------
 
     [Fact]

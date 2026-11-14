@@ -104,8 +104,8 @@ public sealed record SurplusPricing(double Prompt, double Completion, double Cac
 /// <param name="ModelAvailable">True when the configured model appears in the catalogue.</param>
 /// <param name="Model">The configured primary model id.</param>
 /// <param name="FallbackModel">The configured OpenRouter fallback id.</param>
-/// <param name="Pricing">The model's pricing, or null when it could not be read.</param>
-/// <param name="Message">Human-readable explanation when not connected, else null.</param>
+/// <param name="Pricing">The model's pricing, or null when it is unlisted or publishes no usable pricing.</param>
+/// <param name="Message">Human-readable explanation when not connected or unpriced, else null.</param>
 /// <param name="Notes">Non-fatal explanations to show on the page.</param>
 public sealed record SurplusReport(
     bool Configured,
@@ -139,6 +139,11 @@ public interface ISurplusClient
     Task<SurplusReport> GetReportAsync(CancellationToken cancellationToken = default);
 }
 
+/// <summary>Result of looking a model up in Surplus's catalogue.</summary>
+/// <param name="Listed">True when the catalogue contains the model's id.</param>
+/// <param name="Pricing">The model's per-token pricing, or null when it publishes none.</param>
+public readonly record struct SurplusCatalogueEntry(bool Listed, SurplusPricing? Pricing);
+
 /// <summary>Parsers for Surplus's <c>GET /models</c> response, shared by client and tests.</summary>
 public static class SurplusParser
 {
@@ -159,14 +164,16 @@ public static class SurplusParser
     }
 
     /// <summary>
-    /// Finds <paramref name="model"/> in the catalogue and reads its pricing. Returns null
-    /// for malformed JSON, an empty catalogue, or a model that is not listed.
+    /// Looks <paramref name="model"/> up in the catalogue. A model that is listed without
+    /// usable pricing comes back as listed with null <see cref="SurplusCatalogueEntry.Pricing"/>,
+    /// so callers can tell "Surplus does not serve this model" from "Surplus serves it but
+    /// cannot price it". A malformed or empty response is not listed.
     /// </summary>
-    public static SurplusPricing? ParsePricing(string? json, string model)
+    public static SurplusCatalogueEntry Lookup(string? json, string model)
     {
         if (string.IsNullOrWhiteSpace(json))
         {
-            return null;
+            return default;
         }
 
         var target = NormalizeModelId(model);
@@ -176,7 +183,7 @@ public static class SurplusParser
             using var document = JsonDocument.Parse(json);
             if (!document.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
             {
-                return null;
+                return default;
             }
 
             foreach (var item in data.EnumerateArray())
@@ -184,42 +191,69 @@ public static class SurplusParser
                 if (item.ValueKind != JsonValueKind.Object
                     || !item.TryGetProperty("id", out var idElement)
                     || idElement.ValueKind != JsonValueKind.String
-                    || !string.Equals(idElement.GetString(), target, StringComparison.OrdinalIgnoreCase)
-                    || !item.TryGetProperty("pricing", out var pricing)
-                    || pricing.ValueKind != JsonValueKind.Object)
+                    || !string.Equals(idElement.GetString(), target, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
-                return new SurplusPricing(
-                    ReadNumber(pricing, "prompt"),
-                    ReadNumber(pricing, "completion"),
-                    ReadNumber(pricing, "input_cache_read"),
-                    ReadNumber(pricing, "input_cache_write"));
+                if (!item.TryGetProperty("pricing", out var pricing) || pricing.ValueKind != JsonValueKind.Object)
+                {
+                    return new SurplusCatalogueEntry(true, null);
+                }
+
+                // Prompt and completion are the prices an estimate cannot do without; a cache
+                // price that is absent may legitimately be free, so it defaults to zero.
+                if (!TryReadNumber(pricing, "prompt", out var prompt)
+                    || !TryReadNumber(pricing, "completion", out var completion))
+                {
+                    return new SurplusCatalogueEntry(true, null);
+                }
+
+                return new SurplusCatalogueEntry(
+                    true,
+                    new SurplusPricing(
+                        prompt,
+                        completion,
+                        ReadNumber(pricing, "input_cache_read"),
+                        ReadNumber(pricing, "input_cache_write")));
             }
         }
         catch (JsonException)
         {
-            return null;
+            return default;
         }
 
-        return null;
+        return default;
     }
 
-    private static double ReadNumber(JsonElement element, string name)
+    /// <summary>
+    /// Reads a per-token price. A missing or non-finite value is not readable, so a caller
+    /// that needs the price can treat the model as unpriced instead of pricing it at NaN.
+    /// </summary>
+    private static bool TryReadNumber(JsonElement element, string name, out double number)
     {
+        number = 0d;
         if (!element.TryGetProperty(name, out var value))
         {
-            return 0d;
+            return false;
         }
 
-        return value.ValueKind switch
+        switch (value.ValueKind)
         {
-            JsonValueKind.Number when value.TryGetDouble(out var number) => number,
-            JsonValueKind.String when double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) => number,
-            _ => 0d,
-        };
+            case JsonValueKind.Number when value.TryGetDouble(out var parsed):
+                number = parsed;
+                return true;
+            case JsonValueKind.String when double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed):
+                // A catalogue can say "NaN" or "Infinity"; either would poison every estimate.
+                number = parsed;
+                return double.IsFinite(parsed);
+            default:
+                return false;
+        }
     }
+
+    private static double ReadNumber(JsonElement element, string name) =>
+        TryReadNumber(element, name, out var number) ? number : 0d;
 }
 
 /// <summary>
@@ -258,7 +292,7 @@ public sealed class SurplusClient : ISurplusClient
         try
         {
             // /models is the provider's open catalogue; the key is only a configured/not-configured
-// signal, so it is deliberately not sent to an endpoint that does not need it.
+            // signal, so it is deliberately not sent to an endpoint that does not need it.
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{_options.BaseUrl}/models");
             using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -270,12 +304,20 @@ public sealed class SurplusClient : ISurplusClient
                 return new SurplusReport(true, false, false, _options.Model, _options.FallbackModel, null, message, notes);
             }
 
-            var pricing = SurplusParser.ParsePricing(body, _options.Model);
-            if (pricing is null)
+            var entry = SurplusParser.Lookup(body, _options.Model);
+            if (!entry.Listed)
             {
                 var message = $"Surplus did not list {_options.Model}; spend cannot be estimated.";
                 notes.Add(message);
                 return new SurplusReport(true, true, false, _options.Model, _options.FallbackModel, null, message, notes);
+            }
+
+            if (entry.Pricing is not { } pricing)
+            {
+                // The model works, it just cannot be priced; that is not a reason to fall back.
+                var message = $"Surplus lists {_options.Model} but publishes no pricing for it; spend cannot be estimated.";
+                notes.Add(message);
+                return new SurplusReport(true, true, true, _options.Model, _options.FallbackModel, null, message, notes);
             }
 
             return new SurplusReport(true, true, true, _options.Model, _options.FallbackModel, pricing, null, notes);

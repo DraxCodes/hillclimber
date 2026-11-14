@@ -449,6 +449,41 @@ public class HillClimberServiceTests
         Assert.Contains(service.State.Logs, line => line.Contains("retrying with OpenRouter"));
     }
 
+    [Fact]
+    public async Task MixedProviderClimb_EstimatesSurplusSteps_ThenAddsTheOpenRouterCost()
+    {
+        const string surplusStep =
+            """{"type":"step_finish","part":{"reason":"stop","cost":0,"tokens":{"input":100,"output":10,"reasoning":90}}}""";
+        const string openRouterStep =
+            """{"type":"step_finish","part":{"reason":"stop","cost":0.0025,"tokens":{"input":50,"output":5}}}""";
+
+        var opencodeCalls = 0;
+        var dotnetCalls = 0;
+        var runner = new FakeCommandRunner((request, _) => request.FileName switch
+        {
+            "opencode" => ++opencodeCalls switch
+            {
+                1 => CannedResults.Raw(surplusStep),
+                2 => CannedResults.Raw("boom", exitCode: 1),
+                _ => CannedResults.Raw(openRouterStep),
+            },
+            "dotnet" => CannedResults.Tests(++dotnetCalls),
+            _ => CannedResults.Git(),
+        });
+        var service = new HillClimberService(runner);
+
+        var run = service.StartAsync(SurplusOptions(max: 2));
+        await WaitForStatus(service, RunStatus.AwaitingApproval);
+
+        service.ApproveFallback("openrouter/deepseek/deepseek-v4.1-flash");
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(RunStatus.Completed, service.State.Status);
+        Assert.Equal(0.0000538m, service.State.EstimatedSpendUsd);
+        Assert.Equal(0.0025m, service.State.SpendUsd);
+        Assert.Contains(service.State.Logs, line => line.Contains("Spend this run: est. $0.000054 + $0.0025."));
+    }
+
     private static async Task WaitForStatus(IHillClimberService service, RunStatus status)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);
