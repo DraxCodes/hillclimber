@@ -163,6 +163,13 @@
     margin: 0 0 0.9rem;
 }
 
+.providerbar .label {
+    margin-bottom: 0;
+    /* Uppercase has no descender, so centre it optically with the lowercase labels. */
+    position: relative;
+    top: 1.5px;
+}
+
 .providerbar .method {
     border: 1px solid var(--line);
     background: var(--surface-2);
