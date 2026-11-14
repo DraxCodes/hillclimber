@@ -7,8 +7,16 @@
 //
 // It drives the PIN gate, the run|hillclimb method switch, the folder picker, the run
 // and climb controls, the theme toggle, the live output panel, and the /status and
-// /activity pages, and writes one screenshot per page. The runs it starts are stopped
-// immediately, so they do not spend meaningfully. Exit code is non-zero on any failure.
+// /activity pages, and writes one screenshot per page.
+//
+// The runs it starts are stopped immediately, but they do reach a paid provider. Surplus
+// Intelligence is the only one they may use: the harness refuses to start when Surplus is
+// not connected, and it never approves the OpenRouter fallback. Each run's echoed command
+// line must use a `surplus/` model and must not reference `openrouter/`; when the first run
+// does not, the harness stops before starting another paid run.
+//
+// Exit codes: 0 all checks passed, 1 a check failed, 2 refused to continue (Surplus not
+// connected, or a paid run did not use Surplus).
 
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -66,6 +74,40 @@ check('spend line is present', (await page.locator('.spendline').count()) === 1)
 check('spend line shows Surplus as primary', (await page.locator('.spendline .conn').innerText()).toLowerCase().includes('surplus'));
 check('spend line shows the fallback provider', (await page.locator('.spendline').innerText()).toLowerCase().includes('fallback'));
 check('spend line shows a spend figure', /\$/.test(await page.locator('.spendline').innerText()));
+
+// --- provider guard: paid checks only ever run on Surplus -----------------
+// The run and climb below call a paid API. Surplus is the only provider they may spend
+// on; OpenRouter would need an explicit approval click, which this harness never makes.
+// Stop here instead of drifting into a failed run or an unstaged OpenRouter charge.
+const summary = () => `${results.length} checks, ${results.filter((r) => !r.ok).length} failures`;
+const refuse = async (reason) => {
+  console.error(`\n${reason}`);
+  console.error(`REFUSED — ${summary()}. No further paid runs were started.`);
+  await browser.close();
+  process.exit(2);
+};
+
+await page
+  .waitForFunction(() => !/checking/i.test(document.querySelector('.spendline .conn')?.textContent ?? ''), null, { timeout: 20_000 })
+  .catch(() => {});
+const surplusState = (await page.locator('.spendline .conn').innerText()).split(':').pop().trim().toLowerCase();
+if (surplusState !== 'connected') {
+  await refuse(
+    `Surplus is not connected (state: ${surplusState}).\n` +
+      'The token-spending checks only run through Surplus; configure Climber:SurplusApiKey or SURPLUS_API_KEY for the app, then retry.',
+  );
+}
+
+const logText = async () => (await page.locator('.log-line').allInnerTexts()).join('\n');
+const approvalOffered = async () => (await page.locator('.approval-row').count()) > 0;
+
+// Only the echoed command lines matter: prompt text and model prose can mention any provider.
+const commandLines = (text) => text.split('\n').filter((line) => line.includes('opencode run'));
+const surplusCommand = (text) => {
+  const commands = commandLines(text);
+  return commands.length > 0 && commands.every((line) => /--model[=\s]+surplus\//.test(line));
+};
+const openRouterCommand = (text) => /openrouter\//.test(commandLines(text).join('\n'));
 
 // --- provider switch ------------------------------------------------------
 const providers = (await page.locator('.providerbar .method').allInnerTexts()).map((t) => t.trim().toLowerCase());
@@ -167,6 +209,15 @@ check('output labels the running agent', primaryTab.includes('orchestrator') || 
 await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});
 await page.waitForTimeout(1200);
 check('run stop returns to a settled state', ['stopped', 'completed', 'failed', 'idle'].includes(await status()));
+const runLog = await logText();
+const runCommand = (runLog.match(/--model[=\s]+\S+/) ?? [''])[0];
+const runOnSurplus = surplusCommand(runLog) && !openRouterCommand(runLog);
+check('run runs on Surplus', runOnSurplus, runCommand);
+const runApproval = await approvalOffered();
+check('run never offers the OpenRouter fallback', !runApproval);
+if (!runOnSurplus || runApproval) {
+  await refuse('The run did not stay on Surplus. Stopping before the climb would start another paid run.');
+}
 
 // --- hillclimb mode: start / stop ----------------------------------------
 await page.click('button.method:has-text("hillclimb")');
@@ -182,6 +233,15 @@ await shot(page, 'hillclimb.png');
 await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});
 await page.waitForTimeout(1200);
 check('climb stop returns to a settled state', ['stopped', 'completed', 'failed', 'idle'].includes(await status()));
+const climbLog = await logText();
+const climbCommand = (climbLog.match(/--model[=\s]+\S+/) ?? [''])[0];
+const climbOnSurplus = surplusCommand(climbLog) && !openRouterCommand(climbLog);
+check('climb runs on Surplus', climbOnSurplus, climbCommand);
+const climbApproval = await approvalOffered();
+check('climb never offers the OpenRouter fallback', !climbApproval);
+if (!climbOnSurplus || climbApproval) {
+  await refuse('The climb did not stay on Surplus.');
+}
 
 // --- lock ----------------------------------------------------------------
 await page.locator('.btn-row .btn', { hasText: 'lock' }).first().click();

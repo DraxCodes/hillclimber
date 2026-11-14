@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "theme-nav": "node theme-nav.mjs",
-    "security": "node security.mjs"
+    "security": "node security.mjs",
+    "surfaces": "node surfaces.mjs"
   },
   "license": "UNLICENSED",
   "devDependencies": {

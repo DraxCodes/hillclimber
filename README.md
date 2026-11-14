@@ -150,12 +150,15 @@ cd scripts/ui
 node theme-nav.mjs      # theme survives navigation
 node security.mjs       # /status and /activity are PIN-gated
 
-# Token-spending browser check (drives real OpenCode runs)
-node surfaces.mjs
+# Token-spending browser check (drives real OpenCode runs, Surplus only)
+npm run surfaces
 ```
 
-Current state: **190 tests passing, 0 failed, 0 skipped**, **62.42% line coverage**. The
-token-spending `surfaces.mjs` harness is **not run** as part of the default checks.
+Current state: **230 tests passing, 0 failed, 0 skipped**, **62.3% line coverage**. The
+token-spending `surfaces.mjs` harness is **not run** as part of the default checks. It
+refuses to start unless Surplus is connected, checks each run's echoed command line for a
+`surplus/` model, stops before the second paid run when the first does not use Surplus, and
+never approves the OpenRouter fallback.
 
 ## License
 
