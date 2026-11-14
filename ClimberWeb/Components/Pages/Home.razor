@@ -744,20 +744,26 @@ else
     /// </summary>
     private async Task RefreshProviderSurfacesAsync()
     {
-        var loads = Providers.Providers.Select(async provider =>
+        var catalogueLoads = Providers.Providers
+            .Where(provider => provider.Catalogue is not null)
+            .Select(async provider => (provider.Id, Report: await provider.Catalogue!.GetReportAsync()))
+            .ToArray();
+        var spendLoads = Providers.Providers
+            .Where(provider => provider.Spend is not null)
+            .Select(async provider => (provider.Id, Report: await provider.Spend!.GetSpendAsync()))
+            .ToArray();
+
+        // Apply the results after every probe finishes: the dictionaries are not thread-safe,
+        // and the probes resume on the thread pool.
+        foreach (var (id, report) in await Task.WhenAll(catalogueLoads))
         {
-            if (provider.Catalogue is { } catalogue)
-            {
-                _catalogueReports[provider.Id] = await catalogue.GetReportAsync();
-            }
+            _catalogueReports[id] = report;
+        }
 
-            if (provider.Spend is { } spend)
-            {
-                _spendReports[provider.Id] = await spend.GetSpendAsync();
-            }
-        });
-
-        await Task.WhenAll(loads);
+        foreach (var (id, report) in await Task.WhenAll(spendLoads))
+        {
+            _spendReports[id] = report;
+        }
     }
 
     /// <summary>Reads the target folder's agents and the default one to run (config override + conventional default).</summary>

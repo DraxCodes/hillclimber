@@ -386,23 +386,33 @@ else
     {
         var catalogueLoads = Providers.Providers
             .Where(provider => provider.Catalogue is not null)
-            .Select(async provider =>
-            {
-                _catalogueReports[provider.Id] = await provider.Catalogue!.GetReportAsync();
-            });
+            .Select(async provider => (provider.Id, Report: await provider.Catalogue!.GetReportAsync()))
+            .ToArray();
 
         var spendLoads = Providers.Providers
             .Where(provider => provider.Spend is not null)
             .Select(async provider =>
             {
                 var report = await provider.Spend!.GetSpendAsync();
-                _spendReports[provider.Id] = report;
                 var (days, models) = Summarize(report.Activity);
-                _daily[provider.Id] = days;
-                _models[provider.Id] = models;
-            });
+                return (provider.Id, Report: report, Days: days, Models: models);
+            })
+            .ToArray();
 
-        await Task.WhenAll(catalogueLoads.Concat(spendLoads));
+        // Apply the results after every probe finishes: the dictionaries are not thread-safe,
+        // and the probes resume on the thread pool.
+        foreach (var (id, report) in await Task.WhenAll(catalogueLoads))
+        {
+            _catalogueReports[id] = report;
+        }
+
+        foreach (var (id, report, days, models) in await Task.WhenAll(spendLoads))
+        {
+            _spendReports[id] = report;
+            _daily[id] = days;
+            _models[id] = models;
+        }
+
         _loaded = true;
     }
 
