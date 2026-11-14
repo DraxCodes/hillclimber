@@ -2,7 +2,7 @@
 description: Always-on security gatekeeper — verifies tests pass, hunts secrets and exposure, reports concerns to the orchestrator, and checks current best practices online
 display_name: Security Auditor
 mode: subagent
-model: openrouter/deepseek/deepseek-v4.1-flash#low
+model: surplus/deepseek-v4.1-flash-1017#low
 color: "#22b8a6"
 permissions:
   - action: edit

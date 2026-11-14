@@ -2,7 +2,7 @@
 description: Designs the plan and defines measurable quality gates for a hillclimb run
 display_name: Plan Architect
 mode: subagent
-model: openrouter/deepseek/deepseek-v4.1-flash#low
+model: surplus/deepseek-v4.1-flash-1017#low
 color: "#6ea8fe"
 permissions:
   - action: edit

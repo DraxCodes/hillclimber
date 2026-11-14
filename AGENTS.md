@@ -53,11 +53,11 @@ short:
 
 ## Optional local models
 
-Cloud (`openrouter/deepseek/deepseek-v4.1-flash`) is the default for every agent.
+Cloud (`surplus/deepseek-v4.1-flash-1017`) is the default for every agent.
 Local models are an opt-in fallback for privacy, offline work, or unlimited
-throughput — **not a cost saving**: this model is ~$0.15/M input, ~$0.60/M
-output, ~$0.003/M cached, so a busy month costs a few dollars, usually less than
-the electricity to run a local GPU for the same work.
+throughput — **not a cost saving**: Surplus prices this model at ~$0.038/M
+input, ~$0.50/M output, ~$0.0075/M cached read, so a busy month costs a few
+dollars, usually less than the electricity to run a local GPU for the same work.
 
 OpenCode auto-discovers Ollama at `http://127.0.0.1:11434`, so no provider config
 is needed. Install Ollama, then pull a model that fits the machine:

@@ -43,7 +43,7 @@ re-running the script. Update installed skills with `npx skills update`.
 
 ## Optional local models
 
-Cloud (`openrouter/deepseek/deepseek-v4.1-flash`) is the default for every agent.
+Cloud (`surplus/deepseek-v4.1-flash-1017`) is the default for every agent.
 Local models are an opt-in fallback for privacy or offline work — **not a cost
 saving**, since this model is already a few dollars a month at typical volumes.
 

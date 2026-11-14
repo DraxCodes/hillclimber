@@ -2,7 +2,7 @@
 description: Read-only gatekeeper that enforces the quality gates for each hillclimb iteration
 display_name: Quality Gatekeeper
 mode: subagent
-model: openrouter/deepseek/deepseek-v4.1-flash#low
+model: surplus/deepseek-v4.1-flash-1017#low
 color: "#ff6b6b"
 permissions:
   - action: edit

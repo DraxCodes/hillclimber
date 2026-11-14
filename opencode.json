@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openrouter/deepseek/deepseek-v4.1-flash",
+  "model": "surplus/deepseek-v4.1-flash-1017",
   "compaction": {
     "auto": true,
     "buffer": "20%",

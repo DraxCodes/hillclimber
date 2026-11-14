@@ -2,7 +2,7 @@
 description: Owns a work item end to end — plans via plan-architect, gates changes via quality-gatekeeper and the always-on security-auditor, and keeps only proven improvements (the hillclimb loop for measurable objectives)
 display_name: Orchestrator
 mode: primary
-model: openrouter/deepseek/deepseek-v4.1-flash#low
+model: surplus/deepseek-v4.1-flash-1017#low
 color: "#8b5cf6"
 ---
 

@@ -250,7 +250,7 @@ public class ProjectStatusTests
             ---
             description: Designs the plan
             mode: subagent
-            model: openrouter/deepseek/deepseek-v4.1-flash#low
+            model: surplus/deepseek-v4.1-flash-1017#low
             permissions:
               - action: edit
                 resource: "*"
@@ -263,7 +263,7 @@ public class ProjectStatusTests
 
         Assert.Equal("plan-architect", role.Name);
         Assert.Equal("Designs the plan", role.Description);
-        Assert.Equal("openrouter/deepseek/deepseek-v4.1-flash#low", role.Model);
+        Assert.Equal("surplus/deepseek-v4.1-flash-1017#low", role.Model);
         Assert.True(role.ReadOnly);
     }
 
