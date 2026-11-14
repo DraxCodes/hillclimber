@@ -19,8 +19,8 @@ public enum RunStatus
     Stopped,
 
     /// <summary>
-    /// The run paused because the primary provider failed. It resumes only after the user
-    /// approves the OpenRouter fallback, or stops if they cancel.
+    /// The run paused because the current provider failed. It resumes only after the user
+    /// approves the next configured provider, or stops if they cancel.
     /// </summary>
     AwaitingApproval,
 
@@ -28,15 +28,7 @@ public enum RunStatus
     Failed,
 }
 
-/// <summary>Which inference provider a run is using.</summary>
-public enum AiProvider
-{
-    /// <summary>Surplus Intelligence, the primary provider.</summary>
-    Surplus,
 
-    /// <summary>OpenRouter, used only after explicit approval.</summary>
-    OpenRouter,
-}
 
 /// <summary>One vocabulary for run status labels, shared by the dashboard and activity page.</summary>
 public static class RunStatusText

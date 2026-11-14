@@ -6,8 +6,7 @@
 @inject IConfiguration Config
 @inject IFileBrowser Browser
 @inject IClimberAuth Auth
-@inject IOpenRouterClient OpenRouter
-@inject ISurplusClient Surplus
+@inject IProviderRegistry Providers
 @inject IClimbPreflight Preflight
 @inject IJSRuntime JS
 
@@ -70,31 +69,28 @@ else
                 disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Hillclimb)">hillclimb</button>
     </section>
 
-    <section class="spendline" aria-label="Surplus connection and spend">
-        <span class="conn">
-            <span class="dot dot-@SurplusTone" aria-hidden="true"></span>
-            <span>surplus: @SurplusLabel</span>
-        </span>
-        <span class="spend-sep" aria-hidden="true">/</span>
+    <section class="spendline" aria-label="Provider connections and spend">
+        @foreach (var provider in Providers.Providers)
+        {
+            <span class="conn" data-provider="@provider.Id">
+                <span class="dot dot-@ProviderTone(provider)" aria-hidden="true"></span>
+                <span>@provider.DisplayName.ToLowerInvariant(): @ProviderLabel(provider)</span>
+            </span>
+            <span class="spend-sep" aria-hidden="true">/</span>
+        }
         <span class="spend-item">@ActiveSpendNoun <b>@ActiveSpendText</b></span>
-        <span class="spend-sep" aria-hidden="true">/</span>
-        <span class="spend-item" title="Fallback provider, used only after approval">
-            fallback <span class="dot dot-@FallbackTone" aria-hidden="true"></span><b>@FallbackLabel</b>
-        </span>
     </section>
 
     <section class="providerbar" aria-label="provider">
         <span class="label">provider</span>
-        <button class="method @(_providerId == ProviderIds.Surplus ? "active" : string.Empty)"
-                type="button"
-                disabled="@AnyRunning"
-                aria-pressed="@(_providerId == ProviderIds.Surplus)"
-                @onclick="SelectSurplus">surplus</button>
-        <button class="method @(_providerId == ProviderIds.OpenRouter ? "active" : string.Empty)"
-                type="button"
-                disabled="@AnyRunning"
-                aria-pressed="@(_providerId == ProviderIds.OpenRouter)"
-                @onclick="SelectOpenRouter">openrouter</button>
+        @foreach (var provider in Providers.Providers)
+        {
+            <button class="method @(SelectedProviderId == provider.Id ? "active" : string.Empty)"
+                    type="button"
+                    disabled="@AnyRunning"
+                    aria-pressed="@(SelectedProviderId == provider.Id)"
+                    @onclick="() => SelectProvider(provider.Id)">@provider.DisplayName.ToLowerInvariant()</button>
+        }
         <span class="agent-note dim">@ProviderNote</span>
     </section>
 
@@ -239,32 +235,32 @@ else
             <p class="notice notice-info" role="status">@warning</p>
         }
 
-        @if (_pendingProviderApproval)
+        @if (_pendingProviderApproval && PendingProvider is { } pending)
         {
             <p class="notice notice-info" role="status">
-                OpenRouter is the fallback and bills your OpenRouter account. Approve it for this run?
+                @pending.DisplayName is a fallback and bills its own account. Approve it for this run?
             </p>
             <div class="btn-row approval-row">
-                <button class="btn btn-primary" type="button" @onclick="ApproveProviderSwitch">approve openrouter</button>
+                <button class="btn btn-primary" type="button" @onclick="ApproveProviderSwitch">approve @pending.Id.ToLowerInvariant()</button>
                 <button class="btn btn-ghost" type="button" @onclick="CancelProviderSwitch">cancel</button>
             </div>
         }
 
-        @if (_startFallbackOffer)
+        @if (_startFallbackOffer && StartFallbackProvider is { } startFallback)
         {
             <p class="notice notice-bad" role="alert">@_startFallbackMessage</p>
             <div class="btn-row approval-row">
-                <button class="btn btn-primary" type="button" @onclick="StartOnOpenRouter">start on openrouter</button>
+                <button class="btn btn-primary" type="button" @onclick="StartOnFallback">start on @startFallback.Id.ToLowerInvariant()</button>
                 <button class="btn btn-ghost" type="button" @onclick="CancelStartFallback">cancel</button>
             </div>
         }
 
-        @if (ActiveFallbackAvailable)
+        @if (ActiveFallbackAvailable && ActiveFallback is { } fallback)
         {
             <p class="notice notice-bad" role="alert">@ActiveFallbackMessage</p>
             <div class="btn-row approval-row">
                 <button class="btn btn-primary" type="button" @onclick="ApproveActiveFallback">
-                    retry on openrouter
+                    retry on @fallback.Id.ToLowerInvariant()
                 </button>
             </div>
         }
@@ -440,12 +436,14 @@ else
     private string? _sessionId;
     private DotNetObjectReference<Home>? _selfRef;
     private CancellationTokenSource? _expiryCts;
-    private SurplusReport? _surplus;
-    private SpendReport? _spend;
-    private string _providerId = ProviderIds.Surplus;
+    private readonly Dictionary<string, ProviderReport?> _catalogueReports = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SpendReport?> _spendReports = new(StringComparer.OrdinalIgnoreCase);
+    private string _providerId = string.Empty;
     private bool _pendingProviderApproval;
+    private string? _pendingProviderId;
     private bool _startFallbackOffer;
     private string _startFallbackMessage = string.Empty;
+    private string? _startFallbackProviderId;
     private IReadOnlyList<string> _preflightWarnings = Array.Empty<string>();
 
     /// <summary>True while the method currently on screen is active (running or awaiting approval).</summary>
@@ -471,8 +469,8 @@ else
         : _climb.EstimatedSpendUsd;
 
     /// <summary>
-    /// Surplus reports no cost, so its figure is the token-based estimate, marked "est.";
-    /// an approved OpenRouter run keeps its exact reported cost.
+    /// An estimated provider shows the token-based estimate, marked "est."; a reported
+    /// provider keeps its exact cost. A mixed run shows both.
     /// </summary>
     private string ActiveSpendText =>
         SpendFormat.Spend((double)ActiveReportedSpendUsd, (double)ActiveEstimatedSpendUsd, ActiveProvider?.SpendMode ?? SpendMode.None);
@@ -504,17 +502,54 @@ else
                 ? home
                 : Directory.GetCurrentDirectory();
 
-    private string SurplusTone => _surplus?.StateTone ?? "off";
+    /// <summary>The provider selected in the bar; empty until the registry has been read.</summary>
+    private string SelectedProviderId =>
+        string.IsNullOrEmpty(_providerId) ? Providers.Primary?.Id ?? string.Empty : _providerId;
 
-    private string SurplusLabel => _surplus?.StateLabel ?? "checking…";
+    private RegisteredProvider? SelectedProvider => Providers.Find(SelectedProviderId);
 
-    private string FallbackTone => _spend?.Connection.StateTone ?? "off";
+    private RegisteredProvider? PendingProvider =>
+        _pendingProviderId is { } id ? Providers.Find(id) : null;
 
-    private string FallbackLabel => _spend?.Connection.StateLabel ?? "checking…";
+    private RegisteredProvider? StartFallbackProvider =>
+        _startFallbackProviderId is { } id ? Providers.Find(id) : null;
 
-    private string ProviderNote => _providerId == ProviderIds.Surplus
-        ? "primary — spend is estimated from tokens"
-        : "fallback — exact spend, approved for this run";
+    private ProviderSelection? ActiveFallback => _method == RunMethod.Run ? _run.Fallback : _climb.Fallback;
+
+    /// <summary>Connection tone for a provider: catalogue first, then management spend.</summary>
+    private string ProviderTone(RegisteredProvider provider) =>
+        _catalogueReports.TryGetValue(provider.Id, out var catalogue) ? catalogue?.StateTone ?? "off"
+        : _spendReports.TryGetValue(provider.Id, out var spend) ? spend?.Connection.StateTone ?? "off"
+        : "off";
+
+    /// <summary>Connection label for a provider, or a note for one opencode manages itself.</summary>
+    private string ProviderLabel(RegisteredProvider provider) =>
+        _catalogueReports.TryGetValue(provider.Id, out var catalogue) ? catalogue?.StateLabel ?? "checking…"
+        : _spendReports.TryGetValue(provider.Id, out var spend) ? spend?.Connection.StateLabel ?? "checking…"
+        : "opencode-managed";
+
+    private string ProviderNote
+    {
+        get
+        {
+            var provider = SelectedProvider;
+            if (provider is null)
+            {
+                return string.Empty;
+            }
+
+            var role = string.Equals(provider.Id, Providers.Primary?.Id, StringComparison.OrdinalIgnoreCase)
+                ? "primary"
+                : "fallback";
+            var spend = provider.SpendMode switch
+            {
+                SpendMode.Estimated => "spend is estimated from tokens",
+                SpendMode.Reported => "exact spend, approved for this run",
+                _ => "no spend reporting",
+            };
+            return $"{role} — {spend}";
+        }
+    }
 
     private string AgentLineLabel => _method == RunMethod.Run ? "agent" : "agents";
 
@@ -624,6 +659,8 @@ else
         Run.StateChanged += OnRunStateChanged;
         Climber.StateChanged += OnClimbStateChanged;
 
+        ResetProvider();
+
         if (string.IsNullOrWhiteSpace(_folderPath))
         {
             _folderPath = DefaultFolder;
@@ -631,10 +668,7 @@ else
 
         ResolveAgents();
         RebuildEntries();
-        var surplus = Surplus.GetReportAsync();
-        var openRouter = OpenRouter.GetSpendAsync();
-        _surplus = await surplus;
-        _spend = await openRouter;
+        await RefreshProviderSurfacesAsync();
     }
 
     private void OnRunStateChanged(RunState state)
@@ -672,9 +706,11 @@ else
     /// <summary>A fallback approval applies to one run; the next start defaults to the primary again.</summary>
     private void ResetProvider()
     {
-        _providerId = ProviderIds.Surplus;
+        _providerId = Providers.Primary?.Id ?? string.Empty;
         _pendingProviderApproval = false;
+        _pendingProviderId = null;
         _startFallbackOffer = false;
+        _startFallbackProviderId = null;
     }
 
     private void Rerender()
@@ -691,21 +727,37 @@ else
 
     private async Task RefreshSpendAsync()
     {
-        var surplus = await Surplus.GetReportAsync();
-        var openRouter = await OpenRouter.GetSpendAsync();
+        await RefreshProviderSurfacesAsync();
         try
         {
-            await InvokeAsync(() =>
-            {
-                _surplus = surplus;
-                _spend = openRouter;
-                StateHasChanged();
-            });
+            await InvokeAsync(StateHasChanged);
         }
         catch (ObjectDisposedException)
         {
             // The circuit is gone; nothing left to update.
         }
+    }
+
+    /// <summary>
+    /// Refreshes every provider's catalogue and management-spend report. Providers with no
+    /// API surface keep no report; the bar and the activity page describe them directly.
+    /// </summary>
+    private async Task RefreshProviderSurfacesAsync()
+    {
+        var loads = Providers.Providers.Select(async provider =>
+        {
+            if (provider.Catalogue is { } catalogue)
+            {
+                _catalogueReports[provider.Id] = await catalogue.GetReportAsync();
+            }
+
+            if (provider.Spend is { } spend)
+            {
+                _spendReports[provider.Id] = await spend.GetSpendAsync();
+            }
+        });
+
+        await Task.WhenAll(loads);
     }
 
     /// <summary>Reads the target folder's agents and the default one to run (config override + conventional default).</summary>
@@ -725,7 +777,9 @@ else
         _error = null;
         _preflightWarnings = Array.Empty<string>();
         _startFallbackOffer = false;
+        _startFallbackProviderId = null;
         _pendingProviderApproval = false;
+        _pendingProviderId = null;
         _outputTab = PrimaryTab;
         RebuildEntries();
     }
@@ -874,26 +928,43 @@ else
         _preflightWarnings = preflight.Warnings;
         ResolveAgents();
 
-        if (_providerId == ProviderIds.Surplus)
+        var provider = SelectedProvider;
+        if (provider is null)
         {
-            _surplus = await Surplus.GetReportAsync();
-            if (_surplus is not { Reachable: true, ModelAvailable: true })
+            _error = "No provider is configured.";
+            return;
+        }
+
+        if (provider.Catalogue is { } catalogue)
+        {
+            var report = await catalogue.GetReportAsync();
+            _catalogueReports[provider.Id] = report;
+            if (report is not { Reachable: true, ModelAvailable: true })
             {
-                _startFallbackMessage = _surplus is { Configured: false }
-                    ? "Surplus is not configured. Start this run on OpenRouter instead?"
-                    : $"Surplus is unavailable ({_surplus?.StateLabel ?? "unknown"}). Start this run on OpenRouter instead?";
+                var next = Providers.FallbacksAfter(provider.Id).FirstOrDefault();
+                if (next is null)
+                {
+                    _error = $"{provider.DisplayName} is not available ({report.StateLabel}).";
+                    return;
+                }
+
+                _startFallbackProviderId = next.Id;
+                _startFallbackMessage = report.Configured
+                    ? $"{provider.DisplayName} is unavailable ({report.StateLabel}). Start this run on {next.DisplayName} instead?"
+                    : $"{provider.DisplayName} is not configured. Start this run on {next.DisplayName} instead?";
                 _startFallbackOffer = true;
                 return;
             }
         }
 
-        Launch(_providerId, folder, prompt);
+        Launch(provider, folder, prompt);
     }
 
     /// <summary>Starts the selected method with an explicit provider. Never falls back silently.</summary>
-    private void Launch(string providerId, string folder, string prompt)
+    private void Launch(RegisteredProvider provider, string folder, string prompt)
     {
-        var (primary, fallbacks) = Selections(providerId);
+        var selection = ProviderSelection.From(provider, PricingFor(provider));
+        var fallbacks = Providers.FallbacksAfter(provider.Id);
 
         try
         {
@@ -902,11 +973,11 @@ else
             if (_method == RunMethod.Hillclimb)
             {
                 _ = Climber.StartAsync(new ClimberOptions(
-                    folder, prompt, Math.Max(1, _maxIterations), _agents.DefaultAgent, primary, fallbacks));
+                    folder, prompt, Math.Max(1, _maxIterations), _agents.DefaultAgent, selection, fallbacks));
             }
             else
             {
-                _ = Run.StartAsync(new RunOptions(folder, prompt, _agents.DefaultAgent, primary, fallbacks));
+                _ = Run.StartAsync(new RunOptions(folder, prompt, _agents.DefaultAgent, selection, fallbacks));
             }
         }
         catch (Exception ex)
@@ -915,66 +986,73 @@ else
         }
     }
 
-    /// <summary>
-    /// The selected provider plus the providers after it in the configured order. This still
-    /// mirrors the shipped two-provider setup; the registry replaces it in the next change.
-    /// </summary>
-    private (ProviderSelection Primary, IReadOnlyList<ProviderSelection> Fallbacks) Selections(string providerId)
-    {
-        var surplus = new ProviderSelection(
-            ProviderIds.Surplus,
-            "Surplus",
-            _surplus?.Model ?? ProviderRegistry.SurplusDefaultModel,
-            SpendMode.Estimated,
-            _surplus?.Pricing);
-        var openRouter = new ProviderSelection(
-            ProviderIds.OpenRouter,
-            "OpenRouter",
-            FallbackModel,
-            SpendMode.Reported);
+    /// <summary>Catalogue pricing for a token estimate, when the provider publishes it.</summary>
+    private ProviderPricing? PricingFor(RegisteredProvider provider) =>
+        _catalogueReports.TryGetValue(provider.Id, out var report) ? report?.Pricing : null;
 
-        return providerId == ProviderIds.OpenRouter
-            ? (openRouter, Array.Empty<ProviderSelection>())
-            : (surplus, [openRouter]);
-    }
-
-    private void SelectSurplus()
+    private void SelectProvider(string providerId)
     {
-        _pendingProviderApproval = false;
         _startFallbackOffer = false;
-        _providerId = ProviderIds.Surplus;
-    }
-
-    private void SelectOpenRouter()
-    {
-        if (_providerId != ProviderIds.OpenRouter)
+        if (string.Equals(providerId, SelectedProviderId, StringComparison.OrdinalIgnoreCase))
         {
-            _pendingProviderApproval = true;
+            _pendingProviderApproval = false;
+            _pendingProviderId = null;
+            return;
         }
+
+        if (string.Equals(providerId, Providers.Primary?.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            _pendingProviderApproval = false;
+            _pendingProviderId = null;
+            _providerId = providerId;
+            return;
+        }
+
+        _pendingProviderApproval = true;
+        _pendingProviderId = providerId;
     }
 
     private void ApproveProviderSwitch()
     {
+        if (_pendingProviderId is { } id)
+        {
+            _providerId = id;
+        }
+
         _pendingProviderApproval = false;
+        _pendingProviderId = null;
         _startFallbackOffer = false;
-        _providerId = ProviderIds.OpenRouter;
     }
 
-    private void CancelProviderSwitch() => _pendingProviderApproval = false;
+    private void CancelProviderSwitch()
+    {
+        _pendingProviderApproval = false;
+        _pendingProviderId = null;
+    }
 
-    private Task StartOnOpenRouter()
+    private Task StartOnFallback()
     {
         _startFallbackOffer = false;
-        _providerId = ProviderIds.OpenRouter;
+        if (_startFallbackProviderId is { } id)
+        {
+            _providerId = id;
+        }
+
+        _startFallbackProviderId = null;
+        _pendingProviderApproval = false;
+        _pendingProviderId = null;
         return Start();
     }
 
-    private void CancelStartFallback() => _startFallbackOffer = false;
-
-    private string FallbackModel => _surplus?.FallbackModel ?? ProviderRegistry.OpenRouterDefaultModel;
+    private void CancelStartFallback()
+    {
+        _startFallbackOffer = false;
+        _startFallbackProviderId = null;
+    }
 
     private void ApproveActiveFallback()
     {
+        var nextId = ActiveFallback?.Id;
         try
         {
             if (_method == RunMethod.Run)
@@ -986,7 +1064,10 @@ else
                 Climber.ApproveFallback();
             }
 
-            _providerId = ProviderIds.OpenRouter;
+            if (nextId is not null)
+            {
+                _providerId = nextId;
+            }
         }
         catch (Exception ex)
         {

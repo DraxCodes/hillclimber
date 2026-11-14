@@ -343,7 +343,7 @@ public sealed class ProviderRegistry : IProviderRegistry
         descriptor.Kind == ProviderKinds.OpenAi ? new OpenAiCatalogueProbe(http, descriptor) : null;
 
     private static IProviderSpend? CreateSpend(ProviderDescriptor descriptor, HttpClient http) =>
-        descriptor.Kind == ProviderKinds.OpenRouter ? new OpenRouterClient(http, descriptor) : null;
+        descriptor.Kind == ProviderKinds.OpenRouter ? new OpenRouterSpendSurface(http, descriptor) : null;
 
     private static List<ProviderDescriptor> ReadLegacy(IConfiguration configuration)
     {
@@ -421,7 +421,7 @@ public sealed class ProviderRegistry : IProviderRegistry
                 FirstNonEmpty(entry["ApiKey"], configuration[$"{keyPrefix}_API_KEY"]),
                 FirstNonEmpty(entry["ManagementApiKey"], configuration[$"{keyPrefix}_MANAGEMENT_API_KEY"]),
                 ParseSpendMode(entry["Spend"], kind),
-                ReadBool(entry["RequiresKey"], fallback: true),
+                ReadBool(entry["RequiresKey"], fallback: kind != ProviderKinds.None),
                 ReadBool(entry["SendKey"], fallback: true),
                 kind);
 

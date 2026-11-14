@@ -4,10 +4,10 @@ namespace ClimberWeb.Services;
 public static class SpendSummary
 {
     /// <summary>
-    /// Rolling 30-day spend: the sum of OpenRouter's activity rows (the API already returns
+    /// Rolling 30-day spend: the sum of the provider's activity rows (the API already returns
     /// the last 30 days). Empty input is zero, not an error.
     /// </summary>
-    public static double Monthly(IReadOnlyList<OpenRouterActivityRow> rows)
+    public static double Monthly(IReadOnlyList<ProviderActivityRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
         return rows.Sum(row => row.Usage);

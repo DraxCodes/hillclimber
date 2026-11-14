@@ -86,7 +86,7 @@ touching the run loop or the UI.
 | `BaseUrl` | built-in default for `surplus`/`openrouter` | API base; trailing slash trimmed. |
 | `ApiKey` | — | Inference/catalogue key. Also read from `{ID}_API_KEY`. |
 | `ManagementApiKey` | — | Management key for OpenRouter's account/activity endpoints. |
-| `RequiresKey` | `true` | Set false for a local OpenAI-compatible host that needs no key. |
+| `RequiresKey` | `true` (`false` for `none`) | Set false for a local OpenAI-compatible host that needs no key. |
 | `SendKey` | `true` | Set false for Surplus, whose catalogue does not need the key. |
 | `Spend` | derived from `Kind` | Optional override: `estimated`, `reported`, `none`. |
 

@@ -3,11 +3,12 @@ using System.Net.Http.Headers;
 namespace ClimberWeb.Services;
 
 /// <summary>
-/// HTTP client for OpenRouter's spend surfaces. Every call is defensive: a missing key,
-/// a non-success status, a network failure, or an unexpected body becomes an explicit
+/// HTTP client for an OpenRouter-style management surface. Any provider whose descriptor
+/// uses <see cref="ProviderKinds.OpenRouter"/> gets one. Every call is defensive: a missing
+/// key, a non-success status, a network failure, or an unexpected body becomes an explicit
 /// status/note on the returned <see cref="SpendReport"/>, never an exception.
 /// </summary>
-public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
+public sealed class OpenRouterSpendSurface : IProviderSpend
 {
     private readonly HttpClient _http;
     private readonly string _baseUrl;
@@ -15,41 +16,17 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
     private readonly string? _managementApiKey;
     private readonly string _displayName;
 
-    /// <summary>Creates the client from DI-provided options.</summary>
-    public OpenRouterClient(HttpClient http, Microsoft.Extensions.Configuration.IConfiguration configuration)
-        : this(http, OpenRouterOptions.FromConfiguration(configuration))
+    /// <summary>Creates the surface for a registry descriptor, so any OpenRouter-style provider works.</summary>
+    public OpenRouterSpendSurface(HttpClient http, ProviderDescriptor descriptor)
     {
-    }
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(descriptor);
 
-    /// <summary>Creates the client with explicit legacy options (used by tests).</summary>
-    public OpenRouterClient(HttpClient http, OpenRouterOptions options)
-        : this(
-            http,
-            options?.BaseUrl ?? throw new ArgumentNullException(nameof(options)),
-            options.ApiKey,
-            options.ManagementApiKey,
-            "OpenRouter")
-    {
-    }
-
-    /// <summary>Creates the client for a registry descriptor, so any OpenRouter-style provider works.</summary>
-    public OpenRouterClient(HttpClient http, ProviderDescriptor descriptor)
-        : this(
-            http,
-            descriptor?.BaseUrl ?? OpenRouterOptions.DefaultBaseUrl,
-            descriptor?.ApiKey,
-            descriptor?.ManagementApiKey,
-            descriptor?.DisplayName ?? "OpenRouter")
-    {
-    }
-
-    private OpenRouterClient(HttpClient http, string baseUrl, string? apiKey, string? managementApiKey, string displayName)
-    {
-        _http = http ?? throw new ArgumentNullException(nameof(http));
-        _baseUrl = baseUrl;
-        _apiKey = apiKey;
-        _managementApiKey = managementApiKey;
-        _displayName = displayName;
+        _http = http;
+        _baseUrl = descriptor.BaseUrl ?? ProviderRegistry.OpenRouterDefaultBaseUrl;
+        _apiKey = descriptor.ApiKey;
+        _managementApiKey = descriptor.ManagementApiKey;
+        _displayName = descriptor.DisplayName;
     }
 
     private bool HasKey => !string.IsNullOrWhiteSpace(_apiKey);
@@ -64,7 +41,7 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
         if (!HasKey)
         {
             return new SpendReport(
-                new OpenRouterConnection(
+                new ProviderConnection(
                     Configured: false,
                     Connected: false,
                     KeyLabel: null,
@@ -74,14 +51,14 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
                     LimitRemaining: null,
                     Message: $"No {_displayName} API key is configured."),
                 Account: null,
-                Activity: Array.Empty<OpenRouterActivityRow>(),
+                Activity: Array.Empty<ProviderActivityRow>(),
                 notes);
         }
 
         var connection = await CheckKeyAsync(cancellationToken).ConfigureAwait(false);
 
-        OpenRouterAccount? account = null;
-        IReadOnlyList<OpenRouterActivityRow> activity = Array.Empty<OpenRouterActivityRow>();
+        ProviderAccount? account = null;
+        IReadOnlyList<ProviderActivityRow> activity = Array.Empty<ProviderActivityRow>();
 
         if (HasManagementKey)
         {
@@ -96,7 +73,7 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
         return new SpendReport(connection, account, activity, notes);
     }
 
-    private async Task<OpenRouterConnection> CheckKeyAsync(CancellationToken cancellationToken)
+    private async Task<ProviderConnection> CheckKeyAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -114,7 +91,7 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
                 return NotConnected($"{_displayName} returned an unexpected response for the key.");
             }
 
-            return new OpenRouterConnection(
+            return new ProviderConnection(
                 Configured: true,
                 Connected: true,
                 key.Label,
@@ -134,7 +111,7 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
         }
     }
 
-    private async Task<OpenRouterAccount?> GetCreditsAsync(List<string> notes, CancellationToken cancellationToken)
+    private async Task<ProviderAccount?> GetCreditsAsync(List<string> notes, CancellationToken cancellationToken)
     {
         try
         {
@@ -166,7 +143,7 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
         }
     }
 
-    private async Task<IReadOnlyList<OpenRouterActivityRow>> GetActivityAsync(List<string> notes, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ProviderActivityRow>> GetActivityAsync(List<string> notes, CancellationToken cancellationToken)
     {
         try
         {
@@ -175,7 +152,7 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
             if (!response.IsSuccessStatusCode)
             {
                 notes.Add($"Activity is unavailable (HTTP {(int)response.StatusCode}); the management key may be invalid.");
-                return Array.Empty<OpenRouterActivityRow>();
+                return Array.Empty<ProviderActivityRow>();
             }
 
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -188,11 +165,11 @@ public sealed class OpenRouterClient : IOpenRouterClient, IProviderSpend
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
             notes.Add($"Activity is unavailable: {ex.Message}");
-            return Array.Empty<OpenRouterActivityRow>();
+            return Array.Empty<ProviderActivityRow>();
         }
     }
 
-    private static OpenRouterConnection NotConnected(string message) =>
+    private static ProviderConnection NotConnected(string message) =>
         new(Configured: true, Connected: false, KeyLabel: null, IsFreeTier: false, Usage: null, Limit: null, LimitRemaining: null, Message: message);
 
     private HttpRequestMessage Authorized(string path, string? key)

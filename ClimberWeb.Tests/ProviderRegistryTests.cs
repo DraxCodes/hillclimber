@@ -1,4 +1,4 @@
-using ClimberWeb.Services;
+﻿using ClimberWeb.Services;
 using Microsoft.Extensions.Configuration;
 
 namespace ClimberWeb.Tests;
@@ -27,7 +27,7 @@ public class ProviderRegistryTests
         Assert.IsType<OpenAiCatalogueProbe>(registry.Providers[0].Catalogue);
         Assert.Null(registry.Providers[0].Spend);
         Assert.Null(registry.Providers[1].Catalogue);
-        Assert.IsType<OpenRouterClient>(registry.Providers[1].Spend);
+        Assert.IsType<OpenRouterSpendSurface>(registry.Providers[1].Spend);
         Assert.Same(registry.Providers[0], registry.Primary);
     }
 
@@ -121,7 +121,7 @@ public class ProviderRegistryTests
         var provider = Assert.Single(registry.Providers);
         Assert.Equal(SpendMode.Reported, provider.SpendMode);
         Assert.Null(provider.Catalogue);
-        Assert.IsType<OpenRouterClient>(provider.Spend);
+        Assert.IsType<OpenRouterSpendSurface>(provider.Spend);
         Assert.Equal("sk-inference", provider.Descriptor.ApiKey);
         Assert.Equal("sk-management", provider.Descriptor.ManagementApiKey);
     }
@@ -138,6 +138,8 @@ public class ProviderRegistryTests
         Assert.Null(provider.Spend);
         Assert.Equal(SpendMode.None, provider.SpendMode);
         Assert.Equal("provider/model", provider.Descriptor.Model);
+        Assert.False(provider.Descriptor.RequiresKey);
+        Assert.DoesNotContain(registry.Notes, note => note.Contains("no API key"));
     }
 
     [Fact]

@@ -28,12 +28,13 @@ builder.Services.AddSingleton<IProjectStatusService, ProjectStatusService>();
 // Pre-flight checks for a climb target (folder exists, is a git repo, tools on PATH).
 builder.Services.AddSingleton<IClimbPreflight, ClimbPreflight>();
 
-// Provider surfaces. Surplus is the primary provider; OpenRouter stays available as the
-// explicitly approved fallback. A single short-timeout client keeps a stalled API from
-// hanging a page render; parsing is defensive so a bad key is never fatal.
+// Provider surfaces. Configuration resolves to an ordered registry; the first provider is
+// primary and every later one is an approval-gated fallback. A short-timeout client keeps a
+// stalled API from hanging a page render; parsing is defensive so a bad key is never fatal.
 builder.Services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(10) });
-builder.Services.AddSingleton<ISurplusClient, SurplusClient>();
-builder.Services.AddSingleton<IOpenRouterClient, OpenRouterClient>();
+builder.Services.AddSingleton<IProviderRegistry>(sp => ProviderRegistry.FromConfiguration(
+    sp.GetRequiredService<IConfiguration>(),
+    sp.GetRequiredService<HttpClient>()));
 
 // PIN gate: unlock persists for the browser session and slides with activity,
 // expiring after Climber:SessionMinutes (default 30) of inactivity.

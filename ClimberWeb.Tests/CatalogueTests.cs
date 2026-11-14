@@ -1,11 +1,10 @@
 using System.Net;
 using ClimberWeb.Services;
-using Microsoft.Extensions.Configuration;
 
 namespace ClimberWeb.Tests;
 
-/// <summary>Surplus configuration, pricing parsing, spend estimates and the catalogue client.</summary>
-public class SurplusTests
+/// <summary>OpenAI-compatible pricing, catalogue parsing and the shared catalogue probe.</summary>
+public class CatalogueTests
 {
     private const string Catalogue =
         """
@@ -14,58 +13,6 @@ public class SurplusTests
           {"id":"deepseek-v4.1-flash-1017","pricing":{"prompt":"0.0000000380","completion":"0.0000005000","input_cache_read":"0.0000000075","input_cache_write":"0.0000000380"}}
         ]}
         """;
-
-    // ---- options -------------------------------------------------------------
-
-    [Fact]
-    public void Options_DefaultToSurplusAndTheOpenRouterFallback()
-    {
-        var options = SurplusOptions.FromConfiguration(Config());
-
-        Assert.False(options.HasKey);
-        Assert.Equal(SurplusOptions.DefaultBaseUrl, options.BaseUrl);
-        Assert.Equal("surplus/deepseek-v4.1-flash-1017", options.Model);
-        Assert.Equal("openrouter/deepseek/deepseek-v4.1-flash", options.FallbackModel);
-    }
-
-    [Fact]
-    public void Options_ReadEnvironmentStyleConfigurationAndNormalizeTheModel()
-    {
-        var configuration = Config(("SURPLUS_API_KEY", "sk-surplus"), ("Climber:SurplusModel", "deepseek-v4.1-flash-1017"));
-
-        var options = SurplusOptions.FromConfiguration(configuration);
-
-        Assert.True(options.HasKey);
-        Assert.Equal("surplus/deepseek-v4.1-flash-1017", options.Model);
-    }
-
-    [Fact]
-    public void Options_NormalizeABareFallbackModelToOpenRouter()
-    {
-        var configuration = Config(("Climber:FallbackModel", "deepseek/deepseek-v4.1-flash"));
-
-        var options = SurplusOptions.FromConfiguration(configuration);
-
-        Assert.Equal("openrouter/deepseek/deepseek-v4.1-flash", options.FallbackModel);
-    }
-
-    [Fact]
-    public void Options_PreferExplicitClimberKeysAndKeepAPrefixedModel()
-    {
-        var configuration = Config(
-            ("Climber:SurplusApiKey", "explicit"),
-            ("SURPLUS_API_KEY", "env"),
-            ("Climber:SurplusBaseUrl", "https://example.test/v1/"),
-            ("Climber:SurplusModel", "surplus/other"),
-            ("Climber:FallbackModel", "openrouter/other"));
-
-        var options = SurplusOptions.FromConfiguration(configuration);
-
-        Assert.Equal("explicit", options.ApiKey);
-        Assert.Equal("https://example.test/v1", options.BaseUrl);
-        Assert.Equal("surplus/other", options.Model);
-        Assert.Equal("openrouter/other", options.FallbackModel);
-    }
 
     // ---- parsing and estimates ----------------------------------------------
 
@@ -184,20 +131,25 @@ public class SurplusTests
     [Fact]
     public void Report_LabelsTheConnectionState()
     {
-        Assert.Equal("not configured", new SurplusReport(false, false, false, "m", "f", null, null, Array.Empty<string>()).StateLabel);
-        Assert.Equal("connected", new SurplusReport(true, true, true, "m", "f", null, null, Array.Empty<string>()).StateLabel);
-        Assert.Equal("model unavailable", new SurplusReport(true, true, false, "m", "f", null, null, Array.Empty<string>()).StateLabel);
-        Assert.Equal("unreachable", new SurplusReport(true, false, false, "m", "f", null, null, Array.Empty<string>()).StateLabel);
+        Assert.Equal("not configured", Report(configured: false, reachable: false, available: false).StateLabel);
+        Assert.Equal("connected", Report(configured: true, reachable: true, available: true).StateLabel);
+        Assert.Equal("model unavailable", Report(configured: true, reachable: true, available: false).StateLabel);
+        Assert.Equal("unreachable", Report(configured: true, reachable: false, available: false).StateLabel);
     }
 
-    // ---- client --------------------------------------------------------------
+    private static ProviderReport Report(bool configured, bool reachable, bool available) =>
+        new(configured, reachable, available, "m", null, null, Array.Empty<string>());
+
+    // ---- probe ---------------------------------------------------------------
 
     [Fact]
-    public async Task Client_WithoutKey_ReportsNotConfiguredAndDoesNotCallTheApi()
+    public async Task Probe_WithoutKey_ReportsNotConfiguredAndDoesNotCallTheApi()
     {
-        var client = new SurplusClient(new HttpClient(new StubHandler(_ => throw new InvalidOperationException("should not call"))), Options(null));
+        var probe = new OpenAiCatalogueProbe(
+            new HttpClient(new StubHandler(_ => throw new InvalidOperationException("should not call"))),
+            Descriptor(apiKey: null));
 
-        var report = await client.GetReportAsync();
+        var report = await probe.GetReportAsync();
 
         Assert.False(report.Configured);
         Assert.Equal("not configured", report.StateLabel);
@@ -205,12 +157,12 @@ public class SurplusTests
     }
 
     [Fact]
-    public async Task Client_ReadsTheCatalogueAndPricesTheModel()
+    public async Task Probe_ReadsTheCatalogueAndPricesTheModel()
     {
         var handler = new StubHandler(_ => Json(Catalogue));
-        var client = new SurplusClient(new HttpClient(handler), Options("sk-surplus"));
+        var probe = new OpenAiCatalogueProbe(new HttpClient(handler), Descriptor("sk-surplus"));
 
-        var report = await client.GetReportAsync();
+        var report = await probe.GetReportAsync();
 
         Assert.True(report.Reachable);
         Assert.True(report.ModelAvailable);
@@ -221,12 +173,12 @@ public class SurplusTests
     }
 
     [Fact]
-    public async Task Client_MissingModel_ReportsModelUnavailable()
+    public async Task Probe_MissingModel_ReportsModelUnavailable()
     {
         var handler = new StubHandler(_ => Json("""{"data":[{"id":"different","pricing":{"prompt":"1"}}]}"""));
-        var client = new SurplusClient(new HttpClient(handler), Options("sk-surplus"));
+        var probe = new OpenAiCatalogueProbe(new HttpClient(handler), Descriptor("sk-surplus"));
 
-        var report = await client.GetReportAsync();
+        var report = await probe.GetReportAsync();
 
         Assert.True(report.Reachable);
         Assert.False(report.ModelAvailable);
@@ -235,12 +187,12 @@ public class SurplusTests
     }
 
     [Fact]
-    public async Task Client_ListedButUnpricedModel_StaysConnectedWithoutAPricing()
+    public async Task Probe_ListedButUnpricedModel_StaysConnectedWithoutAPricing()
     {
         var handler = new StubHandler(_ => Json("""{"data":[{"id":"deepseek-v4.1-flash-1017"}]}"""));
-        var client = new SurplusClient(new HttpClient(handler), Options("sk-surplus"));
+        var probe = new OpenAiCatalogueProbe(new HttpClient(handler), Descriptor("sk-surplus"));
 
-        var report = await client.GetReportAsync();
+        var report = await probe.GetReportAsync();
 
         Assert.True(report.Reachable);
         Assert.True(report.ModelAvailable);
@@ -253,11 +205,13 @@ public class SurplusTests
     }
 
     [Fact]
-    public async Task Client_NetworkFailure_DoesNotThrow()
+    public async Task Probe_NetworkFailure_DoesNotThrow()
     {
-        var client = new SurplusClient(new HttpClient(new StubHandler(_ => throw new HttpRequestException("no dns"))), Options("sk-surplus"));
+        var probe = new OpenAiCatalogueProbe(
+            new HttpClient(new StubHandler(_ => throw new HttpRequestException("no dns"))),
+            Descriptor("sk-surplus"));
 
-        var report = await client.GetReportAsync();
+        var report = await probe.GetReportAsync();
 
         Assert.False(report.Reachable);
         Assert.Contains("Could not reach Surplus", report.Message!);
@@ -265,25 +219,45 @@ public class SurplusTests
     }
 
     [Fact]
-    public async Task Client_HttpFailure_ReportsUnreachable()
+    public async Task Probe_HttpFailure_ReportsUnreachable()
     {
-        var client = new SurplusClient(new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway))), Options("sk-surplus"));
+        var probe = new OpenAiCatalogueProbe(
+            new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway))),
+            Descriptor("sk-surplus"));
 
-        var report = await client.GetReportAsync();
+        var report = await probe.GetReportAsync();
 
         Assert.False(report.Reachable);
         Assert.Contains("502", report.Message!);
     }
 
+    [Fact]
+    public async Task Probe_SendsTheKeyWhenTheDescriptorAllowsIt()
+    {
+        var handler = new StubHandler(_ => Json(Catalogue));
+        var descriptor = Descriptor("sk-acme") with { SendKey = true };
+        var probe = new OpenAiCatalogueProbe(new HttpClient(handler), descriptor);
+
+        await probe.GetReportAsync();
+
+        Assert.Equal("Bearer", handler.LastRequest!.Headers.Authorization?.Scheme);
+        Assert.Equal("sk-acme", handler.LastRequest.Headers.Authorization?.Parameter);
+    }
+
     // ---- helpers -------------------------------------------------------------
 
-    private static SurplusOptions Options(string? apiKey) =>
-        new(apiKey, SurplusOptions.DefaultBaseUrl, SurplusOptions.DefaultModel, SurplusOptions.DefaultFallbackModel);
-
-    private static IConfiguration Config(params (string Key, string Value)[] values) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(values.Select(v => new KeyValuePair<string, string?>(v.Key, v.Value)))
-            .Build();
+    private static ProviderDescriptor Descriptor(string? apiKey) => new(
+        ProviderIds.Surplus,
+        "Surplus",
+        ProviderIds.Surplus,
+        ProviderRegistry.SurplusDefaultModel,
+        ProviderRegistry.SurplusDefaultBaseUrl,
+        apiKey,
+        ManagementApiKey: null,
+        SpendMode.Estimated,
+        RequiresKey: true,
+        SendKey: false,
+        Kind: ProviderKinds.OpenAi);
 
     private static HttpResponseMessage Json(string body) =>
         new(HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };

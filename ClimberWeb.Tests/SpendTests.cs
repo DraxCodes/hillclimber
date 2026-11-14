@@ -3,7 +3,7 @@ using ClimberWeb.Services;
 
 namespace ClimberWeb.Tests;
 
-/// <summary>Per-climb spend accumulation and the OpenRouter connection/spend client.</summary>
+/// <summary>Per-climb spend accumulation and the OpenRouter-style spend surface.</summary>
 public class SpendTests
 {
     // ---- opencode event usage ------------------------------------------------
@@ -76,12 +76,12 @@ public class SpendTests
     {
         var rows = new[]
         {
-            new OpenRouterActivityRow(new DateOnly(2026, 11, 12), "a/model", 1, 10, 2, 0.30),
-            new OpenRouterActivityRow(new DateOnly(2026, 11, 13), "b/model", 2, 20, 4, 2.50),
+            new ProviderActivityRow(new DateOnly(2026, 11, 12), "a/model", 1, 10, 2, 0.30),
+            new ProviderActivityRow(new DateOnly(2026, 11, 13), "b/model", 2, 20, 4, 2.50),
         };
 
         Assert.Equal(2.80, SpendSummary.Monthly(rows), 6);
-        Assert.Equal(0d, SpendSummary.Monthly(Array.Empty<OpenRouterActivityRow>()));
+        Assert.Equal(0d, SpendSummary.Monthly(Array.Empty<ProviderActivityRow>()));
     }
 
     [Fact]
@@ -118,10 +118,10 @@ public class SpendTests
     [Fact]
     public void Headline_PrefersMonthly_ThenGlobal_ThenDash()
     {
-        var connection = new OpenRouterConnection(true, true, "k", false, null, null, null, null);
-        var account = new OpenRouterAccount(10d, 4.18d);
-        var rows = new[] { new OpenRouterActivityRow(new DateOnly(2026, 11, 12), "m", 1, 1, 1, 2.80) };
-        var noActivity = Array.Empty<OpenRouterActivityRow>();
+        var connection = new ProviderConnection(true, true, "k", false, null, null, null, null);
+        var account = new ProviderAccount(10d, 4.18d);
+        var rows = new[] { new ProviderActivityRow(new DateOnly(2026, 11, 12), "m", 1, 1, 1, 2.80) };
+        var noActivity = Array.Empty<ProviderActivityRow>();
 
         Assert.Equal("$2.80/pm", SpendSummary.Headline(new SpendReport(connection, account, rows, Array.Empty<string>())));
         Assert.Equal("$4.18", SpendSummary.Headline(new SpendReport(connection, account, noActivity, Array.Empty<string>())));
@@ -129,7 +129,7 @@ public class SpendTests
         Assert.Equal("—", SpendSummary.Headline(null));
     }
 
-    // ---- OpenRouter parsing --------------------------------------------------
+    // ---- OpenRouter management parsing --------------------------------------
 
     [Fact]
     public void ParseKey_ReadsLabelUsageAndLimit()
@@ -185,12 +185,12 @@ public class SpendTests
         Assert.Empty(OpenRouterParser.ParseActivity(json));
     }
 
-    // ---- OpenRouter client ---------------------------------------------------
+    // ---- OpenRouter-style spend surface --------------------------------------
 
     [Fact]
     public async Task Client_WithoutKey_ReportsNotConfigured()
     {
-        var client = new OpenRouterClient(new HttpClient(new StubHandler(_ => throw new InvalidOperationException("should not call"))), Options(apiKey: null));
+        var client = new OpenRouterSpendSurface(new HttpClient(new StubHandler(_ => throw new InvalidOperationException("should not call"))), Descriptor(apiKey: null));
 
         var report = await client.GetSpendAsync();
 
@@ -210,7 +210,7 @@ public class SpendTests
             _ => new HttpResponseMessage(HttpStatusCode.NotFound),
         });
 
-        var client = new OpenRouterClient(new HttpClient(handler), Options("sk-normal", "sk-management"));
+        var client = new OpenRouterSpendSurface(new HttpClient(handler), Descriptor("sk-normal", "sk-management"));
         var report = await client.GetSpendAsync();
 
         Assert.True(report.Connection.Connected);
@@ -223,7 +223,7 @@ public class SpendTests
     public async Task Client_KeyRejected_ReportsNotConnected()
     {
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
-        var client = new OpenRouterClient(new HttpClient(handler), Options("sk-bad"));
+        var client = new OpenRouterSpendSurface(new HttpClient(handler), Descriptor("sk-bad"));
 
         var report = await client.GetSpendAsync();
 
@@ -236,7 +236,7 @@ public class SpendTests
     public async Task Client_NetworkFailure_DoesNotThrow()
     {
         var handler = new StubHandler(_ => throw new HttpRequestException("no dns"));
-        var client = new OpenRouterClient(new HttpClient(handler), Options("sk-any"));
+        var client = new OpenRouterSpendSurface(new HttpClient(handler), Descriptor("sk-any"));
 
         var report = await client.GetSpendAsync();
 
@@ -251,7 +251,7 @@ public class SpendTests
             ? Json("""{"data":{"label":"k","is_free_tier":true,"usage":0.1}}""")
             : new HttpResponseMessage(HttpStatusCode.Forbidden));
 
-        var client = new OpenRouterClient(new HttpClient(handler), Options("sk-normal", "sk-mgmt"));
+        var client = new OpenRouterSpendSurface(new HttpClient(handler), Descriptor("sk-normal", "sk-mgmt"));
         var report = await client.GetSpendAsync();
 
         Assert.True(report.Connection.Connected);
@@ -262,8 +262,17 @@ public class SpendTests
 
     // ---- helpers -------------------------------------------------------------
 
-    private static OpenRouterOptions Options(string? apiKey, string? managementKey = null) =>
-        new(apiKey, managementKey, OpenRouterOptions.DefaultBaseUrl);
+    private static ProviderDescriptor Descriptor(string? apiKey, string? managementKey = null) =>
+        new(
+            ProviderIds.OpenRouter,
+            "OpenRouter",
+            ProviderIds.OpenRouter,
+            ProviderRegistry.OpenRouterDefaultModel,
+            ProviderRegistry.OpenRouterDefaultBaseUrl,
+            apiKey,
+            managementKey,
+            SpendMode.Reported,
+            Kind: ProviderKinds.OpenRouter);
 
     private static HttpResponseMessage Json(string body) =>
         new(HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };

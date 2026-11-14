@@ -1,15 +1,14 @@
 @page "/activity"
 @rendermode InteractiveServer
 @implements IDisposable
-@inject IOpenRouterClient OpenRouter
-@inject ISurplusClient Surplus
+@inject IProviderRegistry Providers
 @inject IRunService Run
 @inject IHillClimberService Climber
 
 <PageTitle>activity · hillclimber</PageTitle>
 
 <AuthGate OnUnlocked="LoadAsync">
-@if (_report is null || _surplus is null)
+@if (!_loaded)
 {
     <section class="panel">
         <div class="panel-head">
@@ -21,42 +20,225 @@
 }
 else
 {
-    <p class="lede">Surplus is the primary provider; OpenRouter is the approved fallback. Read-only.</p>
+    <p class="lede">@Lede</p>
+
+    @foreach (var note in Providers.Notes)
+    {
+        <p class="notice notice-info" role="status">@note</p>
+    }
+
+    var panel = 0;
+    @for (var i = 0; i < Providers.Providers.Count; i++)
+    {
+        var provider = Providers.Providers[i];
+        var catalogue = CatalogueReport(provider.Id);
+        var spend = SpendReportFor(provider.Id);
+        <section class="panel">
+            <div class="panel-head">
+                <span class="idx">@($"[{panel++:00}]")</span>
+                <span class="panel-title">@PanelTitle(provider)</span>
+                <span class="panel-meta">@(i == 0 ? "primary" : "fallback")</span>
+            </div>
+
+            @if (catalogue is { } report)
+            {
+                <div class="conn-line">
+                    <span class="dot dot-@report.StateTone" aria-hidden="true"></span>
+                    <span class="conn-state">@report.StateLabel</span>
+                    @if (report.Model is { } model)
+                    {
+                        <span class="chip mono">@model</span>
+                    }
+                </div>
+
+                @if (report.Pricing is { } pricing)
+                {
+                    <div class="spend-row">
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(pricing.Prompt * 1_000_000)</span>
+                            <span class="spend-lbl">input / Mtok</span>
+                        </div>
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(pricing.Completion * 1_000_000)</span>
+                            <span class="spend-lbl">output / Mtok</span>
+                        </div>
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(pricing.CacheRead * 1_000_000)</span>
+                            <span class="spend-lbl">cache read / Mtok</span>
+                        </div>
+                    </div>
+                }
+                else if (report.Message is { } message)
+                {
+                    <p class="empty">@message</p>
+                }
+
+                @foreach (var note in report.Notes)
+                {
+                    <p class="notice notice-info" role="status">@note</p>
+                }
+
+                <p class="footnote dim">
+                    @provider.DisplayName prices tokens in its OpenAI-compatible catalogue, so its
+                    figures are estimates from opencode's <code class="mono">step_finish</code> tokens
+                    times catalogue pricing. Runs are not persisted.
+                </p>
+            }
+            else if (spend is { } spendReport)
+            {
+                <div class="conn-line">
+                    <span class="dot dot-@spendReport.Connection.StateTone" aria-hidden="true"></span>
+                    <span class="conn-state">@spendReport.Connection.StateLabel</span>
+                    @if (spendReport.Connection.IsFreeTier && spendReport.Connection.Connected)
+                    {
+                        <span class="chip">free tier</span>
+                    }
+                </div>
+
+                @if (spendReport.Connection.Connected)
+                {
+                    <div class="spend-row">
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(spendReport.Connection.Usage)</span>
+                            <span class="spend-lbl">key spend</span>
+                        </div>
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(spendReport.Connection.Limit)</span>
+                            <span class="spend-lbl">key limit</span>
+                        </div>
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(spendReport.Connection.LimitRemaining)</span>
+                            <span class="spend-lbl">remaining</span>
+                        </div>
+                    </div>
+                }
+                else if (spendReport.Connection.Message is { } message)
+                {
+                    <p class="empty">@message</p>
+                }
+
+                @foreach (var note in spendReport.Notes)
+                {
+                    <p class="notice notice-info" role="status">@note</p>
+                }
+            }
+            else
+            {
+                <p class="empty">
+                    @provider.DisplayName has no API surface configured; opencode runs it directly.
+                </p>
+            }
+        </section>
+
+        @if (spend is not null)
+        {
+            <section class="panel">
+                <div class="panel-head">
+                    <span class="idx">@($"[{panel++:00}]")</span>
+                    <span class="panel-title">@($"{provider.DisplayName.ToLowerInvariant()} account spend")</span>
+                </div>
+                @if (spend.Account is { } account)
+                {
+                    <div class="spend-row">
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(account.TotalUsage)</span>
+                            <span class="spend-lbl">total spent</span>
+                        </div>
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(account.TotalCredits)</span>
+                            <span class="spend-lbl">credits purchased</span>
+                        </div>
+                        <div class="spend-stat">
+                            <span class="spend-num">@SpendFormat.Usd(account.Remaining)</span>
+                            <span class="spend-lbl">remaining</span>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p class="empty">Account total is unavailable — a management key is required.</p>
+                }
+            </section>
+        }
+
+        @if (spend is not null)
+        {
+            var daily = DailyFor(provider.Id);
+            var models = ModelsFor(provider.Id);
+            <section class="panel">
+                <div class="panel-head">
+                    <span class="idx">@($"[{panel++:00}]")</span>
+                    <span class="panel-title">@($"{provider.DisplayName.ToLowerInvariant()} activity")</span>
+                    <span class="panel-meta">@daily.Count day@(daily.Count == 1 ? "" : "s")</span>
+                </div>
+                @if (daily.Count == 0)
+                {
+                    <p class="empty">No activity in the last 30 days.</p>
+                }
+                else
+                {
+                    <div class="chart">
+                        <svg viewBox="@($"0 0 {ChartWidth(daily)} {ChartHeight}")"
+                             width="@ChartWidth(daily)" height="@ChartHeight"
+                             preserveAspectRatio="xMidYMid meet"
+                             role="img"
+                             aria-label="@($"{provider.DisplayName} spend across {daily.Count} day(s)")">
+                            <line class="axis" x1="0" y1="@Baseline" x2="@ChartWidth(daily)" y2="@Baseline" />
+                            @for (var d = 0; d < daily.Count; d++)
+                            {
+                                var bucket = daily[d];
+                                var barHeight = DailyMax(daily) == 0 ? 0 : bucket.Usage / DailyMax(daily) * (Baseline - TopPad);
+                                var x = d * Step + BarGap;
+                                var y = Baseline - barHeight;
+                                <g class="bar-group">
+                                    <title>@($"{bucket.Label}: {SpendFormat.Usd(bucket.Usage)}")</title>
+                                    <rect class="bar" x="@x" y="@y" width="@BarWidth" height="@barHeight" rx="2" />
+                                </g>
+                            }
+                        </svg>
+                        <div class="chart-labels" style="@($"width: {ChartWidth(daily)}px")">
+                            @for (var d = 0; d < daily.Count; d++)
+                            {
+                                <span class="chart-tick" style="@($"width: {Step}px")">@(ShowLabel(daily, d) ? daily[d].Label : string.Empty)</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </section>
+
+            <section class="panel panel-flush">
+                <div class="panel-head">
+                    <span class="idx">@($"[{panel++:00}]")</span>
+                    <span class="panel-title">@($"{provider.DisplayName.ToLowerInvariant()} by model")</span>
+                    <span class="panel-meta">@models.Count models</span>
+                </div>
+                @if (models.Count == 0)
+                {
+                    <p class="empty" style="padding: 0.9rem 1rem;">No per-model activity.</p>
+                }
+                else
+                {
+                    <ul class="models">
+                        @foreach (var model in models)
+                        {
+                            <li class="model">
+                                <span class="model-name mono">@model.Model</span>
+                                <span class="model-metric">@model.Requests req</span>
+                                <span class="model-metric">@SpendFormat.Tokens(model.PromptTokens + model.CompletionTokens) tok</span>
+                                <span class="model-cost mono">@SpendFormat.Usd(model.Usage)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        }
+    }
 
     <section class="panel">
         <div class="panel-head">
-            <span class="idx">[00]</span>
-            <span class="panel-title">surplus</span>
-            <span class="panel-meta">primary</span>
+            <span class="idx">@($"[{panel++:00}]")</span>
+            <span class="panel-title">this session</span>
         </div>
-        <div class="conn-line">
-            <span class="dot dot-@_surplus.StateTone" aria-hidden="true"></span>
-            <span class="conn-state">@_surplus.StateLabel</span>
-            <span class="chip mono">@_surplus.Model</span>
-        </div>
-
-        @if (_surplus.Pricing is { } pricing)
-        {
-            <div class="spend-row">
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(pricing.Prompt * 1_000_000)</span>
-                    <span class="spend-lbl">input / Mtok</span>
-                </div>
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(pricing.Completion * 1_000_000)</span>
-                    <span class="spend-lbl">output / Mtok</span>
-                </div>
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(pricing.CacheRead * 1_000_000)</span>
-                    <span class="spend-lbl">cache read / Mtok</span>
-                </div>
-            </div>
-        }
-        else if (_surplus.Message is { } surplusMessage)
-        {
-            <p class="empty">@surplusMessage</p>
-        }
-
         <div class="spend-row">
             <div class="spend-stat">
                 <span class="spend-num">@SpendFormat.Usd((double)SessionEstimate)</span>
@@ -67,159 +249,15 @@ else
                 <span class="spend-lbl">tokens this session</span>
             </div>
         </div>
-
-        @foreach (var note in _surplus.Notes)
-        {
-            <p class="notice notice-info" role="status">@note</p>
-        }
-
         <p class="footnote dim">
-            Surplus exposes no usage or credits API, so this is an estimate from opencode's
-            <code class="mono">step_finish</code> tokens times catalogue pricing. Runs are not persisted.
+            Estimated from opencode's <code class="mono">step_finish</code> tokens times each
+            provider's catalogue pricing. Runs are not persisted.
         </p>
     </section>
 
-    @foreach (var note in _report.Notes)
-    {
-        <p class="notice notice-info" role="status">@note</p>
-    }
-
     <section class="panel">
         <div class="panel-head">
-            <span class="idx">[01]</span>
-            <span class="panel-title">openrouter connection</span>
-            <span class="panel-meta">fallback · @_report.Connection.KeyLabel</span>
-        </div>
-        <div class="conn-line">
-            <span class="dot dot-@_report.Connection.StateTone" aria-hidden="true"></span>
-            <span class="conn-state">@_report.Connection.StateLabel</span>
-            @if (_report.Connection.IsFreeTier && _report.Connection.Connected)
-            {
-                <span class="chip">free tier</span>
-            }
-        </div>
-
-        @if (_report.Connection.Connected)
-        {
-            <div class="spend-row">
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(_report.Connection.Usage)</span>
-                    <span class="spend-lbl">key spend</span>
-                </div>
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(_report.Connection.Limit)</span>
-                    <span class="spend-lbl">key limit</span>
-                </div>
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(_report.Connection.LimitRemaining)</span>
-                    <span class="spend-lbl">remaining</span>
-                </div>
-            </div>
-        }
-        else if (_report.Connection.Message is { } message)
-        {
-            <p class="empty">@message</p>
-        }
-    </section>
-
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[02]</span>
-            <span class="panel-title">account spend</span>
-        </div>
-        @if (_report.Account is not { } account)
-        {
-            <p class="empty">Account total is unavailable — a management key is required.</p>
-        }
-        else
-        {
-            <div class="spend-row">
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(account.TotalUsage)</span>
-                    <span class="spend-lbl">total spent</span>
-                </div>
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(account.TotalCredits)</span>
-                    <span class="spend-lbl">credits purchased</span>
-                </div>
-                <div class="spend-stat">
-                    <span class="spend-num">@SpendFormat.Usd(account.Remaining)</span>
-                    <span class="spend-lbl">remaining</span>
-                </div>
-            </div>
-        }
-    </section>
-
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[03]</span>
-            <span class="panel-title">activity</span>
-            <span class="panel-meta">@_daily.Count day@(_daily.Count == 1 ? "" : "s")</span>
-        </div>
-        @if (_daily.Count == 0)
-        {
-            <p class="empty">No activity in the last 30 days.</p>
-        }
-        else
-        {
-            <div class="chart">
-                <svg viewBox="@($"0 0 {ChartWidth} {ChartHeight}")"
-                     width="@ChartWidth" height="@ChartHeight"
-                     preserveAspectRatio="xMidYMid meet"
-                     role="img"
-                     aria-label="@($"OpenRouter spend across {_daily.Count} day(s)")">
-                    <line class="axis" x1="0" y1="@Baseline" x2="@ChartWidth" y2="@Baseline" />
-                    @for (var i = 0; i < _daily.Count; i++)
-                    {
-                        var bucket = _daily[i];
-                        var barHeight = DailyMax == 0 ? 0 : bucket.Usage / DailyMax * (Baseline - TopPad);
-                        var x = i * Step + BarGap;
-                        var y = Baseline - barHeight;
-                        <g class="bar-group">
-                            <title>@($"{bucket.Label}: {SpendFormat.Usd(bucket.Usage)}")</title>
-                            <rect class="bar" x="@x" y="@y" width="@BarWidth" height="@barHeight" rx="2" />
-                        </g>
-                    }
-                </svg>
-                <div class="chart-labels" style="@($"width: {ChartWidth}px")">
-                    @for (var i = 0; i < _daily.Count; i++)
-                    {
-                        <span class="chart-tick" style="@($"width: {Step}px")">@(ShowLabel(i) ? _daily[i].Label : string.Empty)</span>
-                    }
-                </div>
-            </div>
-        }
-    </section>
-
-    <section class="panel panel-flush">
-        <div class="panel-head">
-            <span class="idx">[04]</span>
-            <span class="panel-title">by model</span>
-            <span class="panel-meta">@_models.Count models</span>
-        </div>
-        @if (_models.Count == 0)
-        {
-            <p class="empty" style="padding: 0.9rem 1rem;">No per-model activity.</p>
-        }
-        else
-        {
-            <ul class="models">
-                @foreach (var model in _models)
-                {
-                    <li class="model">
-                        <span class="model-name mono">@model.Model</span>
-                        <span class="model-metric">@model.Requests req</span>
-                        <span class="model-metric">@SpendFormat.Tokens(model.PromptTokens + model.CompletionTokens) tok</span>
-                        <span class="model-cost mono">@SpendFormat.Usd(model.Usage)</span>
-                    </li>
-                }
-            </ul>
-        }
-    </section>
-
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[05]</span>
+            <span class="idx">@($"[{panel++:00}]")</span>
             <span class="panel-title">this climb</span>
             <span class="panel-meta">@ClimbStatusLabel</span>
         </div>
@@ -235,15 +273,15 @@ else
         </div>
         <p class="tokens dim">tokens: @ClimbTokens</p>
         <p class="footnote dim">
-            Summed live from opencode's own <code class="mono">step_finish</code> events; Surplus
-            figures are token-based estimates, OpenRouter figures are reported costs. Runs are
-            not persisted, so this reflects the current/last run only.
+            Summed live from opencode's own <code class="mono">step_finish</code> events;
+            estimated and reported figures are kept separate. Runs are not persisted, so this
+            reflects the current/last run only.
         </p>
     </section>
 
     <section class="panel">
         <div class="panel-head">
-            <span class="idx">[06]</span>
+            <span class="idx">@($"[{panel++:00}]")</span>
             <span class="panel-title">saved with skills</span>
         </div>
         <p class="empty">Not measured.</p>
@@ -263,8 +301,11 @@ else
     private const int Baseline = 96;
     private const int ChartHeight = 104;
 
-    private SpendReport? _report;
-    private SurplusReport? _surplus;
+    private readonly Dictionary<string, ProviderReport?> _catalogueReports = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SpendReport?> _spendReports = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyList<DailySpend>> _daily = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyList<ModelSpend>> _models = new(StringComparer.OrdinalIgnoreCase);
+    private bool _loaded;
     private RunState _run = new();
     private ClimberState _climb = new();
 
@@ -284,13 +325,54 @@ else
 
     private string ClimbTokens => $"{SpendFormat.Tokens(_climb.InputTokens)} in / {SpendFormat.Tokens(_climb.OutputTokens)} out";
 
-    private IReadOnlyList<DailySpend> _daily = Array.Empty<DailySpend>();
+    /// <summary>
+    /// One sentence naming the configured order. The default two-provider setup keeps the
+    /// original wording; extra providers are simply appended to the fallback list.
+    /// </summary>
+    private string Lede
+    {
+        get
+        {
+            if (Providers.Primary is not { } primary)
+            {
+                return "No provider is configured. Read-only.";
+            }
 
-    private IReadOnlyList<ModelSpend> _models = Array.Empty<ModelSpend>();
+            var fallbacks = Providers.Providers.Skip(1).Select(provider => provider.DisplayName).ToArray();
+            if (fallbacks.Length == 0)
+            {
+                return $"{primary.DisplayName} is the primary provider. Read-only.";
+            }
 
-    private int ChartWidth => Math.Max(1, _daily.Count * Step + BarGap * 2);
+            var names = fallbacks.Length == 1
+                ? $"{fallbacks[0]} is the approved fallback"
+                : $"{string.Join(", ", fallbacks[..^1])} and {fallbacks[^1]} are approved fallbacks";
+            return $"{primary.DisplayName} is the primary provider; {names}. Read-only.";
+        }
+    }
 
-    private double DailyMax => _daily.Count > 0 ? _daily.Max(b => b.Usage) : 0d;
+    private string PanelTitle(RegisteredProvider provider) =>
+        provider.Spend is not null
+            ? $"{provider.DisplayName.ToLowerInvariant()} connection"
+            : provider.DisplayName.ToLowerInvariant();
+
+    private ProviderReport? CatalogueReport(string id) =>
+        _catalogueReports.TryGetValue(id, out var report) ? report : null;
+
+    private SpendReport? SpendReportFor(string id) =>
+        _spendReports.TryGetValue(id, out var report) ? report : null;
+
+    private IReadOnlyList<DailySpend> DailyFor(string id) =>
+        _daily.TryGetValue(id, out var days) ? days : Array.Empty<DailySpend>();
+
+    private IReadOnlyList<ModelSpend> ModelsFor(string id) =>
+        _models.TryGetValue(id, out var models) ? models : Array.Empty<ModelSpend>();
+
+    private static int ChartWidth(IReadOnlyList<DailySpend> daily) =>
+        Math.Max(1, daily.Count * Step + BarGap * 2);
+
+    private static double DailyMax(IReadOnlyList<DailySpend> daily) =>
+        daily.Count > 0 ? daily.Max(bucket => bucket.Usage) : 0d;
 
     protected override void OnInitialized()
     {
@@ -302,11 +384,26 @@ else
 
     private async Task LoadAsync()
     {
-        var surplus = Surplus.GetReportAsync();
-        var openRouter = OpenRouter.GetSpendAsync();
-        _surplus = await surplus;
-        _report = await openRouter;
-        (_daily, _models) = Summarize(_report.Activity);
+        var catalogueLoads = Providers.Providers
+            .Where(provider => provider.Catalogue is not null)
+            .Select(async provider =>
+            {
+                _catalogueReports[provider.Id] = await provider.Catalogue!.GetReportAsync();
+            });
+
+        var spendLoads = Providers.Providers
+            .Where(provider => provider.Spend is not null)
+            .Select(async provider =>
+            {
+                var report = await provider.Spend!.GetSpendAsync();
+                _spendReports[provider.Id] = report;
+                var (days, models) = Summarize(report.Activity);
+                _daily[provider.Id] = days;
+                _models[provider.Id] = models;
+            });
+
+        await Task.WhenAll(catalogueLoads.Concat(spendLoads));
+        _loaded = true;
     }
 
     private void OnRunStateChanged(RunState state)
@@ -323,7 +420,7 @@ else
 
     /// <summary>Aggregates rows into a contiguous daily series and a per-model rollup.</summary>
     private static (IReadOnlyList<DailySpend> Days, IReadOnlyList<ModelSpend> Models) Summarize(
-        IReadOnlyList<OpenRouterActivityRow> rows)
+        IReadOnlyList<ProviderActivityRow> rows)
     {
         if (rows.Count == 0)
         {
@@ -342,10 +439,10 @@ else
         return (byDay, byModel);
     }
 
-    private bool ShowLabel(int index)
+    private static bool ShowLabel(IReadOnlyList<DailySpend> daily, int index)
     {
-        var every = Math.Max(1, (int)Math.Ceiling(_daily.Count / 8d));
-        return index % every == 0 || index == _daily.Count - 1;
+        var every = Math.Max(1, (int)Math.Ceiling(daily.Count / 8d));
+        return index % every == 0 || index == daily.Count - 1;
     }
 
     public void Dispose()
