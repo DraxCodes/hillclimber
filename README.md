@@ -129,7 +129,7 @@ Surplus/OpenRouter pair from the legacy keys below.
 | `Prefix` | `Id` | Serving-provider prefix for `--model`. |
 | `Model` | built-in for `surplus`/`openrouter` | Model id; null lets `opencode` decide. |
 | `BaseUrl` | built-in for `surplus`/`openrouter` | API base; trailing slash trimmed. |
-| `ApiKey` | — | Inference/catalogue key; also read from `{ID}_API_KEY`. |
+| `ApiKey` | - | Inference/catalogue key; also read from an id-derived variable such as `ACME_LABS_API_KEY` (upper-cased, with `-` and `.` replaced by `_`). |
 | `ManagementApiKey` | — | Management key for the OpenRouter-style spend surface. |
 | `RequiresKey` | `true` (`false` for `none`) | Set false for a local host that needs no key. |
 | `SendKey` | `true` | Set false for a catalogue that does not accept the key (Surplus). |
@@ -211,12 +211,36 @@ node providers.mjs      # provider bar, approval copy, one /activity card per pr
 npm run surfaces
 ```
 
+The token-spending harness refuses (exit `2`) unless Surplus is the *only* configured
+provider and reports `connected`. The legacy keys always synthesise Surplus **and**
+OpenRouter, so pin the array to one entry before running it:
+
+```json
+{
+  "Climber": {
+    "Providers": [
+      {
+        "Id": "surplus",
+        "Name": "Surplus",
+        "Kind": "openai",
+        "Prefix": "surplus",
+        "Model": "surplus/deepseek-v4.1-flash-1017",
+        "BaseUrl": "https://api.surplusintelligence.ai/min80/v1",
+        "SendKey": false
+      }
+    ]
+  }
+}
+```
+
+`SURPLUS_API_KEY` still supplies the key. Each run's echoed command line must use a
+`surplus/` model and no `openrouter/`; the harness stops before the second paid run when
+the first does not, and never approves a fallback. Exit codes: `0` all checks passed, `1` a
+check failed, `2` refused to continue (configuration, connection, or a paid run that did
+not use Surplus).
+
 Current state: **253 tests passing, 0 failed, 0 skipped**, **62.26% line coverage**. The
-token-spending `surfaces.mjs` harness is **not run** as part of the default checks. It
-requires Surplus to be the *only* configured provider, refuses to start otherwise or when
-Surplus is not connected, checks each run's echoed command line for a `surplus/` model,
-stops before the second paid run when the first does not use Surplus, and never approves a
-fallback.
+token-spending `surfaces.mjs` harness is **not run** as part of the default checks.
 
 ## License
 

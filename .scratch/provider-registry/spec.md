@@ -84,7 +84,7 @@ touching the run loop or the UI.
 | `Prefix` | `Id` | Serving-provider prefix for `--model` normalisation. |
 | `Model` | built-in default for `surplus`/`openrouter`, else null | Model id; null omits `--model` so opencode's own config decides. |
 | `BaseUrl` | built-in default for `surplus`/`openrouter` | API base; trailing slash trimmed. |
-| `ApiKey` | — | Inference/catalogue key. Also read from `{ID}_API_KEY`. |
+| `ApiKey` | — | Inference/catalogue key. Also read from an id-derived variable such as `ACME_LABS_API_KEY` (upper-cased, with `-` and `.` replaced by `_`). |
 | `ManagementApiKey` | — | Management key for OpenRouter's account/activity endpoints. |
 | `RequiresKey` | `true` (`false` for `none`) | Set false for a local OpenAI-compatible host that needs no key. |
 | `SendKey` | `true` | Set false for Surplus, whose catalogue does not need the key. |

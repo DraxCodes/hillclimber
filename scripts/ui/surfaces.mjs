@@ -93,7 +93,8 @@ const configuredProviders = (await page.locator('.providerbar .method').allInner
 if (configuredProviders.length !== 1 || configuredProviders[0] !== 'surplus') {
   await refuse(
     `This paid harness needs Surplus as the only configured provider (saw: ${configuredProviders.join(', ') || 'none'}).\n` +
-      'Set Climber:Providers to a single Surplus entry, or remove the array and keep the legacy Surplus keys, then retry.',
+      'Set Climber:Providers to a single Surplus entry (see "Testing" in README.md), then retry. ' +
+      'Omitting the array synthesises the legacy Surplus + OpenRouter pair, which also refuses.',
   );
 }
 
