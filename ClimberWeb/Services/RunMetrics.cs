@@ -32,7 +32,7 @@ public readonly record struct RunMetrics(
     /// <paramref name="pricing"/> is supplied, the tokens are also priced for a Surplus
     /// estimate; opencode reports <c>0</c> cost for that provider.
     /// </summary>
-    public RunMetrics Add(string? line, SurplusPricing? pricing = null)
+    public RunMetrics Add(string? line, ProviderPricing? pricing = null)
     {
         if (OpenCodeEvents.TryReadStepUsage(line) is not { } usage)
         {

@@ -86,7 +86,7 @@ public sealed record SurplusOptions(string? ApiKey, string BaseUrl, string Model
 /// <param name="Completion">Output token price.</param>
 /// <param name="CacheRead">Prompt-cache read price.</param>
 /// <param name="CacheWrite">Prompt-cache write price.</param>
-public sealed record SurplusPricing(double Prompt, double Completion, double CacheRead, double CacheWrite)
+public sealed record ProviderPricing(double Prompt, double Completion, double CacheRead, double CacheWrite)
 {
     /// <summary>
     /// Estimates the USD cost of the supplied token counts. This is an approximation: it
@@ -113,7 +113,7 @@ public sealed record SurplusReport(
     bool ModelAvailable,
     string Model,
     string FallbackModel,
-    SurplusPricing? Pricing,
+    ProviderPricing? Pricing,
     string? Message,
     IReadOnlyList<string> Notes)
 {
@@ -142,10 +142,10 @@ public interface ISurplusClient
 /// <summary>Result of looking a model up in Surplus's catalogue.</summary>
 /// <param name="Listed">True when the catalogue contains the model's id.</param>
 /// <param name="Pricing">The model's per-token pricing, or null when it publishes none.</param>
-public readonly record struct SurplusCatalogueEntry(bool Listed, SurplusPricing? Pricing);
+public readonly record struct CatalogueEntry(bool Listed, ProviderPricing? Pricing);
 
 /// <summary>Parsers for Surplus's <c>GET /models</c> response, shared by client and tests.</summary>
-public static class SurplusParser
+public static class OpenAiCatalogueParser
 {
     /// <summary>Strips the <c>provider/</c> prefix and any <c>#variant</c> suffix.</summary>
     public static string NormalizeModelId(string model)
@@ -165,11 +165,11 @@ public static class SurplusParser
 
     /// <summary>
     /// Looks <paramref name="model"/> up in the catalogue. A model that is listed without
-    /// usable pricing comes back as listed with null <see cref="SurplusCatalogueEntry.Pricing"/>,
+    /// usable pricing comes back as listed with null <see cref="CatalogueEntry.Pricing"/>,
     /// so callers can tell "Surplus does not serve this model" from "Surplus serves it but
     /// cannot price it". A malformed or empty response is not listed.
     /// </summary>
-    public static SurplusCatalogueEntry Lookup(string? json, string model)
+    public static CatalogueEntry Lookup(string? json, string model)
     {
         if (string.IsNullOrWhiteSpace(json))
         {
@@ -198,7 +198,7 @@ public static class SurplusParser
 
                 if (!item.TryGetProperty("pricing", out var pricing) || pricing.ValueKind != JsonValueKind.Object)
                 {
-                    return new SurplusCatalogueEntry(true, null);
+                    return new CatalogueEntry(true, null);
                 }
 
                 // Prompt and completion are the prices an estimate cannot do without; a cache
@@ -206,12 +206,12 @@ public static class SurplusParser
                 if (!TryReadNumber(pricing, "prompt", out var prompt)
                     || !TryReadNumber(pricing, "completion", out var completion))
                 {
-                    return new SurplusCatalogueEntry(true, null);
+                    return new CatalogueEntry(true, null);
                 }
 
-                return new SurplusCatalogueEntry(
+                return new CatalogueEntry(
                     true,
-                    new SurplusPricing(
+                    new ProviderPricing(
                         prompt,
                         completion,
                         ReadNumber(pricing, "input_cache_read"),
@@ -304,7 +304,7 @@ public sealed class SurplusClient : ISurplusClient
                 return new SurplusReport(true, false, false, _options.Model, _options.FallbackModel, null, message, notes);
             }
 
-            var entry = SurplusParser.Lookup(body, _options.Model);
+            var entry = OpenAiCatalogueParser.Lookup(body, _options.Model);
             if (!entry.Listed)
             {
                 var message = $"Surplus did not list {_options.Model}; spend cannot be estimated.";

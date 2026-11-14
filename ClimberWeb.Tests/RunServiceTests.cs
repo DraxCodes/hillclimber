@@ -179,7 +179,7 @@ public class RunServiceTests
 
     // ---- Surplus estimate + approved fallback --------------------------------
 
-    private static SurplusPricing Pricing => new(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
+    private static ProviderPricing Pricing => new(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
 
     [Fact]
     public async Task Run_OnSurplusFailure_OffersTheFallbackWithoutSwitching()
@@ -248,7 +248,7 @@ public class RunServiceTests
     public void RunMetrics_PricesReasoningTokensAtTheCompletionRate()
     {
         const string line = """{"type":"step_finish","part":{"cost":0,"tokens":{"input":100,"output":10,"reasoning":90}}}""";
-        var pricing = new SurplusPricing(0.000001, 0.000010, 0, 0);
+        var pricing = new ProviderPricing(0.000001, 0.000010, 0, 0);
 
         var metrics = RunMetrics.Zero.Add(line, pricing);
 
@@ -262,7 +262,7 @@ public class RunServiceTests
     {
         const string surplusStep = """{"type":"step_finish","part":{"cost":0,"tokens":{"input":100,"output":10,"reasoning":90}}}""";
         const string openRouterStep = """{"type":"step_finish","part":{"cost":0.0025,"tokens":{"input":50,"output":5}}}""";
-        var pricing = new SurplusPricing(0.000001, 0.000010, 0, 0);
+        var pricing = new ProviderPricing(0.000001, 0.000010, 0, 0);
 
         var metrics = RunMetrics.Zero.Add(surplusStep, pricing).Add(openRouterStep);
 

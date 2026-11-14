@@ -383,7 +383,7 @@ public class HillClimberServiceTests
 
     // ---- approved OpenRouter fallback ---------------------------------------
 
-    private static SurplusPricing Pricing => new(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
+    private static ProviderPricing Pricing => new(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
 
     private static ClimberOptions SurplusOptions(int max = 1) =>
         new(@"C:\work\repo", "make tests pass", max, null, "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing);

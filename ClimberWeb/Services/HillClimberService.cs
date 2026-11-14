@@ -72,7 +72,7 @@ public sealed record ClimberOptions(
     string? Agent = null,
     string? Model = null,
     AiProvider? Provider = null,
-    SurplusPricing? Pricing = null);
+    ProviderPricing? Pricing = null);
 
 /// <summary>The hill-climbing loop, as consumed by the UI.</summary>
 public interface IHillClimberService
@@ -116,7 +116,7 @@ public sealed class HillClimberService : IHillClimberService
     private ClimberState _state = new();
     private CancellationTokenSource? _cts;
     private Task _runTask = Task.CompletedTask;
-    private SurplusPricing? _activePricing;
+    private ProviderPricing? _activePricing;
     private TaskCompletionSource<string>? _approval;
 
     public HillClimberService(ICommandRunner runner, ILogger<HillClimberService>? logger = null)

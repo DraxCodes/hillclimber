@@ -45,7 +45,7 @@ public sealed record RunOptions(
     string? Agent = null,
     string? Model = null,
     AiProvider? Provider = null,
-    SurplusPricing? Pricing = null);
+    ProviderPricing? Pricing = null);
 
 /// <summary>The general single-shot opencode run, as consumed by the UI.</summary>
 public interface IRunService
@@ -91,7 +91,7 @@ public sealed class RunService : IRunService
     private CancellationTokenSource? _cts;
     private Task _runTask = Task.CompletedTask;
     private RunOptions? _lastOptions;
-    private SurplusPricing? _activePricing;
+    private ProviderPricing? _activePricing;
 
     public RunService(ICommandRunner runner, ILogger<RunService>? logger = null)
     {

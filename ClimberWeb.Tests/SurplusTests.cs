@@ -72,7 +72,7 @@ public class SurplusTests
     [Fact]
     public void Parser_FindsTheModelAndReadsPerTokenPricing()
     {
-        var pricing = SurplusParser.Lookup(Catalogue, "surplus/deepseek-v4.1-flash-1017#low").Pricing;
+        var pricing = OpenAiCatalogueParser.Lookup(Catalogue, "surplus/deepseek-v4.1-flash-1017#low").Pricing;
 
         Assert.NotNull(pricing);
         Assert.Equal(0.000000038, pricing.Prompt);
@@ -87,7 +87,7 @@ public class SurplusTests
     [InlineData("""{"data":[{"id":"different"}]}""")]
     public void Parser_ReportsAnUnusableCatalogueAsNotListed(string json)
     {
-        var entry = SurplusParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017");
+        var entry = OpenAiCatalogueParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017");
 
         Assert.False(entry.Listed);
         Assert.Null(entry.Pricing);
@@ -98,7 +98,7 @@ public class SurplusTests
     {
         const string json = """{"data":[{"id":"deepseek-v4.1-flash-1017"}]}""";
 
-        var entry = SurplusParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017");
+        var entry = OpenAiCatalogueParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017");
 
         Assert.True(entry.Listed);
         Assert.Null(entry.Pricing);
@@ -113,7 +113,7 @@ public class SurplusTests
     [InlineData("""{"data":[{"id":"deepseek-v4.1-flash-1017","pricing":{"prompt":"0.0000000380","completion":"Infinity"}}]}""")]
     public void Parser_TreatsAModelWithoutUsablePromptAndCompletionPricingAsUnpriced(string json)
     {
-        var entry = SurplusParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017");
+        var entry = OpenAiCatalogueParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017");
 
         Assert.True(entry.Listed);
         Assert.Null(entry.Pricing);
@@ -124,7 +124,7 @@ public class SurplusTests
     {
         const string json = """{"data":[{"id":"deepseek-v4.1-flash-1017","pricing":{"prompt":"0","completion":"0.0000005","input_cache_read":"0","input_cache_write":"0"}}]}""";
 
-        var pricing = SurplusParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017").Pricing;
+        var pricing = OpenAiCatalogueParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017").Pricing;
 
         Assert.NotNull(pricing);
         Assert.Equal(0d, pricing!.Prompt);
@@ -138,7 +138,7 @@ public class SurplusTests
     {
         const string json = """{"data":[{"id":"deepseek-v4.1-flash-1017","pricing":{"prompt":"0.0000000380","completion":"0.0000005"}}]}""";
 
-        var pricing = SurplusParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017").Pricing;
+        var pricing = OpenAiCatalogueParser.Lookup(json, "surplus/deepseek-v4.1-flash-1017").Pricing;
 
         Assert.NotNull(pricing);
         Assert.Equal(0d, pricing!.CacheRead);
@@ -148,7 +148,7 @@ public class SurplusTests
     [Fact]
     public void Estimate_PricesPromptCompletionAndCacheTokens()
     {
-        var pricing = new SurplusPricing(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
+        var pricing = new ProviderPricing(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
 
         var estimate = pricing.Estimate(input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 0);
 
@@ -160,7 +160,7 @@ public class SurplusTests
     {
         // 1.2345e-8 + 9.87654e-7 = 9.99999e-7 per step; rounding each step up to 1e-6 is what
         // keeps the total at 0.01 rather than the unrounded 0.00999999.
-        var pricing = new SurplusPricing(0.000000012345, 0.000000987654, 0, 0);
+        var pricing = new ProviderPricing(0.000000012345, 0.000000987654, 0, 0);
         const int steps = 10_000;
         var exactPerStep = (decimal)pricing.Prompt + (decimal)pricing.Completion;
 
@@ -177,8 +177,8 @@ public class SurplusTests
     [Fact]
     public void NormalizeModelId_StripsProviderAndVariant()
     {
-        Assert.Equal("deepseek-v4.1-flash-1017", SurplusParser.NormalizeModelId("surplus/deepseek-v4.1-flash-1017#low"));
-        Assert.Equal("deepseek-v4.1-flash-1017", SurplusParser.NormalizeModelId("deepseek-v4.1-flash-1017"));
+        Assert.Equal("deepseek-v4.1-flash-1017", OpenAiCatalogueParser.NormalizeModelId("surplus/deepseek-v4.1-flash-1017#low"));
+        Assert.Equal("deepseek-v4.1-flash-1017", OpenAiCatalogueParser.NormalizeModelId("deepseek-v4.1-flash-1017"));
     }
 
     [Fact]
