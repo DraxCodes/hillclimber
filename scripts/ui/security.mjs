@@ -26,7 +26,7 @@ const browser = await chromium.launch({ headless: true });
 
 for (const { path, content } of [
   { path: '/status', content: 'Project health' },
-  { path: '/activity', content: 'OpenRouter connection' },
+  { path: '/activity', content: 'Surplus is the primary provider' },
 ]) {
   const context = await browser.newContext({ viewport: { width: 900, height: 1000 } });
   const page = await context.newPage();

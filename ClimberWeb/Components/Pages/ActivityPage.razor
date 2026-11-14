@@ -2,24 +2,82 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @inject IOpenRouterClient OpenRouter
+@inject ISurplusClient Surplus
+@inject IRunService Run
 @inject IHillClimberService Climber
 
 <PageTitle>activity · hillclimber</PageTitle>
 
 <AuthGate OnUnlocked="LoadAsync">
-@if (_report is null)
+@if (_report is null || _surplus is null)
 {
     <section class="panel">
         <div class="panel-head">
             <span class="idx">[00]</span>
             <span class="panel-title">activity</span>
         </div>
-        <p class="lede">Checking OpenRouter…</p>
+        <p class="lede">Checking providers…</p>
     </section>
 }
 else
 {
-    <p class="lede">OpenRouter connection and spend — read-only.</p>
+    <p class="lede">Surplus is the primary provider; OpenRouter is the approved fallback. Read-only.</p>
+
+    <section class="panel">
+        <div class="panel-head">
+            <span class="idx">[00]</span>
+            <span class="panel-title">surplus</span>
+            <span class="panel-meta">primary</span>
+        </div>
+        <div class="conn-line">
+            <span class="dot dot-@_surplus.StateTone" aria-hidden="true"></span>
+            <span class="conn-state">@_surplus.StateLabel</span>
+            <span class="chip mono">@_surplus.Model</span>
+        </div>
+
+        @if (_surplus.Pricing is { } pricing)
+        {
+            <div class="spend-row">
+                <div class="spend-stat">
+                    <span class="spend-num">@SpendFormat.Usd(pricing.Prompt * 1_000_000)</span>
+                    <span class="spend-lbl">input / Mtok</span>
+                </div>
+                <div class="spend-stat">
+                    <span class="spend-num">@SpendFormat.Usd(pricing.Completion * 1_000_000)</span>
+                    <span class="spend-lbl">output / Mtok</span>
+                </div>
+                <div class="spend-stat">
+                    <span class="spend-num">@SpendFormat.Usd(pricing.CacheRead * 1_000_000)</span>
+                    <span class="spend-lbl">cache read / Mtok</span>
+                </div>
+            </div>
+        }
+        else if (_surplus.Message is { } surplusMessage)
+        {
+            <p class="empty">@surplusMessage</p>
+        }
+
+        <div class="spend-row">
+            <div class="spend-stat">
+                <span class="spend-num">@SpendFormat.Usd((double)SessionEstimate)</span>
+                <span class="spend-lbl">est. spent this session</span>
+            </div>
+            <div class="spend-stat">
+                <span class="spend-num">@SpendFormat.Tokens(SessionTokens)</span>
+                <span class="spend-lbl">tokens this session</span>
+            </div>
+        </div>
+
+        @foreach (var note in _surplus.Notes)
+        {
+            <p class="notice notice-info" role="status">@note</p>
+        }
+
+        <p class="footnote dim">
+            Surplus exposes no usage or credits API, so this is an estimate from opencode's
+            <code class="mono">step_finish</code> tokens times catalogue pricing. Runs are not persisted.
+        </p>
+    </section>
 
     @foreach (var note in _report.Notes)
     {
@@ -28,9 +86,9 @@ else
 
     <section class="panel">
         <div class="panel-head">
-            <span class="idx">[00]</span>
-            <span class="panel-title">connection</span>
-            <span class="panel-meta">@_report.Connection.KeyLabel</span>
+            <span class="idx">[01]</span>
+            <span class="panel-title">openrouter connection</span>
+            <span class="panel-meta">fallback · @_report.Connection.KeyLabel</span>
         </div>
         <div class="conn-line">
             <span class="dot dot-@_report.Connection.StateTone" aria-hidden="true"></span>
@@ -66,7 +124,7 @@ else
 
     <section class="panel">
         <div class="panel-head">
-            <span class="idx">[01]</span>
+            <span class="idx">[02]</span>
             <span class="panel-title">account spend</span>
         </div>
         @if (_report.Account is not { } account)
@@ -94,7 +152,7 @@ else
 
     <section class="panel">
         <div class="panel-head">
-            <span class="idx">[02]</span>
+            <span class="idx">[03]</span>
             <span class="panel-title">activity</span>
             <span class="panel-meta">@_daily.Count day@(_daily.Count == 1 ? "" : "s")</span>
         </div>
@@ -135,7 +193,7 @@ else
 
     <section class="panel panel-flush">
         <div class="panel-head">
-            <span class="idx">[03]</span>
+            <span class="idx">[04]</span>
             <span class="panel-title">by model</span>
             <span class="panel-meta">@_models.Count models</span>
         </div>
@@ -161,13 +219,13 @@ else
 
     <section class="panel">
         <div class="panel-head">
-            <span class="idx">[04]</span>
+            <span class="idx">[05]</span>
             <span class="panel-title">this climb</span>
             <span class="panel-meta">@ClimbStatusLabel</span>
         </div>
         <div class="spend-row">
             <div class="spend-stat">
-                <span class="spend-num">@SpendFormat.Usd((double)ClimbSpend)</span>
+                <span class="spend-num">@ClimbSpendText</span>
                 <span class="spend-lbl">spent this climb</span>
             </div>
             <div class="spend-stat">
@@ -177,14 +235,15 @@ else
         </div>
         <p class="tokens dim">tokens: @ClimbTokens</p>
         <p class="footnote dim">
-            Summed live from opencode's own <code class="mono">step_finish</code> costs. Runs are not
-            persisted, so this reflects the current/last run only.
+            Summed live from opencode's own <code class="mono">step_finish</code> events; Surplus
+            figures are token-based estimates, OpenRouter figures are reported costs. Runs are
+            not persisted, so this reflects the current/last run only.
         </p>
     </section>
 
     <section class="panel">
         <div class="panel-head">
-            <span class="idx">[05]</span>
+            <span class="idx">[06]</span>
             <span class="panel-title">saved with skills</span>
         </div>
         <p class="empty">Not measured.</p>
@@ -205,13 +264,23 @@ else
     private const int ChartHeight = 104;
 
     private SpendReport? _report;
+    private SurplusReport? _surplus;
+    private RunState _run = new();
     private ClimberState _climb = new();
 
-    private decimal ClimbSpend => _climb.SpendUsd;
+    /// <summary>Token-based estimate across the current/last run and climb.</summary>
+    private decimal SessionEstimate => _run.Metrics.EstimatedSpendUsd + _climb.EstimatedSpendUsd;
+
+    private long SessionTokens =>
+        _run.Metrics.InputTokens + _run.Metrics.OutputTokens + _run.Metrics.CacheReadTokens + _run.Metrics.CacheWriteTokens
+        + _climb.InputTokens + _climb.OutputTokens + _climb.CacheReadTokens + _climb.CacheWriteTokens;
+
+    private string ClimbSpendText =>
+        SpendFormat.Spend((double)_climb.SpendUsd, (double)_climb.EstimatedSpendUsd, _climb.Provider);
 
     private int ClimbBest => _climb.BestScore;
 
-    private string ClimbStatusLabel => _climb.Status.ToString().ToLowerInvariant();
+    private string ClimbStatusLabel => _climb.Status.Label();
 
     private string ClimbTokens => $"{SpendFormat.Tokens(_climb.InputTokens)} in / {SpendFormat.Tokens(_climb.OutputTokens)} out";
 
@@ -225,14 +294,25 @@ else
 
     protected override void OnInitialized()
     {
+        _run = Run.State;
         _climb = Climber.State;
+        Run.StateChanged += OnRunStateChanged;
         Climber.StateChanged += OnStateChanged;
     }
 
     private async Task LoadAsync()
     {
-        _report = await OpenRouter.GetSpendAsync();
+        var surplus = Surplus.GetReportAsync();
+        var openRouter = OpenRouter.GetSpendAsync();
+        _surplus = await surplus;
+        _report = await openRouter;
         (_daily, _models) = Summarize(_report.Activity);
+    }
+
+    private void OnRunStateChanged(RunState state)
+    {
+        _run = state;
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void OnStateChanged(ClimberState state)
@@ -268,7 +348,11 @@ else
         return index % every == 0 || index == _daily.Count - 1;
     }
 
-    public void Dispose() => Climber.StateChanged -= OnStateChanged;
+    public void Dispose()
+    {
+        Run.StateChanged -= OnRunStateChanged;
+        Climber.StateChanged -= OnStateChanged;
+    }
 
     private sealed record DailySpend(DateOnly Date, string Label, double Usage);
 

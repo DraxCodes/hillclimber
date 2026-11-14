@@ -25,4 +25,34 @@ public static class SpendFormat
         value >= 1000
             ? $"{(value / 1000.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)}k"
             : value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The dashboard's spend figure. Surplus has no reported cost, so its token estimate is
+    /// always labelled <c>est.</c> even before pricing produces a number; OpenRouter keeps its
+    /// exact reported cost. A mixed climb shows both.
+    /// </summary>
+    public static string Spend(double reported, double estimated, AiProvider? provider)
+    {
+        if (estimated > 0 && reported > 0)
+        {
+            return $"est. {Usd(estimated)} + {Usd(reported)}";
+        }
+
+        if (estimated > 0 || provider == AiProvider.Surplus)
+        {
+            return $"est. {Usd(estimated)}";
+        }
+
+        return Usd(reported);
+    }
+
+    /// <summary>The line both services append after a run, using <see cref="Spend"/>.</summary>
+    public static string SpendLine(decimal reported, decimal estimated, AiProvider? provider) =>
+        (estimated, reported, provider) switch
+        {
+            (> 0, > 0, _) => $"Spend this run: est. ${Amount((double)estimated)} + ${Amount((double)reported)}.",
+            (> 0, _, _) => $"Spend this run: est. ${Amount((double)estimated)} (Surplus pricing).",
+            (_, _, AiProvider.Surplus) => "Spend this run: est. $0 (Surplus pricing unavailable).",
+            _ => $"Spend this run: ${Amount((double)reported)}.",
+        };
 }

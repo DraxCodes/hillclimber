@@ -7,6 +7,7 @@
 @inject IFileBrowser Browser
 @inject IClimberAuth Auth
 @inject IOpenRouterClient OpenRouter
+@inject ISurplusClient Surplus
 @inject IClimbPreflight Preflight
 @inject IJSRuntime JS
 
@@ -69,15 +70,32 @@ else
                 disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Hillclimb)">hillclimb</button>
     </section>
 
-    <section class="spendline" aria-label="OpenRouter connection and spend">
+    <section class="spendline" aria-label="Surplus connection and spend">
         <span class="conn">
-            <span class="dot dot-@SpendTone" aria-hidden="true"></span>
-            <span>openrouter: @SpendLabel</span>
+            <span class="dot dot-@SurplusTone" aria-hidden="true"></span>
+            <span>surplus: @SurplusLabel</span>
         </span>
         <span class="spend-sep" aria-hidden="true">/</span>
-        <span class="spend-item">@ActiveSpendNoun <b>@SpendFormat.Usd((double)ActiveSpendUsd)</b></span>
+        <span class="spend-item">@ActiveSpendNoun <b>@ActiveSpendText</b></span>
         <span class="spend-sep" aria-hidden="true">/</span>
-        <span class="spend-item" title="Rolling 30-day spend; all-time total until 30 days of activity exist">total <b>@TotalSpendLabel</b></span>
+        <span class="spend-item" title="Fallback provider, used only after approval">
+            fallback <span class="dot dot-@FallbackTone" aria-hidden="true"></span><b>@FallbackLabel</b>
+        </span>
+    </section>
+
+    <section class="providerbar" aria-label="provider">
+        <span class="label">provider</span>
+        <button class="method @(_provider == AiProvider.Surplus ? "active" : string.Empty)"
+                type="button"
+                disabled="@AnyRunning"
+                aria-pressed="@(_provider == AiProvider.Surplus)"
+                @onclick="SelectSurplus">surplus</button>
+        <button class="method @(_provider == AiProvider.OpenRouter ? "active" : string.Empty)"
+                type="button"
+                disabled="@AnyRunning"
+                aria-pressed="@(_provider == AiProvider.OpenRouter)"
+                @onclick="SelectOpenRouter">openrouter</button>
+        <span class="agent-note dim">@ProviderNote</span>
     </section>
 
     @if (_method == RunMethod.Run)
@@ -89,7 +107,7 @@ else
             </div>
             <div class="cell">
                 <dt>spent</dt>
-                <dd>@SpendFormat.Usd((double)_run.Metrics.SpendUsd)</dd>
+                <dd>@ActiveSpendText</dd>
             </div>
             <div class="cell">
                 <dt>tokens</dt>
@@ -219,6 +237,36 @@ else
         @foreach (var warning in _preflightWarnings)
         {
             <p class="notice notice-info" role="status">@warning</p>
+        }
+
+        @if (_pendingProviderApproval)
+        {
+            <p class="notice notice-info" role="status">
+                OpenRouter is the fallback and bills your OpenRouter account. Approve it for this run?
+            </p>
+            <div class="btn-row approval-row">
+                <button class="btn btn-primary" type="button" @onclick="ApproveProviderSwitch">approve openrouter</button>
+                <button class="btn btn-ghost" type="button" @onclick="CancelProviderSwitch">cancel</button>
+            </div>
+        }
+
+        @if (_startFallbackOffer)
+        {
+            <p class="notice notice-bad" role="alert">@_startFallbackMessage</p>
+            <div class="btn-row approval-row">
+                <button class="btn btn-primary" type="button" @onclick="StartOnOpenRouter">start on openrouter</button>
+                <button class="btn btn-ghost" type="button" @onclick="CancelStartFallback">cancel</button>
+            </div>
+        }
+
+        @if (ActiveFallbackAvailable)
+        {
+            <p class="notice notice-bad" role="alert">@ActiveFallbackMessage</p>
+            <div class="btn-row approval-row">
+                <button class="btn btn-primary" type="button" @onclick="ApproveActiveFallback">
+                    retry on openrouter
+                </button>
+            </div>
         }
 
         <div class="btn-row">
@@ -392,16 +440,23 @@ else
     private string? _sessionId;
     private DotNetObjectReference<Home>? _selfRef;
     private CancellationTokenSource? _expiryCts;
+    private SurplusReport? _surplus;
     private SpendReport? _spend;
+    private AiProvider _provider = AiProvider.Surplus;
+    private bool _pendingProviderApproval;
+    private bool _startFallbackOffer;
+    private string _startFallbackMessage = string.Empty;
     private IReadOnlyList<string> _preflightWarnings = Array.Empty<string>();
 
-    /// <summary>True while the method currently on screen is running.</summary>
+    /// <summary>True while the method currently on screen is active (running or awaiting approval).</summary>
     private bool ActiveRunning => _method == RunMethod.Run
-        ? _run.Status == RunStatus.Running
-        : _climb.Status == RunStatus.Running;
+        ? _run.Status is RunStatus.Running or RunStatus.AwaitingApproval
+        : _climb.Status is RunStatus.Running or RunStatus.AwaitingApproval;
 
-    /// <summary>True while either method is running; the two share the machine, so only one may go at a time.</summary>
-    private bool AnyRunning => _run.Status == RunStatus.Running || _climb.Status == RunStatus.Running;
+    /// <summary>True while either method is active; the two share the machine, so only one may go at a time.</summary>
+    private bool AnyRunning =>
+        _run.Status is RunStatus.Running or RunStatus.AwaitingApproval
+        || _climb.Status is RunStatus.Running or RunStatus.AwaitingApproval;
 
     private RunStatus ActiveStatus => _method == RunMethod.Run ? _run.Status : _climb.Status;
 
@@ -409,9 +464,30 @@ else
 
     private IReadOnlyList<string> ActiveLogs => _method == RunMethod.Run ? _run.Logs : _climb.Logs;
 
-    private decimal ActiveSpendUsd => _method == RunMethod.Run ? _run.Metrics.SpendUsd : _climb.SpendUsd;
+    private decimal ActiveReportedSpendUsd => _method == RunMethod.Run ? _run.Metrics.SpendUsd : _climb.SpendUsd;
+
+    private decimal ActiveEstimatedSpendUsd => _method == RunMethod.Run
+        ? _run.Metrics.EstimatedSpendUsd
+        : _climb.EstimatedSpendUsd;
+
+    /// <summary>
+    /// Surplus reports no cost, so its figure is the token-based estimate, marked "est.";
+    /// an approved OpenRouter run keeps its exact reported cost.
+    /// </summary>
+    private string ActiveSpendText =>
+        SpendFormat.Spend((double)ActiveReportedSpendUsd, (double)ActiveEstimatedSpendUsd, ActiveProvider);
+
+    private AiProvider? ActiveProvider => _method == RunMethod.Run ? _run.Provider : _climb.Provider;
 
     private string ActiveSpendNoun => _method == RunMethod.Run ? "this run" : "this climb";
+
+    private bool ActiveFallbackAvailable => _method == RunMethod.Run
+        ? _run.FallbackAvailable
+        : _climb.FallbackAvailable;
+
+    private string? ActiveFallbackMessage => _method == RunMethod.Run
+        ? _run.FallbackMessage
+        : _climb.FallbackMessage;
 
     private string PromptLabel => _method == RunMethod.Run ? "prompt" : "goal prompt";
 
@@ -428,12 +504,17 @@ else
                 ? home
                 : Directory.GetCurrentDirectory();
 
-    private string SpendTone => _spend?.Connection.StateTone ?? "off";
+    private string SurplusTone => _surplus?.StateTone ?? "off";
 
-    private string SpendLabel => _spend?.Connection.StateLabel ?? "checking…";
+    private string SurplusLabel => _surplus?.StateLabel ?? "checking…";
 
-    /// <summary>Rolling 30-day spend as <c>$/pm</c>, falling back to the all-time total until activity exists.</summary>
-    private string TotalSpendLabel => SpendSummary.Headline(_spend);
+    private string FallbackTone => _spend?.Connection.StateTone ?? "off";
+
+    private string FallbackLabel => _spend?.Connection.StateLabel ?? "checking…";
+
+    private string ProviderNote => _provider == AiProvider.Surplus
+        ? "primary — spend is estimated from tokens"
+        : "fallback — exact spend, approved for this run";
 
     private string AgentLineLabel => _method == RunMethod.Run ? "agent" : "agents";
 
@@ -466,15 +547,7 @@ else
         }
     }
 
-    private string StatusText => ActiveStatus switch
-    {
-        RunStatus.Idle => "idle",
-        RunStatus.Running => "running",
-        RunStatus.Completed => "completed",
-        RunStatus.Stopped => "stopped",
-        RunStatus.Failed => "failed",
-        _ => ActiveStatus.ToString(),
-    };
+    private string StatusText => ActiveStatus.Label();
 
     /// <summary>The tab that shows the combined stream; subagent tabs are keyed by agent id.</summary>
     private const string PrimaryTab = "primary";
@@ -558,34 +631,50 @@ else
 
         ResolveAgents();
         RebuildEntries();
-        _spend = await OpenRouter.GetSpendAsync();
+        var surplus = Surplus.GetReportAsync();
+        var openRouter = OpenRouter.GetSpendAsync();
+        _surplus = await surplus;
+        _spend = await openRouter;
     }
 
     private void OnRunStateChanged(RunState state)
     {
-        var wasRunning = _run.Status == RunStatus.Running;
+        var wasActive = _run.Status is RunStatus.Running or RunStatus.AwaitingApproval;
         _run = state;
         RebuildEntries();
         Rerender();
 
-        if (wasRunning && state.Status != RunStatus.Running)
+        if (wasActive && IsTerminal(state.Status))
         {
+            ResetProvider();
             _ = RefreshSpendAsync();
         }
     }
 
     private void OnClimbStateChanged(ClimberState state)
     {
-        var wasRunning = _climb.Status == RunStatus.Running;
+        var wasActive = _climb.Status is RunStatus.Running or RunStatus.AwaitingApproval;
         _climb = state;
         RebuildEntries();
         Rerender();
 
-        // The account total moves once a run spends something; refresh when it finishes.
-        if (wasRunning && state.Status != RunStatus.Running)
+        // The provider surfaces move once a run spends something; refresh when it finishes.
+        if (wasActive && IsTerminal(state.Status))
         {
+            ResetProvider();
             _ = RefreshSpendAsync();
         }
+    }
+
+    private static bool IsTerminal(RunStatus status) =>
+        status is RunStatus.Completed or RunStatus.Failed or RunStatus.Stopped;
+
+    /// <summary>A fallback approval applies to one run; the next start defaults to Surplus again.</summary>
+    private void ResetProvider()
+    {
+        _provider = AiProvider.Surplus;
+        _pendingProviderApproval = false;
+        _startFallbackOffer = false;
     }
 
     private void Rerender()
@@ -602,12 +691,14 @@ else
 
     private async Task RefreshSpendAsync()
     {
-        var report = await OpenRouter.GetSpendAsync();
+        var surplus = await Surplus.GetReportAsync();
+        var openRouter = await OpenRouter.GetSpendAsync();
         try
         {
             await InvokeAsync(() =>
             {
-                _spend = report;
+                _surplus = surplus;
+                _spend = openRouter;
                 StateHasChanged();
             });
         }
@@ -633,6 +724,8 @@ else
         _method = method;
         _error = null;
         _preflightWarnings = Array.Empty<string>();
+        _startFallbackOffer = false;
+        _pendingProviderApproval = false;
         _outputTab = PrimaryTab;
         RebuildEntries();
     }
@@ -763,13 +856,14 @@ else
 
     private void CloseBrowser() => _browseOpen = false;
 
-    private void Start()
+    private async Task Start()
     {
         _error = null;
         _preflightWarnings = Array.Empty<string>();
         _outputTab = PrimaryTab;
 
         var folder = _folderPath.Trim();
+        var prompt = _prompt.Trim();
         var preflight = Preflight.Check(folder, _method);
         if (!preflight.CanRun)
         {
@@ -780,18 +874,100 @@ else
         _preflightWarnings = preflight.Warnings;
         ResolveAgents();
 
+        if (_provider == AiProvider.Surplus)
+        {
+            _surplus = await Surplus.GetReportAsync();
+            if (_surplus is not { Reachable: true, ModelAvailable: true })
+            {
+                _startFallbackMessage = _surplus is { Configured: false }
+                    ? "Surplus is not configured. Start this run on OpenRouter instead?"
+                    : $"Surplus is unavailable ({_surplus?.StateLabel ?? "unknown"}). Start this run on OpenRouter instead?";
+                _startFallbackOffer = true;
+                return;
+            }
+        }
+
+        Launch(_provider, folder, prompt);
+    }
+
+    /// <summary>Starts the selected method with an explicit provider. Never falls back silently.</summary>
+    private void Launch(AiProvider provider, string folder, string prompt)
+    {
+        var model = provider == AiProvider.Surplus
+            ? _surplus?.Model ?? SurplusOptions.DefaultModel
+            : FallbackModel;
+        var pricing = provider == AiProvider.Surplus ? _surplus?.Pricing : null;
+        _provider = provider;
+
         try
         {
             // StartAsync throws synchronously for invalid input / concurrent runs and returns a
             // task that completes when the run finishes; we don't await it here.
             if (_method == RunMethod.Hillclimb)
             {
-                _ = Climber.StartAsync(new ClimberOptions(folder, _prompt.Trim(), Math.Max(1, _maxIterations), _agents.DefaultAgent));
+                _ = Climber.StartAsync(new ClimberOptions(
+                    folder, prompt, Math.Max(1, _maxIterations), _agents.DefaultAgent, model, provider, pricing));
             }
             else
             {
-                _ = Run.StartAsync(new RunOptions(folder, _prompt.Trim(), _agents.DefaultAgent));
+                _ = Run.StartAsync(new RunOptions(folder, prompt, _agents.DefaultAgent, model, provider, pricing));
             }
+        }
+        catch (Exception ex)
+        {
+            _error = StripParameterSuffix(ex.Message);
+        }
+    }
+
+    private void SelectSurplus()
+    {
+        _pendingProviderApproval = false;
+        _startFallbackOffer = false;
+        _provider = AiProvider.Surplus;
+    }
+
+    private void SelectOpenRouter()
+    {
+        if (_provider != AiProvider.OpenRouter)
+        {
+            _pendingProviderApproval = true;
+        }
+    }
+
+    private void ApproveProviderSwitch()
+    {
+        _pendingProviderApproval = false;
+        _startFallbackOffer = false;
+        _provider = AiProvider.OpenRouter;
+    }
+
+    private void CancelProviderSwitch() => _pendingProviderApproval = false;
+
+    private Task StartOnOpenRouter()
+    {
+        _startFallbackOffer = false;
+        _provider = AiProvider.OpenRouter;
+        return Start();
+    }
+
+    private void CancelStartFallback() => _startFallbackOffer = false;
+
+    private string FallbackModel => _surplus?.FallbackModel ?? SurplusOptions.DefaultFallbackModel;
+
+    private void ApproveActiveFallback()
+    {
+        try
+        {
+            if (_method == RunMethod.Run)
+            {
+                _ = Run.ApproveFallbackAsync(FallbackModel);
+            }
+            else
+            {
+                Climber.ApproveFallback(FallbackModel);
+            }
+
+            _provider = AiProvider.OpenRouter;
         }
         catch (Exception ex)
         {

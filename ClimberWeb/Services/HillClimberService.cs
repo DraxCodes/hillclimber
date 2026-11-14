@@ -43,6 +43,18 @@ public sealed record ClimberState
 
     /// <summary>Prompt-cache write tokens this run.</summary>
     public long CacheWriteTokens { get; init; }
+
+    /// <summary>Token-based spend estimate for providers that report no cost.</summary>
+    public decimal EstimatedSpendUsd { get; init; }
+
+    /// <summary>True when the primary provider failed and the fallback awaits approval.</summary>
+    public bool FallbackAvailable { get; init; }
+
+    /// <summary>Explains the fallback offer, or null when none is available.</summary>
+    public string? FallbackMessage { get; init; }
+
+    /// <summary>The provider the current iteration is using, when known.</summary>
+    public AiProvider? Provider { get; init; }
 }
 
 /// <summary>Inputs for a climb run.</summary>
@@ -50,11 +62,17 @@ public sealed record ClimberState
 /// <param name="GoalPrompt">Instruction handed to <c>opencode run</c> each iteration.</param>
 /// <param name="MaxIterations">Maximum number of iterations (defaults to 5).</param>
 /// <param name="Agent">Agent to run with, or null to use opencode's own default.</param>
+/// <param name="Model">Explicit model id; null lets the target folder's config decide.</param>
+/// <param name="Provider">The provider in use, when known.</param>
+/// <param name="Pricing">Surplus pricing for a token-based estimate, or null for exact cost.</param>
 public sealed record ClimberOptions(
     string TargetFolder,
     string GoalPrompt,
     int MaxIterations = 5,
-    string? Agent = null);
+    string? Agent = null,
+    string? Model = null,
+    AiProvider? Provider = null,
+    SurplusPricing? Pricing = null);
 
 /// <summary>The hill-climbing loop, as consumed by the UI.</summary>
 public interface IHillClimberService
@@ -75,6 +93,12 @@ public interface IHillClimberService
 
     /// <summary>Requests immediate cancellation of the running loop.</summary>
     void Stop();
+
+    /// <summary>
+    /// Resumes an awaiting climb on <paramref name="model"/> after the user approved the
+    /// OpenRouter fallback. Throws when the loop is not awaiting approval.
+    /// </summary>
+    void ApproveFallback(string model);
 }
 
 /// <summary>
@@ -92,6 +116,8 @@ public sealed class HillClimberService : IHillClimberService
     private ClimberState _state = new();
     private CancellationTokenSource? _cts;
     private Task _runTask = Task.CompletedTask;
+    private SurplusPricing? _activePricing;
+    private TaskCompletionSource<string>? _approval;
 
     public HillClimberService(ICommandRunner runner, ILogger<HillClimberService>? logger = null)
     {
@@ -118,7 +144,7 @@ public sealed class HillClimberService : IHillClimberService
         {
             lock (_gate)
             {
-                return _state.Status == RunStatus.Running;
+                return _state.Status is RunStatus.Running or RunStatus.AwaitingApproval;
             }
         }
     }
@@ -141,13 +167,15 @@ public sealed class HillClimberService : IHillClimberService
 
         lock (_gate)
         {
-            if (_state.Status == RunStatus.Running)
+            if (_state.Status is RunStatus.Running or RunStatus.AwaitingApproval)
             {
                 throw new InvalidOperationException("A climb is already running. Stop it before starting another.");
             }
 
             _log.Clear();
             _metrics = RunMetrics.Zero;
+            Volatile.Write(ref _activePricing, options.Pricing);
+            _approval = null;
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
             _state = new ClimberState
@@ -157,6 +185,7 @@ public sealed class HillClimberService : IHillClimberService
                 CurrentIteration = 0,
                 BestScore = 0,
                 Logs = Array.Empty<string>(),
+                Provider = options.Provider,
             };
         }
 
@@ -170,6 +199,28 @@ public sealed class HillClimberService : IHillClimberService
         lock (_gate)
         {
             _cts?.Cancel();
+            _approval?.TrySetCanceled();
+        }
+    }
+
+    /// <inheritdoc />
+    public void ApproveFallback(string model)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
+
+        TaskCompletionSource<string>? approval;
+        lock (_gate)
+        {
+            approval = _approval;
+            if (approval is null || _state.Status != RunStatus.AwaitingApproval)
+            {
+                throw new InvalidOperationException("The climb is not awaiting fallback approval.");
+            }
+        }
+
+        if (!approval.TrySetResult(model))
+        {
+            throw new InvalidOperationException("The climb is not awaiting fallback approval.");
         }
     }
 
@@ -180,6 +231,12 @@ public sealed class HillClimberService : IHillClimberService
     {
         try
         {
+            // Once the user approves a fallback, every remaining iteration stays on OpenRouter
+            // rather than repeatedly failing against Surplus.
+            var model = options.Model;
+            var provider = options.Provider;
+            Volatile.Write(ref _activePricing, options.Pricing);
+
             for (var iteration = 1; iteration <= maxIterations; iteration++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -188,21 +245,71 @@ public sealed class HillClimberService : IHillClimberService
                 Log($"===== Iteration {iteration}/{maxIterations} =====");
 
                 // 1. Ask opencode to make a change toward the goal.
-                Log($"$ {OpenCodeRun.CommandLine(options.GoalPrompt, options.Agent)}");
-                var opencode = await _runner.RunAsync(
-                    OpenCodeRun.Request(options.GoalPrompt, options.TargetFolder, options.Agent),
-                    OnOpenCodeLine,
-                    cancellationToken).ConfigureAwait(false);
 
-                cancellationToken.ThrowIfCancellationRequested();
+                while (true)
+                {
+                    Log($"$ {OpenCodeRun.CommandLine(options.GoalPrompt, options.Agent, model)}");
+                    CommandResult opencode;
+                    try
+                    {
+                        opencode = await _runner.RunAsync(
+                            OpenCodeRun.Request(options.GoalPrompt, options.TargetFolder, options.Agent, model),
+                            OnOpenCodeLine,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex) when (provider == AiProvider.Surplus)
+                    {
+                        // A thrown provider call is a Surplus failure too; ask before spending.
+                        Log($"[opencode failed: {ex.Message}]");
+                        model = await RequestFallbackAsync(cancellationToken).ConfigureAwait(false);
+                        provider = AiProvider.OpenRouter;
+                        Volatile.Write(ref _activePricing, null);
+                        UpdateState(state => state with
+                        {
+                            Status = RunStatus.Running,
+                            FallbackAvailable = false,
+                            FallbackMessage = null,
+                            Message = "Surplus failed; continuing on OpenRouter.",
+                            Provider = AiProvider.OpenRouter,
+                        });
+                        continue;
+                    }
 
-                if (opencode.ExitCode == 127)
-                {
-                    Log("[opencode not found — is it installed and on PATH?]");
-                }
-                else if (opencode.ExitCode != 0)
-                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (opencode.ExitCode == 127)
+                    {
+                        Log("[opencode not found — is it installed and on PATH?]");
+                        break;
+                    }
+
+                    if (opencode.ExitCode == 0)
+                    {
+                        break;
+                    }
+
                     Log($"[opencode exited with code {opencode.ExitCode}]");
+                    if (provider != AiProvider.Surplus)
+                    {
+                        break;
+                    }
+
+                    // The primary provider failed: pause until the user approves the fallback.
+                    model = await RequestFallbackAsync(cancellationToken).ConfigureAwait(false);
+                    provider = AiProvider.OpenRouter;
+                    Volatile.Write(ref _activePricing, null);
+                    UpdateState(state => state with
+                    {
+                        Status = RunStatus.Running,
+                        FallbackAvailable = false,
+                        FallbackMessage = null,
+                        Message = "Surplus failed; continuing on OpenRouter.",
+                        Provider = AiProvider.OpenRouter,
+                    });
                 }
 
                 // 2. Measure the result.
@@ -256,14 +363,15 @@ public sealed class HillClimberService : IHillClimberService
             }
 
             var finalBest = State.BestScore;
-            var finalSpend = State.SpendUsd;
             UpdateState(state => state with
             {
                 Status = RunStatus.Completed,
                 Message = $"Completed {maxIterations} iteration(s). Best score: {finalBest}.",
+                FallbackAvailable = false,
+                FallbackMessage = null,
             });
             Log($"===== Completed. Best score: {finalBest} =====");
-            Log($"Spend this run: ${finalSpend:0.######}.");
+            LogSpend();
         }
         catch (OperationCanceledException)
         {
@@ -271,6 +379,8 @@ public sealed class HillClimberService : IHillClimberService
             {
                 Status = RunStatus.Stopped,
                 Message = "Stopped by user.",
+                FallbackAvailable = false,
+                FallbackMessage = null,
             });
             Log("===== Stopped by user =====");
         }
@@ -285,6 +395,51 @@ public sealed class HillClimberService : IHillClimberService
             });
         }
     }
+
+    /// <summary>
+    /// Pauses the loop and waits for the user to approve the OpenRouter fallback. Returns the
+    /// approved model; cancellation (Stop) propagates as <see cref="OperationCanceledException"/>.
+    /// </summary>
+    private async Task<string> RequestFallbackAsync(CancellationToken cancellationToken)
+    {
+        TaskCompletionSource<string> approval;
+        lock (_gate)
+        {
+            approval = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _approval = approval;
+        }
+
+        Log("----- Surplus failed. Retry this iteration on OpenRouter, or stop. -----");
+        UpdateState(state => state with
+        {
+            Status = RunStatus.AwaitingApproval,
+            FallbackAvailable = true,
+            FallbackMessage = "Surplus failed. Retry this iteration on OpenRouter?",
+            Message = "Waiting for approval to use OpenRouter.",
+        });
+
+        string model;
+        try
+        {
+            model = await approval.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                if (ReferenceEquals(_approval, approval))
+                {
+                    _approval = null;
+                }
+            }
+        }
+
+        Log($"[approved: retrying with OpenRouter model {model}]");
+        return model;
+    }
+
+    private void LogSpend() =>
+        Log(SpendFormat.SpendLine(State.SpendUsd, State.EstimatedSpendUsd, State.Provider));
 
     private async Task RevertAsync(string targetFolder, CancellationToken cancellationToken)
     {
@@ -316,7 +471,7 @@ public sealed class HillClimberService : IHillClimberService
     {
         Log(line);
 
-        var updated = _metrics.Add(line);
+        var updated = _metrics.Add(line, Volatile.Read(ref _activePricing));
         if (updated == _metrics)
         {
             return;
@@ -330,6 +485,7 @@ public sealed class HillClimberService : IHillClimberService
             OutputTokens = updated.OutputTokens,
             CacheReadTokens = updated.CacheReadTokens,
             CacheWriteTokens = updated.CacheWriteTokens,
+            EstimatedSpendUsd = updated.EstimatedSpendUsd,
         });
     }
 

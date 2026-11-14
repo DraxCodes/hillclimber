@@ -177,6 +177,73 @@ public class RunServiceTests
         Assert.Contains(snapshot, s => s.Status == RunStatus.Completed);
     }
 
+    // ---- Surplus estimate + approved fallback --------------------------------
+
+    private static SurplusPricing Pricing => new(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
+
+    [Fact]
+    public async Task Run_OnSurplusFailure_OffersTheFallbackWithoutSwitching()
+    {
+        var runner = new FakeCommandRunner((_, _) => CannedResults.Raw("boom", exitCode: 1));
+        var service = new RunService(runner);
+
+        await service.StartAsync(new RunOptions(
+            @"C:\repo", "go", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing));
+
+        var state = service.State;
+        Assert.Equal(RunStatus.Failed, state.Status);
+        Assert.True(state.FallbackAvailable);
+        Assert.Contains("Retry on OpenRouter", state.Message);
+        Assert.Single(runner.RequestsFor("opencode"));
+        Assert.Contains("surplus/deepseek-v4.1-flash-1017", Assert.Single(runner.RequestsFor("opencode")).Arguments);
+    }
+
+    [Fact]
+    public async Task Run_ApproveFallback_RetriesWithTheOpenRouterModel()
+    {
+        var opencodeCalls = 0;
+        var runner = new FakeCommandRunner((request, _) => request.FileName == "opencode"
+            ? opencodeCalls++ == 0 ? CannedResults.Raw("boom", exitCode: 1) : CannedResults.Raw(StepFinish)
+            : CannedResults.Raw(string.Empty));
+        var service = new RunService(runner);
+
+        await service.StartAsync(new RunOptions(
+            @"C:\repo", "go", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing));
+
+        await service.ApproveFallbackAsync("openrouter/deepseek/deepseek-v4.1-flash");
+
+        var requests = runner.RequestsFor("opencode");
+        Assert.Equal(2, requests.Count);
+        Assert.Contains("openrouter/deepseek/deepseek-v4.1-flash", requests[1].Arguments);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
+        Assert.False(service.State.FallbackAvailable);
+        Assert.Equal(0.0125m, service.State.Metrics.SpendUsd);
+        Assert.Equal(0m, service.State.Metrics.EstimatedSpendUsd);
+    }
+
+    [Fact]
+    public async Task Run_UnexpectedExceptionOnSurplus_OffersTheFallback()
+    {
+        var runner = new FakeCommandRunner((_, _) => throw new InvalidOperationException("boom"));
+        var service = new RunService(runner);
+
+        await service.StartAsync(new RunOptions(
+            @"C:\repo", "go", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing));
+
+        Assert.Equal(RunStatus.Failed, service.State.Status);
+        Assert.True(service.State.FallbackAvailable);
+        Assert.Contains("Retry on OpenRouter", service.State.Message);
+    }
+
+    [Fact]
+    public void RunMetrics_WithPricing_AddsAnEstimatedSpend()
+    {
+        var metrics = RunMetrics.Zero.Add(StepFinish, Pricing);
+
+        Assert.Equal(0.0125m, metrics.SpendUsd);
+        Assert.Equal(0.00002294m, metrics.EstimatedSpendUsd);
+    }
+
     // ---- shared accumulator --------------------------------------------------
 
     [Fact]

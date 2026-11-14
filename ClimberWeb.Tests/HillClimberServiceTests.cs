@@ -380,4 +380,86 @@ public class HillClimberServiceTests
         Assert.Contains("--agent", request.Arguments);
         Assert.Contains("task-orchestrator", request.Arguments);
     }
+
+    // ---- approved OpenRouter fallback ---------------------------------------
+
+    private static SurplusPricing Pricing => new(0.000000038, 0.0000005, 0.0000000075, 0.000000038);
+
+    private static ClimberOptions SurplusOptions(int max = 1) =>
+        new(@"C:\work\repo", "make tests pass", max, null, "surplus/deepseek-v4.1-flash-1017", AiProvider.Surplus, Pricing);
+
+    [Fact]
+    public async Task SurplusFailure_PausesForApproval_AndDoesNotSwitchSilently()
+    {
+        var runner = new FakeCommandRunner((request, _) => request.FileName == "opencode"
+            ? CannedResults.Raw("boom", exitCode: 1)
+            : CannedResults.Tests(1));
+        var service = new HillClimberService(runner);
+
+        var run = service.StartAsync(SurplusOptions());
+        await WaitForStatus(service, RunStatus.AwaitingApproval);
+
+        Assert.True(service.IsRunning);
+        Assert.True(service.State.FallbackAvailable);
+        Assert.Single(runner.RequestsFor("opencode"));
+        Assert.Contains("Surplus failed", service.State.Logs.First(line => line.Contains("Surplus failed")));
+
+        service.Stop();
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(RunStatus.Stopped, service.State.Status);
+    }
+
+    [Fact]
+    public async Task SurplusException_PausesForApproval()
+    {
+        var runner = new FakeCommandRunner((request, _) =>
+            request.FileName == "opencode" ? throw new InvalidOperationException("boom") : CannedResults.Tests(1));
+        var service = new HillClimberService(runner);
+
+        var run = service.StartAsync(SurplusOptions());
+        await WaitForStatus(service, RunStatus.AwaitingApproval);
+
+        Assert.True(service.State.FallbackAvailable);
+        Assert.Contains(service.State.Logs, line => line.Contains("opencode failed: boom"));
+
+        service.Stop();
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(RunStatus.Stopped, service.State.Status);
+    }
+
+    [Fact]
+    public async Task ApproveFallback_RetriesTheIterationOnOpenRouter_AndCompletes()
+    {
+        var runner = new FakeCommandRunner((request, _) => request.FileName == "opencode"
+            ? CannedResults.Raw("boom", exitCode: 1)
+            : CannedResults.Tests(1));
+        var service = new HillClimberService(runner);
+
+        var run = service.StartAsync(SurplusOptions());
+        await WaitForStatus(service, RunStatus.AwaitingApproval);
+
+        service.ApproveFallback("openrouter/deepseek/deepseek-v4.1-flash");
+        await run.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var requests = runner.RequestsFor("opencode");
+        Assert.Equal(2, requests.Count);
+        Assert.Contains("openrouter/deepseek/deepseek-v4.1-flash", requests[1].Arguments);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
+        Assert.False(service.State.FallbackAvailable);
+        Assert.Contains(service.State.Logs, line => line.Contains("retrying with OpenRouter"));
+    }
+
+    private static async Task WaitForStatus(IHillClimberService service, RunStatus status)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (service.State.Status != status)
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException($"Expected {status}, saw {service.State.Status}.");
+            }
+
+            await Task.Delay(10);
+        }
+    }
 }

@@ -28,9 +28,11 @@ builder.Services.AddSingleton<IProjectStatusService, ProjectStatusService>();
 // Pre-flight checks for a climb target (folder exists, is a git repo, tools on PATH).
 builder.Services.AddSingleton<IClimbPreflight, ClimbPreflight>();
 
-// OpenRouter spend/connection surfaces. A single short-timeout client keeps a stalled
-// API from hanging a page render; parsing is defensive so a bad key is never fatal.
+// Provider surfaces. Surplus is the primary provider; OpenRouter stays available as the
+// explicitly approved fallback. A single short-timeout client keeps a stalled API from
+// hanging a page render; parsing is defensive so a bad key is never fatal.
 builder.Services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(10) });
+builder.Services.AddSingleton<ISurplusClient, SurplusClient>();
 builder.Services.AddSingleton<IOpenRouterClient, OpenRouterClient>();
 
 // PIN gate: unlock persists for the browser session and slides with activity,

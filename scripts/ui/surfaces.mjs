@@ -63,12 +63,24 @@ check('correct PIN unlocks the dashboard', (await page.locator('.telemetry').cou
 
 // --- spend line -----------------------------------------------------------
 check('spend line is present', (await page.locator('.spendline').count()) === 1);
-check('spend line shows a connection state', (await page.locator('.spendline .conn').innerText()).toLowerCase().includes('openrouter'));
+check('spend line shows Surplus as primary', (await page.locator('.spendline .conn').innerText()).toLowerCase().includes('surplus'));
+check('spend line shows the fallback provider', (await page.locator('.spendline').innerText()).toLowerCase().includes('fallback'));
+check('spend line shows a spend figure', /\$/.test(await page.locator('.spendline').innerText()));
+
+// --- provider switch ------------------------------------------------------
+const providers = (await page.locator('.providerbar .method').allInnerTexts()).map((t) => t.trim().toLowerCase());
+check('provider switch offers surplus and openrouter', providers.includes('surplus') && providers.includes('openrouter'));
+check('surplus is the default provider', (await page.locator('.providerbar .method.active').innerText()).trim().toLowerCase() === 'surplus');
+await page.click('.providerbar .method:has-text("openrouter")');
+await page.waitForTimeout(200);
+check('choosing openrouter asks for approval', (await page.locator('text=Approve it for this run?').count()) === 1);
+await page.click('button:has-text("cancel")');
+await page.waitForTimeout(200);
+check('cancelling keeps surplus selected', (await page.locator('.providerbar .method.active').innerText()).trim().toLowerCase() === 'surplus');
 
 // --- method switch --------------------------------------------------------
 check('method switch is present', (await page.locator('.methodbar .method').count()) === 2);
-check('run is the default method', (await page.locator('.method.active').innerText()).toLowerCase() === 'run');
-check('spend line shows a total', /\$/.test(await page.locator('.spendline').innerText()) && (await page.locator('.spendline').innerText()).toLowerCase().includes('total'));
+check('run is the default method', (await page.locator('.methodbar .method.active').innerText()).toLowerCase() === 'run');
 
 // --- run-mode controls ----------------------------------------------------
 for (const sel of ['#folder', '#prompt']) {
@@ -93,7 +105,7 @@ check('empty prompt shows a clean error', (await page.locator('.notice-bad').inn
 // --- switch to hillclimb --------------------------------------------------
 await page.click('button.method:has-text("hillclimb")');
 await page.waitForTimeout(300);
-check('hillclimb becomes the active method', (await page.locator('.method.active').innerText()).toLowerCase() === 'hillclimb');
+check('hillclimb becomes the active method', (await page.locator('.methodbar .method.active').innerText()).toLowerCase() === 'hillclimb');
 check('hillclimb reveals max iterations', (await page.locator('#max').count()) === 1);
 const climbAgents = (await page.locator('.agent-line').innerText()).toLowerCase();
 check('hillclimb shows the agent trio',
@@ -189,11 +201,13 @@ await shot(page, 'status.png');
 
 await page.click('a.nav-link[href="/activity"]');
 await page.waitForTimeout(1000);
-// The page fetches OpenRouter on load; wait for the report rather than a fixed delay.
-await page.waitForSelector('text=OpenRouter connection and spend', { timeout: 20000 }).catch(() => {});
+// The page fetches both providers on load; wait for the reports rather than a fixed delay.
+await page.waitForSelector('text=Surplus is the primary provider', { timeout: 20000 }).catch(() => {});
 check('/activity loads', page.url().endsWith('/activity'));
 const activityTitles = (await page.locator('.panel-title').allInnerTexts()).map((t) => t.toLowerCase());
-check('/activity shows connection', activityTitles.some((t) => t.includes('connection')));
+check('/activity shows the surplus section', activityTitles.some((t) => t.includes('surplus')));
+check('/activity shows the openrouter fallback', activityTitles.some((t) => t.includes('openrouter connection')));
+check('/activity shows the surplus estimate', (await page.locator('body').innerText()).toLowerCase().includes('est. spent this session'));
 check('/activity shows account spend', activityTitles.some((t) => t.includes('account spend')));
 check('/activity shows the spend graph section', activityTitles.some((t) => t.includes('activity')));
 check('/activity shows saved-with-skills honesty', (await page.locator('body').innerText()).includes('Not measured'));

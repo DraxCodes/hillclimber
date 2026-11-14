@@ -31,4 +31,22 @@ public class OpenCodeRunTests
             "opencode run \"do it\" --agent task-orchestrator --format json",
             OpenCodeRun.CommandLine("do it", "task-orchestrator"));
     }
+
+    [Fact]
+    public void Request_WithModel_AddsTheModelFlagAfterTheAgent()
+    {
+        var request = OpenCodeRun.Request("do it", @"C:\repo", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017");
+
+        Assert.Equal(
+            new[] { "run", "do it", "--agent", "task-orchestrator", "--model", "surplus/deepseek-v4.1-flash-1017", "--format", "json" },
+            request.Arguments);
+    }
+
+    [Fact]
+    public void CommandLine_ShowsTheModelWhenSet()
+    {
+        Assert.Equal(
+            "opencode run \"do it\" --agent task-orchestrator --model surplus/deepseek-v4.1-flash-1017 --format json",
+            OpenCodeRun.CommandLine("do it", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017"));
+    }
 }

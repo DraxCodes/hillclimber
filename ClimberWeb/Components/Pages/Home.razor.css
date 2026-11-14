@@ -153,6 +153,30 @@
     cursor: not-allowed;
 }
 
+/* Provider switch --------------------------------------------------------- */
+
+.providerbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 0.9rem;
+}
+
+.providerbar .method {
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+}
+
+.providerbar .method.active {
+    border-color: var(--ink-3);
+    background: var(--surface);
+}
+
+.approval-row {
+    margin-bottom: 0.9rem;
+}
+
 /* Telemetry --------------------------------------------------------------- */
 
 .telemetry {

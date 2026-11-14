@@ -6,8 +6,8 @@
 
 <br clear="left" />
 
-[![tests](https://img.shields.io/badge/tests-190%20passing-brightgreen)](#testing)
-[![coverage](https://img.shields.io/badge/coverage-62.42%25-yellowgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-216%20passing-brightgreen)](#testing)
+[![coverage](https://img.shields.io/badge/coverage-61.97%25-yellowgreen)](#testing)
 [![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://learn.microsoft.com/aspnet/core/blazor/)
 [![personal use](https://img.shields.io/badge/license-personal%20use-lightgrey)](#license)
@@ -33,10 +33,13 @@ throwaway script. It runs on the LAN so a phone can drive it, behind a PIN.
   own, and the primary tab keeps a marker pointing at the delegated work.
 - **Telemetry** — status, spend, tokens, elapsed time, iteration, best score, and last test
   result, streamed from OpenCode's own events.
+- **Surplus primary, OpenRouter fallback** — runs use Surplus Intelligence; OpenRouter is
+  offered only after explicit approval when Surplus fails or is unreachable.
 - **Status page** — branch, HEAD, tree state, commit cadence, coverage, tracked issues, and
   the configured agents/workflow.
-- **Activity page** — OpenRouter connection, key spend/limit, account credits, rolling
-  30-day spend, and per-model activity.
+- **Activity page** — Surplus connection, model pricing, estimated session spend and
+  tokens, plus OpenRouter's key spend, credits, rolling 30-day spend, and per-model
+  activity as the fallback provider.
 - **PIN gate** — every page is locked until the session enters the PIN; the session slides
   with activity and re-locks after the idle timeout.
 - **LAN-friendly** — binds `0.0.0.0:5179` when a real PIN is configured, so a phone on the
@@ -48,7 +51,9 @@ throwaway script. It runs on the LAN so a phone can drive it, behind a PIN.
 
 - [.NET 11 SDK](https://dotnet.microsoft.com/download)
 - [OpenCode](https://opencode.ai) on `PATH` (the dashboard shells out to `opencode run`)
-- Optional: an OpenRouter API key for the spend/connection surfaces
+- A Surplus Intelligence API key for the primary provider (`SURPLUS_API_KEY` or
+  `Climber:SurplusApiKey`)
+- Optional: an OpenRouter API key for the approved fallback and its spend surfaces
 
 ### Run it
 
@@ -88,12 +93,17 @@ Settings live in `ClimberWeb/appsettings.json`, with local overrides in the giti
 | `Climber:SessionMinutes` | `30` | Idle minutes before a session re-locks. |
 | `Climber:DefaultFolder` | user profile | Folder shown in the target picker. |
 | `Climber:DefaultAgent` | `task-orchestrator` | Agent to run when the target provides one. |
-| `Climber:OpenRouterApiKey` | — | Inference key; also used for `GET /key`. |
+| `Climber:SurplusApiKey` | — | Primary provider key. `SURPLUS_API_KEY` is also read. |
+| `Climber:SurplusBaseUrl` | `https://api.surplusintelligence.ai/min80/v1` | Surplus API base. |
+| `Climber:SurplusModel` | `surplus/deepseek-v4.1-flash-1017` | Model passed to `opencode run --model`. |
+| `Climber:FallbackModel` | `openrouter/deepseek/deepseek-v4.1-flash` | OpenRouter model offered after approval. |
+| `Climber:OpenRouterApiKey` | — | Fallback inference key; also used for `GET /key`. |
 | `Climber:OpenRouterManagementApiKey` | — | Management key for `/credits` and `/activity`. |
 | `Climber:OpenRouterBaseUrl` | `https://openrouter.ai/api/v1` | OpenRouter API base. |
 
-`OPENROUTER_API_KEY` and `OPENROUTER_MANAGEMENT_API_KEY` are also read. Never commit real
-keys; `*.local.json` is gitignored.
+`SURPLUS_API_KEY`, `OPENROUTER_API_KEY`, and `OPENROUTER_MANAGEMENT_API_KEY` are also read.
+Never commit real keys; `*.local.json` is gitignored. Surplus has no usage/credits API, so
+its spend figure is an estimate from tokens × the model's catalogue pricing.
 
 ## Security posture
 
@@ -117,7 +127,7 @@ throttling, tool-output logging, filesystem scope, and the OpenRouter base-URL o
 
 ```
 ClimberWeb/            Blazor Server app (pages, services, auth, command runner)
-ClimberWeb.Tests/      xUnit tests (190 passing)
+ClimberWeb.Tests/      xUnit tests (216 passing)
 scripts/               status/coverage, fixture, and Playwright UI checks
 status/                committed coverage/test artifact read by /status
 fixtures/              throwaway sample project for climb proofs
