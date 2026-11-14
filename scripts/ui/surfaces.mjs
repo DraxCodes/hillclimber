@@ -9,14 +9,15 @@
 // and climb controls, the theme toggle, the live output panel, and the /status and
 // /activity pages, and writes one screenshot per page.
 //
-// The runs it starts are stopped immediately, but they do reach a paid provider. Surplus
-// Intelligence is the only one they may use: the harness refuses to start when Surplus is
-// not connected, and it never approves the OpenRouter fallback. Each run's echoed command
-// line must use a `surplus/` model and must not reference `openrouter/`; when the first run
-// does not, the harness stops before starting another paid run.
+// The runs it starts are stopped immediately, but they do reach a paid provider. This
+// harness is pinned to a configuration with Surplus as the ONLY provider: it refuses to
+// start (exit 2) otherwise or when Surplus is not connected, and it never approves a
+// fallback. Each run's echoed command line must use a `surplus/` model and must not
+// reference `openrouter/`; when the first run does not, it stops before starting another
+// paid run. The two-provider approval UX is covered by the free `providers.mjs`.
 //
-// Exit codes: 0 all checks passed, 1 a check failed, 2 refused to continue (Surplus not
-// connected, or a paid run did not use Surplus).
+// Exit codes: 0 all checks passed, 1 a check failed, 2 refused to continue (Surplus-only
+// configuration not in place, Surplus not connected, or a paid run did not use Surplus).
 
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -70,15 +71,15 @@ await page.waitForTimeout(500);
 check('correct PIN unlocks the dashboard', (await page.locator('.telemetry').count()) > 0);
 
 // --- spend line -----------------------------------------------------------
+const surplusConn = page.locator('.spendline .conn[data-provider="surplus"]');
 check('spend line is present', (await page.locator('.spendline').count()) === 1);
-check('spend line shows Surplus as primary', (await page.locator('.spendline .conn').innerText()).toLowerCase().includes('surplus'));
-check('spend line shows the fallback provider', (await page.locator('.spendline').innerText()).toLowerCase().includes('fallback'));
-check('spend line shows a spend figure', /\$/.test(await page.locator('.spendline').innerText()));
+check('spend line shows Surplus as primary', (await surplusConn.innerText()).toLowerCase().includes('surplus'));
+check('spend line shows a spend figure', (await page.locator('.spendline .spend-item').first().innerText()).trim().length > 0);
 
 // --- provider guard: paid checks only ever run on Surplus -----------------
 // The run and climb below call a paid API. Surplus is the only provider they may spend
-// on; OpenRouter would need an explicit approval click, which this harness never makes.
-// Stop here instead of drifting into a failed run or an unstaged OpenRouter charge.
+// on, so the harness requires Surplus to be the single configured provider and never
+// approves anything else. Stop here instead of drifting into a failed run or a charge.
 const summary = () => `${results.length} checks, ${results.filter((r) => !r.ok).length} failures`;
 const refuse = async (reason) => {
   console.error(`\n${reason}`);
@@ -87,10 +88,19 @@ const refuse = async (reason) => {
   process.exit(2);
 };
 
+const configuredProviders = (await page.locator('.providerbar .method').allInnerTexts())
+  .map((text) => text.trim().toLowerCase());
+if (configuredProviders.length !== 1 || configuredProviders[0] !== 'surplus') {
+  await refuse(
+    `This paid harness needs Surplus as the only configured provider (saw: ${configuredProviders.join(', ') || 'none'}).\n` +
+      'Set Climber:Providers to a single Surplus entry, or remove the array and keep the legacy Surplus keys, then retry.',
+  );
+}
+
 await page
-  .waitForFunction(() => !/checking/i.test(document.querySelector('.spendline .conn')?.textContent ?? ''), null, { timeout: 20_000 })
+  .waitForFunction(() => !/checking/i.test(document.querySelector('.spendline .conn[data-provider="surplus"]')?.textContent ?? ''), null, { timeout: 20_000 })
   .catch(() => {});
-const surplusState = (await page.locator('.spendline .conn').innerText()).split(':').pop().trim().toLowerCase();
+const surplusState = (await surplusConn.innerText()).split(':').pop().trim().toLowerCase();
 if (surplusState !== 'connected') {
   await refuse(
     `Surplus is not connected (state: ${surplusState}).\n` +
@@ -108,17 +118,6 @@ const surplusCommand = (text) => {
   return commands.length > 0 && commands.every((line) => /--model[=\s]+surplus\//.test(line));
 };
 const openRouterCommand = (text) => /openrouter\//.test(commandLines(text).join('\n'));
-
-// --- provider switch ------------------------------------------------------
-const providers = (await page.locator('.providerbar .method').allInnerTexts()).map((t) => t.trim().toLowerCase());
-check('provider switch offers surplus and openrouter', providers.includes('surplus') && providers.includes('openrouter'));
-check('surplus is the default provider', (await page.locator('.providerbar .method.active').innerText()).trim().toLowerCase() === 'surplus');
-await page.click('.providerbar .method:has-text("openrouter")');
-await page.waitForTimeout(200);
-check('choosing openrouter asks for approval', (await page.locator('text=Approve it for this run?').count()) === 1);
-await page.click('button:has-text("cancel")');
-await page.waitForTimeout(200);
-check('cancelling keeps surplus selected', (await page.locator('.providerbar .method.active').innerText()).trim().toLowerCase() === 'surplus');
 
 // --- method switch --------------------------------------------------------
 check('method switch is present', (await page.locator('.methodbar .method').count()) === 2);
@@ -214,7 +213,7 @@ const runCommand = (runLog.match(/--model[=\s]+\S+/) ?? [''])[0];
 const runOnSurplus = surplusCommand(runLog) && !openRouterCommand(runLog);
 check('run runs on Surplus', runOnSurplus, runCommand);
 const runApproval = await approvalOffered();
-check('run never offers the OpenRouter fallback', !runApproval);
+check('run never offers a fallback', !runApproval);
 if (!runOnSurplus || runApproval) {
   await refuse('The run did not stay on Surplus. Stopping before the climb would start another paid run.');
 }
@@ -238,7 +237,7 @@ const climbCommand = (climbLog.match(/--model[=\s]+\S+/) ?? [''])[0];
 const climbOnSurplus = surplusCommand(climbLog) && !openRouterCommand(climbLog);
 check('climb runs on Surplus', climbOnSurplus, climbCommand);
 const climbApproval = await approvalOffered();
-check('climb never offers the OpenRouter fallback', !climbApproval);
+check('climb never offers a fallback', !climbApproval);
 if (!climbOnSurplus || climbApproval) {
   await refuse('The climb did not stay on Surplus.');
 }
@@ -261,15 +260,13 @@ await shot(page, 'status.png');
 
 await page.click('a.nav-link[href="/activity"]');
 await page.waitForTimeout(1000);
-// The page fetches both providers on load; wait for the reports rather than a fixed delay.
+// The page fetches its provider on load; wait for the report rather than a fixed delay.
 await page.waitForSelector('text=Surplus is the primary provider', { timeout: 20000 }).catch(() => {});
 check('/activity loads', page.url().endsWith('/activity'));
 const activityTitles = (await page.locator('.panel-title').allInnerTexts()).map((t) => t.toLowerCase());
 check('/activity shows the surplus section', activityTitles.some((t) => t.includes('surplus')));
-check('/activity shows the openrouter fallback', activityTitles.some((t) => t.includes('openrouter connection')));
 check('/activity shows the surplus estimate', (await page.locator('body').innerText()).toLowerCase().includes('est. spent this session'));
-check('/activity shows account spend', activityTitles.some((t) => t.includes('account spend')));
-check('/activity shows the spend graph section', activityTitles.some((t) => t.includes('activity')));
+check('/activity shows no other provider', !activityTitles.some((t) => t.includes('openrouter')));
 check('/activity shows saved-with-skills honesty', (await page.locator('body').innerText()).includes('Not measured'));
 await shot(page, 'activity.png');
 

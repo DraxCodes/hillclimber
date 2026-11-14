@@ -6,8 +6,8 @@
 
 <br clear="left" />
 
-[![tests](https://img.shields.io/badge/tests-216%20passing-brightgreen)](#testing)
-[![coverage](https://img.shields.io/badge/coverage-61.97%25-yellowgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-253%20passing-brightgreen)](#testing)
+[![coverage](https://img.shields.io/badge/coverage-62.26%25-yellowgreen)](#testing)
 [![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://learn.microsoft.com/aspnet/core/blazor/)
 [![personal use](https://img.shields.io/badge/license-personal%20use-lightgrey)](#license)
@@ -33,13 +33,14 @@ throwaway script. It runs on the LAN so a phone can drive it, behind a PIN.
   own, and the primary tab keeps a marker pointing at the delegated work.
 - **Telemetry** — status, spend, tokens, elapsed time, iteration, best score, and last test
   result, streamed from OpenCode's own events.
-- **Surplus primary, OpenRouter fallback** — runs use Surplus Intelligence; OpenRouter is
-  offered only after explicit approval when Surplus fails or is unreachable.
+- **Pluggable providers** — an ordered `Climber:Providers` registry. The first provider is
+  primary; later providers are offered only after explicit approval, one approved step at a
+  time. Any OpenAI-compatible catalogue, an OpenRouter-style management API, or a provider
+  that `opencode` manages itself (no API surface) can be configured without code changes.
 - **Status page** — branch, HEAD, tree state, commit cadence, coverage, tracked issues, and
   the configured agents/workflow.
-- **Activity page** — Surplus connection, model pricing, estimated session spend and
-  tokens, plus OpenRouter's key spend, credits, rolling 30-day spend, and per-model
-  activity as the fallback provider.
+- **Activity page** — one card per configured provider: connection state, catalogue
+  pricing, key/account spend, rolling 30-day activity, and a token-based session estimate.
 - **PIN gate** — every page is locked until the session enters the PIN; the session slides
   with activity and re-locks after the idle timeout.
 - **LAN-friendly** — binds `0.0.0.0:5179` when a real PIN is configured, so a phone on the
@@ -51,9 +52,9 @@ throwaway script. It runs on the LAN so a phone can drive it, behind a PIN.
 
 - [.NET 11 SDK](https://dotnet.microsoft.com/download)
 - [OpenCode](https://opencode.ai) on `PATH` (the dashboard shells out to `opencode run`)
-- A Surplus Intelligence API key for the primary provider (`SURPLUS_API_KEY` or
-  `Climber:SurplusApiKey`)
-- Optional: an OpenRouter API key for the approved fallback and its spend surfaces
+- At least one provider configured for `opencode`. The shipped default is Surplus
+  Intelligence (`SURPLUS_API_KEY` or `Climber:SurplusApiKey`), with OpenRouter offered as
+  the approval-gated fallback when its key is present.
 
 ### Run it
 
@@ -87,13 +88,67 @@ Then open `http://<your-machine>:5179` from the phone.
 Settings live in `ClimberWeb/appsettings.json`, with local overrides in the gitignored
 `ClimberWeb/appsettings.local.json` or environment variables (`Climber__Pin`, etc.).
 
+### Providers
+
+`Climber:Providers` is an ordered array. The first entry is primary; each later entry is a
+fallback, offered only after explicit approval. Omit the array to keep the shipped
+Surplus/OpenRouter pair from the legacy keys below.
+
+```json
+{
+  "Climber": {
+    "Providers": [
+      {
+        "Id": "surplus",
+        "Name": "Surplus",
+        "Kind": "openai",
+        "Prefix": "surplus",
+        "Model": "surplus/deepseek-v4.1-flash-1017",
+        "BaseUrl": "https://api.surplusintelligence.ai/min80/v1",
+        "RequiresKey": true,
+        "SendKey": false
+      },
+      {
+        "Id": "openrouter",
+        "Name": "OpenRouter",
+        "Kind": "openrouter",
+        "Prefix": "openrouter",
+        "Model": "openrouter/deepseek/deepseek-v4.1-flash",
+        "BaseUrl": "https://openrouter.ai/api/v1"
+      }
+    ]
+  }
+}
+```
+
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `Id` | — (required) | Stable identity and the `opencode` model prefix. |
+| `Name` | title-cased `Id` | Label in the dashboard. |
+| `Kind` | `none` | `openai` (OpenAI-compatible `GET /models`), `openrouter` (`/key`, `/credits`, `/activity`), or `none` (opencode-managed). |
+| `Prefix` | `Id` | Serving-provider prefix for `--model`. |
+| `Model` | built-in for `surplus`/`openrouter` | Model id; null lets `opencode` decide. |
+| `BaseUrl` | built-in for `surplus`/`openrouter` | API base; trailing slash trimmed. |
+| `ApiKey` | — | Inference/catalogue key; also read from `{ID}_API_KEY`. |
+| `ManagementApiKey` | — | Management key for the OpenRouter-style spend surface. |
+| `RequiresKey` | `true` (`false` for `none`) | Set false for a local host that needs no key. |
+| `SendKey` | `true` | Set false for a catalogue that does not accept the key (Surplus). |
+| `Spend` | derived from `Kind` | Optional override: `estimated`, `reported`, `none`. |
+
+### Other settings
+
 | Key | Default | Purpose |
 |-----|---------|---------|
 | `Climber:Pin` | `1234` (loopback only) | PIN for the dashboard. Set a real value to bind on the LAN. |
 | `Climber:SessionMinutes` | `30` | Idle minutes before a session re-locks. |
 | `Climber:DefaultFolder` | user profile | Folder shown in the target picker. |
 | `Climber:DefaultAgent` | `task-orchestrator` | Agent to run when the target provides one. |
-| `Climber:SurplusApiKey` | — | Primary provider key. `SURPLUS_API_KEY` is also read. |
+
+Legacy provider keys remain aliases when `Climber:Providers` is absent:
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `Climber:SurplusApiKey` | — | Primary key. `SURPLUS_API_KEY` is also read. |
 | `Climber:SurplusBaseUrl` | `https://api.surplusintelligence.ai/min80/v1` | Surplus API base. |
 | `Climber:SurplusModel` | `surplus/deepseek-v4.1-flash-1017` | Model passed to `opencode run --model`. |
 | `Climber:FallbackModel` | `openrouter/deepseek/deepseek-v4.1-flash` | OpenRouter model offered after approval. |
@@ -102,8 +157,9 @@ Settings live in `ClimberWeb/appsettings.json`, with local overrides in the giti
 | `Climber:OpenRouterBaseUrl` | `https://openrouter.ai/api/v1` | OpenRouter API base. |
 
 `SURPLUS_API_KEY`, `OPENROUTER_API_KEY`, and `OPENROUTER_MANAGEMENT_API_KEY` are also read.
-Never commit real keys; `*.local.json` is gitignored. Surplus has no usage/credits API, so
-its spend figure is an estimate from tokens × the model's catalogue pricing.
+Never commit real keys; `*.local.json` is gitignored. A provider with a catalogue prices
+its spend from tokens × catalogue pricing; one with a management surface keeps the exact
+reported cost; a provider with neither shows `—` rather than a made-up zero.
 
 ## Security posture
 
@@ -127,7 +183,7 @@ throttling, tool-output logging, filesystem scope, and the OpenRouter base-URL o
 
 ```
 ClimberWeb/            Blazor Server app (pages, services, auth, command runner)
-ClimberWeb.Tests/      xUnit tests (216 passing)
+ClimberWeb.Tests/      xUnit tests (253 passing)
 scripts/               status/coverage, fixture, and Playwright UI checks
 status/                committed coverage/test artifact read by /status
 fixtures/              throwaway sample project for climb proofs
@@ -149,16 +205,18 @@ powershell -File scripts/status.ps1
 cd scripts/ui
 node theme-nav.mjs      # theme survives navigation
 node security.mjs       # /status and /activity are PIN-gated
+node providers.mjs      # provider bar, approval copy, one /activity card per provider
 
 # Token-spending browser check (drives real OpenCode runs, Surplus only)
 npm run surfaces
 ```
 
-Current state: **230 tests passing, 0 failed, 0 skipped**, **62.3% line coverage**. The
+Current state: **253 tests passing, 0 failed, 0 skipped**, **62.26% line coverage**. The
 token-spending `surfaces.mjs` harness is **not run** as part of the default checks. It
-refuses to start unless Surplus is connected, checks each run's echoed command line for a
-`surplus/` model, stops before the second paid run when the first does not use Surplus, and
-never approves the OpenRouter fallback.
+requires Surplus to be the *only* configured provider, refuses to start otherwise or when
+Surplus is not connected, checks each run's echoed command line for a `surplus/` model,
+stops before the second paid run when the first does not use Surplus, and never approves a
+fallback.
 
 ## License
 

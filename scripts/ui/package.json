@@ -7,6 +7,7 @@
   "scripts": {
     "theme-nav": "node theme-nav.mjs",
     "security": "node security.mjs",
+    "providers": "node providers.mjs",
     "surfaces": "node surfaces.mjs"
   },
   "license": "UNLICENSED",
