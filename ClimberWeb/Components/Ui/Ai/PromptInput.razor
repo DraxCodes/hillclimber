@@ -77,8 +77,8 @@
               placeholder="@Placeholder"
               aria-label="@AriaLabel"
               disabled="@Disabled"
-              @bind="Value"
-              @bind:event="oninput"
+              value="@Value"
+              @oninput="OnInput"
               @ref="Element"></textarea>
 
     <div class="flex flex-wrap items-center gap-2 px-2 pb-2" data-slot="prompt-input-footer">
@@ -148,6 +148,18 @@
     private Task Stop() => OnStop.InvokeAsync();
     private Task Browse() => OnBrowse.InvokeAsync();
     private Task Recall() => OnRecall.InvokeAsync();
+
+    /// <summary>
+    /// Two-way binding for the textarea. It can't use <c>@bind="Value"</c>: that only
+    /// assigns the parameter, so the parent never hears about typing and keeps the send
+    /// button disabled.
+    /// </summary>
+    private async Task OnInput(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString() ?? "";
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
 
     private Task OnFolderInput(ChangeEventArgs args)
     {
