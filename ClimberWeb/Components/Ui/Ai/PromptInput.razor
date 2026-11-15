@@ -92,15 +92,15 @@
         <div class="ml-auto flex items-center gap-1.5">
             @if (Running)
             {
-                <Button Variant="destructive" Size="icon" Class="size-8 rounded-full" AriaLabel="Stop" Title="Stop" OnClick="Stop" data-stop="true">
-                    <UiIcon Name="square" CssClass="size-3.5" />
+                <Button Variant="destructive" Size="icon-xs" AriaLabel="Stop" Title="Stop" OnClick="Stop" data-stop="true">
+                    <UiIcon Name="square" CssClass="size-3" />
                 </Button>
             }
             else
             {
-                <Button Variant="default" Size="icon" Class="size-8 rounded-full" AriaLabel="Send" Title="Send" Disabled="@(!CanSend)"
+                <Button Variant="secondary" Size="icon-xs" Class="disabled:opacity-100 disabled:text-muted-foreground/70" AriaLabel="Send" Title="Send" Disabled="@(!CanSend)"
                         OnClick="Send" data-send="true">
-                    <UiIcon Name="arrow-up" CssClass="size-4" />
+                    <UiIcon Name="arrow-up" CssClass="size-3.5" />
                 </Button>
             }
         </div>
