@@ -1,0 +1,487 @@
+<PageTitle>hillclimber</PageTitle>
+
+@if (!_authChecked)
+{
+    <div class="flex flex-1 items-center justify-center p-4">
+        <Card Class="w-full max-w-sm gap-0 py-0">
+            <CardHeader Class="gap-1 border-b px-4 py-3">
+                <CardTitle Class="font-mono text-[0.68rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    session
+                </CardTitle>
+                <CardDescription>Checking the local session.</CardDescription>
+            </CardHeader>
+            <CardContent Class="px-4 py-4">
+                <Spinner>Establishing session…</Spinner>
+            </CardContent>
+        </Card>
+    </div>
+}
+else if (!_unlocked)
+{
+    <div class="flex flex-1 items-center justify-center p-4">
+        <Card Class="w-full max-w-sm gap-0 py-0">
+            <CardHeader Class="gap-1 border-b px-4 py-3">
+                <CardTitle Class="flex items-center gap-2 text-sm font-medium">
+                    <UiIcon Name="lock" CssClass="size-3.5 text-muted-foreground" />
+                    unlock
+                </CardTitle>
+                <CardDescription>Enter the access PIN to drive OpenCode.</CardDescription>
+            </CardHeader>
+            <CardContent Class="space-y-3 px-4 py-4">
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-medium text-muted-foreground" for="pin">pin</label>
+                    <input id="pin"
+                           class="focus-ring h-9 w-full rounded-md border bg-background px-3 font-mono text-sm"
+                           type="password"
+                           inputmode="numeric"
+                           autocomplete="off"
+                           @bind="_pinInput"
+                           @bind:event="oninput"
+                           @onkeydown="OnPinKeyDown" />
+                </div>
+
+                @if (_pinError is not null)
+                {
+                    <Alert Tone="destructive" Icon="lock" Title="Incorrect PIN">
+                        @_pinError
+                    </Alert>
+                }
+
+                <Button Class="w-full" OnClick="Unlock">unlock →</Button>
+            </CardContent>
+        </Card>
+    </div>
+}
+else
+{
+    <SectionContent SectionName="context">
+        <div class="border-t bg-muted/30" data-slot="context-strip">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2.5 py-1.5 sm:px-3">
+                <span class="statusline flex min-w-0 items-center gap-1.5" aria-live="polite">
+                    <span class="@UiClass.Join("size-2 shrink-0 rounded-full", PulseClass)" aria-hidden="true"></span>
+                    <span class="status-word st-@StatusKey text-xs font-semibold">@StatusText</span>
+                    @if (ActiveMessage is { Length: > 0 } message)
+                    {
+                        <span class="status-msg hidden max-w-[40ch] truncate text-xs text-muted-foreground sm:inline">@message</span>
+                    }
+                </span>
+
+                <div class="methodbar inline-flex items-center rounded-md border bg-background p-0.5" role="tablist" aria-label="method">
+                    <button class="method @(_method == RunMethod.Run ? "active" : string.Empty) focus-ring inline-flex h-7 items-center rounded-sm px-2.5 font-mono text-xs transition-colors disabled:opacity-50"
+                            type="button" role="tab" aria-selected="@(_method == RunMethod.Run)"
+                            disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Run)">run</button>
+                    <button class="method @(_method == RunMethod.Hillclimb ? "active" : string.Empty) focus-ring inline-flex h-7 items-center rounded-sm px-2.5 font-mono text-xs transition-colors disabled:opacity-50"
+                            type="button" role="tab" aria-selected="@(_method == RunMethod.Hillclimb)"
+                            disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Hillclimb)">hillclimb</button>
+                </div>
+
+                <div class="spendline flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1" aria-label="Provider connections and spend">
+                    @foreach (var provider in Providers.Providers)
+                    {
+                        <span class="conn inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
+                              data-provider="@provider.Id"
+                              title="@($"{provider.DisplayName}: {ProviderLabel(provider)}")">
+                            <span class="@ToneDot(provider)" aria-hidden="true"></span>
+                            <span class="truncate">@provider.DisplayName.ToLowerInvariant()</span>
+                            <span class="hidden text-muted-foreground/80 md:inline">@ProviderLabel(provider)</span>
+                        </span>
+                    }
+                    <span class="spend-item text-xs text-muted-foreground">
+                        @ActiveSpendNoun <b class="font-semibold text-foreground">@ActiveSpendText</b>
+                    </span>
+                </div>
+
+                <div class="providerbar flex min-w-0 flex-wrap items-center gap-1" aria-label="provider">
+                    <span class="label font-mono text-[0.62rem] uppercase tracking-[0.12em] text-muted-foreground">platform</span>
+                    @foreach (var provider in Providers.Providers)
+                    {
+                        <button class="method @(SelectedProviderId == provider.Id ? "active" : string.Empty) focus-ring inline-flex h-7 items-center rounded-md border px-2 font-mono text-[0.68rem] transition-colors disabled:opacity-50"
+                                type="button"
+                                disabled="@AnyRunning"
+                                aria-pressed="@(SelectedProviderId == provider.Id)"
+                                title="@ProviderNote"
+                                @onclick="() => SelectProvider(provider.Id)">@provider.DisplayName.ToLowerInvariant()</button>
+                    }
+                </div>
+
+                @if (_method == RunMethod.Run)
+                {
+                    <dl class="telemetry ml-auto flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="Run telemetry">
+                        <div class="cell inline-flex items-baseline gap-1">
+                            <dt class="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted-foreground">status</dt>
+                            <dd class="st-@StatusKey text-xs font-medium">@StatusText</dd>
+                        </div>
+                        <div class="cell inline-flex items-baseline gap-1">
+                            <dt class="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted-foreground">spent</dt>
+                            <dd class="text-xs font-medium">@ActiveSpendText</dd>
+                        </div>
+                        <div class="cell inline-flex items-baseline gap-1">
+                            <dt class="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted-foreground">tokens</dt>
+                            <dd class="text-xs font-medium">@SpendFormat.Tokens(_run.Metrics.TotalTokens)</dd>
+                        </div>
+                        <div class="cell inline-flex items-baseline gap-1">
+                            <dt class="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted-foreground">elapsed</dt>
+                            <dd class="text-xs font-medium">@ElapsedLabel</dd>
+                        </div>
+                    </dl>
+                }
+                else
+                {
+                    <dl class="telemetry ml-auto flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="Climb telemetry">
+                        <div class="cell inline-flex items-baseline gap-1">
+                            <dt class="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted-foreground">status</dt>
+                            <dd class="st-@StatusKey text-xs font-medium">@StatusText</dd>
+                        </div>
+                        <div class="cell inline-flex items-baseline gap-1">
+                            <dt class="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted-foreground">iteration</dt>
+                            <dd class="text-xs font-medium">
+                                @if (_climb.MaxIterations > 0)
+                                {
+                                    @_climb.CurrentIteration<span class="text-muted-foreground">/@_climb.MaxIterations</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted-foreground">—</span>
+                                }
+                            </dd>
+                        </div>
+                        <div class="cell inline-flex items-baseline gap-1">
+                            <dt class="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted-foreground">best score</dt>
+                            <dd class="text-xs font-medium">@_climb.BestScore</dd>
+                        </div>
+                        <div class="cell inline-flex items-baseline gap-1">
+                            <dt class="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-muted-foreground">last run</dt>
+                            <dd class="text-xs font-medium">
+                                @if (_climb.LastPassed is int passed)
+                                {
+                                    <span class="text-green">@passed</span><span class="text-muted-foreground">/</span><span class="text-red">@_climb.LastFailed</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted-foreground">—</span>
+                                }
+                            </dd>
+                        </div>
+                    </dl>
+                }
+            </div>
+        </div>
+    </SectionContent>
+
+    <div class="flex min-h-0 flex-1 flex-col">
+        <section class="flex min-h-0 flex-1 flex-col" data-slot="chat" aria-label="Chat">
+            <div class="flex items-center gap-2 border-b px-3 py-2">
+                <div class="min-w-0 flex-1">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <h1 class="truncate text-sm font-medium">@ChatTitle</h1>
+                        <Badge Variant="outline" Class="hidden font-mono text-[0.62rem] uppercase tracking-[0.12em] sm:inline-flex">@MethodLabel</Badge>
+                    </div>
+                    <p class="mt-0.5 truncate font-mono text-[0.64rem] text-muted-foreground" title="@_folderPath">@FolderShort</p>
+                </div>
+
+                @if (Activity is { Working: true } activity)
+                {
+                    <span class="log-working" role="status" aria-live="polite" aria-label="Working: @activity.Label">
+                        <span class="log-working-dot" aria-hidden="true"></span>
+                        <span class="log-working-what" aria-hidden="true">@activity.Label</span>
+                        @if (ActiveElapsed is { Length: > 0 } elapsed)
+                        {
+                            <span class="log-working-elapsed" aria-hidden="true">@elapsed</span>
+                        }
+                    </span>
+                }
+
+                <button class="log-latest" id="log-latest" type="button" data-latest hidden aria-label="Jump to latest output">
+                    latest <span aria-hidden="true">↓</span>
+                </button>
+
+                <Tooltip Text="Lock session" Align="end">
+                    <button class="focus-ring inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            type="button" aria-label="Lock session" @onclick="Lock">
+                        <UiIcon Name="lock" CssClass="size-3.5" />
+                    </button>
+                </Tooltip>
+            </div>
+
+            @if (SubAgentNames.Count > 0)
+            {
+                <div class="outtabs" role="tablist" aria-label="Output stream">
+                    <button class="outtab @(_outputTab == PrimaryTab ? "active" : string.Empty)" type="button" data-outtab="@PrimaryTab"
+                            role="tab" aria-selected="@(_outputTab == PrimaryTab)" @onclick="() => SelectOutputTab(PrimaryTab)">@PrimaryTabLabel</button>
+                    @foreach (var name in SubAgentNames)
+                    {
+                        var working = TabWorking(name);
+                        <button class="outtab @(_outputTab == name ? "active" : string.Empty) @(working ? "working" : string.Empty)"
+                                type="button" data-outtab="@name" data-working="@(working ? "true" : null)"
+                                role="tab" aria-selected="@(_outputTab == name)"
+                                aria-label="@(working ? $"{SubLabel(name)} (working)" : null)"
+                                @onclick="() => SelectOutputTab(name)">
+                            @if (working)
+                            {
+                                <span class="outtab-dot" aria-hidden="true"></span>
+                            }
+                            <span class="outtab-label">@SubLabel(name)</span>
+                        </button>
+                    }
+                </div>
+            }
+
+            <div class="log @(_outputTab == PrimaryTab ? string.Empty : "solo")"
+                 id="log-feed"
+                 data-slot="chat-message-scroller"
+                 data-active-tab="@_outputTab">
+                @{
+                    var items = VisibleItems;
+
+                    // "Newest" is a claim about the transcript, not the DOM order: the feed is
+                    // rendered newest first, and the turn nearest that edge is the one a reader
+                    // arrives at. Only that turn opens by default and, while the run is live, it
+                    // is the one that shimmers.
+                    var newestTurn = items.FirstOrDefault(item => item.Kind == OutputItemKind.Turn);
+                    var activeItem = items.Count > 0 ? items[0] : null;
+                }
+                @foreach (var item in items)
+                {
+                    var key = item.Entries[0].Raw;
+                    if (item.Kind == OutputItemKind.Message)
+                    {
+                        <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                            <AiMessage Text="@MessageText(item)" />
+                        </div>
+                    }
+                    else if (item.Kind == OutputItemKind.Turn)
+                    {
+                        var newest = ReferenceEquals(item, newestTurn);
+                        var active = newest && ReferenceEquals(item, activeItem);
+                        var turn = TurnPresentation.For(
+                            item.Entries,
+                            item.Footer,
+                            item.Open,
+                            live: ActiveLive,
+                            newest: newest,
+                            active: active);
+
+                        // A reader's own click wins over the default. The key is the turn's
+                        // first raw event, which is stable while the run grows.
+                        var isOpen = _turnOpen.TryGetValue(key, out var chosen) ? chosen : turn.Open;
+                        @if (_outputTab == PrimaryTab)
+                        {
+                            <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                                <AiTurn Summary="@turn.Summary" Status="@turn.Status" Open="@isOpen" Footer="@turn.Footer"
+                                        OnToggle="open => SetTurnOpen(key, open)">
+                                    @foreach (var entry in item.Entries)
+                                    {
+                                        @Row(entry, newest)
+                                    }
+                                </AiTurn>
+                            </div>
+                        }
+                        else
+                        {
+                            // A subagent tab carries one agent's own work. It has no step
+                            // boundaries of its own, so a turn summary would claim an open step
+                            // that already finished; the rows stand on their own.
+                            <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                                @foreach (var entry in item.Entries)
+                                {
+                                    @Row(entry, openReasoning: false)
+                                }
+                            </div>
+                        }
+                    }
+                    else if (item.Kind == OutputItemKind.Unrecognized)
+                    {
+                        var unknown = ToolPresentation.ForEvent(item.Entries[0]);
+                        <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                            <AiTraceLine Icon="@unknown.Icon" Title="@unknown.Title" Detail="@unknown.Detail" />
+                        </div>
+                    }
+                    else if (item.Kind == OutputItemKind.Error)
+                    {
+                        <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                            <AiMarker Text="@MarkerText(item.Entries[0])" Tone="MarkerTone.Error" />
+                        </div>
+                    }
+                    else if (item.Kind == OutputItemKind.Marker)
+                    {
+                        <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                            <AiMarker Text="@MarkerText(item.Entries[0])" />
+                        </div>
+                    }
+                    else
+                    {
+                        var plain = item.Entries[0];
+                        <div class="log-item log-raw mx-auto w-full max-w-3xl" @key="key">
+                            <div class="log-line @LineClass(plain.Raw)">@plain.Raw</div>
+                        </div>
+                    }
+                }
+                @if (VisibleEntries.Count == 0)
+                {
+                    <div class="log-item mx-auto flex w-full max-w-3xl items-center justify-center py-8">
+                        <Empty Icon="message" Title="@EmptyTitle">
+                            <p>@EmptyBody</p>
+                        </Empty>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <div class="border-t bg-background" data-slot="composer-dock">
+            <div class="mx-auto w-full max-w-3xl space-y-2 px-2 pb-2 pt-2 sm:px-3">
+                @if (_error is not null)
+                {
+                    <Alert Tone="destructive" Icon="x" Title="Cannot start">
+                        @_error
+                    </Alert>
+                }
+
+                @foreach (var warning in _preflightWarnings)
+                {
+                    <Alert Tone="warning" Icon="zap">
+                        @warning
+                    </Alert>
+                }
+
+                @if (_pendingProviderApproval && PendingProvider is { } pending)
+                {
+                    <Alert Tone="warning" Icon="zap" Title="Fallback provider">
+                        @pending.DisplayName is a fallback and bills its own account. Approve it for this run?
+                        <Actions>
+                            <div class="approval-row flex flex-wrap items-center gap-2">
+                                <Button Size="sm" OnClick="ApproveProviderSwitch">approve @pending.Id.ToLowerInvariant()</Button>
+                                <Button Variant="ghost" Size="sm" OnClick="CancelProviderSwitch">cancel</Button>
+                            </div>
+                        </Actions>
+                    </Alert>
+                }
+
+                @if (_startFallbackOffer && StartFallbackProvider is { } startFallback)
+                {
+                    <Alert Tone="destructive" Icon="x" Title="Provider unavailable">
+                        @_startFallbackMessage
+                        <Actions>
+                            <div class="approval-row flex flex-wrap items-center gap-2">
+                                <Button Size="sm" OnClick="StartOnFallback">start on @startFallback.Id.ToLowerInvariant()</Button>
+                                <Button Variant="ghost" Size="sm" OnClick="CancelStartFallback">cancel</Button>
+                            </div>
+                        </Actions>
+                    </Alert>
+                }
+
+                @if (ActiveFallbackAvailable && ActiveFallback is { } fallback)
+                {
+                    <Alert Tone="destructive" Icon="x" Title="Retry available">
+                        @ActiveFallbackMessage
+                        <Actions>
+                            <div class="approval-row flex flex-wrap items-center gap-2">
+                                <Button Size="sm" OnClick="ApproveActiveFallback">retry on @fallback.Id.ToLowerInvariant()</Button>
+                            </div>
+                        </Actions>
+                    </Alert>
+                }
+
+                <PromptInput @ref="_promptInput"
+                             @bind-Value="_prompt.Text"
+                             Disabled="@AnyRunning"
+                             Running="@ActiveRunning"
+                             CanSend="@CanSend"
+                             Placeholder="@PromptPlaceholder"
+                             AriaLabel="@PromptLabel"
+                             ModelText="@ModelText"
+                             Folder="@_folderPath"
+                             FolderLabel="@FolderShort"
+                             ShowMaxIterations="@(_method == RunMethod.Hillclimb)"
+                             MaxIterations="@_maxIterations"
+                             AgentLabel="@AgentChipLabel"
+                             AgentNote="@AgentNote"
+                             CanRecall="@_prompt.CanRecall(AnyRunning)"
+                             OnSend="Start"
+                             OnStop="Stop"
+                             OnBrowse="OpenBrowser"
+                             OnRecall="RecallLastPrompt"
+                             FolderChanged="SetFolder"
+                             MaxIterationsChanged="SetMaxIterations" />
+
+                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 font-mono text-[0.62rem] text-muted-foreground">
+                    <span>enter sends · shift+enter adds a line</span>
+                    @if (AgentNote.Length > 0)
+                    {
+                        <span class="truncate">@AgentNote</span>
+                    }
+                </p>
+            </div>
+        </div>
+    </div>
+
+    @if (_browseOpen && _browseListing is not null)
+    {
+        <div class="fixed inset-0 z-40 bg-black/35" @onclick="CloseBrowser"></div>
+        <section class="browser fixed inset-x-3 top-[10vh] z-50 mx-auto flex max-h-[76dvh] w-auto max-w-lg flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-xl"
+                 role="dialog" aria-modal="true" aria-label="Select target folder">
+            <div class="flex items-center gap-2 border-b px-3 py-2">
+                <UiIcon Name="folder" CssClass="size-3.5 text-muted-foreground" />
+                <span class="flex-1 text-sm font-medium">select folder</span>
+                <Button Variant="ghost" Size="icon-sm" AriaLabel="Close" OnClick="CloseBrowser">
+                    <UiIcon Name="x" />
+                </Button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5 border-b px-3 py-2">
+                @foreach (var root in _browseListing.Roots)
+                {
+                    <button class="chip focus-ring inline-flex h-7 items-center rounded-md border px-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                            type="button" @onclick="() => Navigate(root.FullPath)">@root.Name</button>
+                }
+            </div>
+
+            <nav class="flex flex-wrap items-center gap-1 border-b px-3 py-1.5 font-mono text-xs" aria-label="Breadcrumb">
+                <button class="focus-ring inline-flex h-7 items-center rounded-md px-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                        type="button" @onclick="() => Navigate(null)">computer</button>
+                @foreach (var crumb in _browseListing.Trail)
+                {
+                    <span class="text-muted-foreground" aria-hidden="true">/</span>
+                    <button class="focus-ring inline-flex h-7 items-center rounded-md px-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                            type="button" @onclick="() => Navigate(crumb.FullPath)">@crumb.Name</button>
+                }
+            </nav>
+
+            <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
+                @if (_browseListing.Error is not null)
+                {
+                    <Alert Tone="destructive" Icon="x">@_browseListing.Error</Alert>
+                }
+
+                @if (_browseListing.CurrentPath is not null)
+                {
+                    <button class="focus-ring flex h-8 w-full items-center rounded-md px-2 text-left font-mono text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            type="button" @onclick="() => Navigate(_browseListing.ParentPath)">
+                        <span>..</span>
+                    </button>
+                }
+
+                @foreach (var dir in _browseListing.Directories)
+                {
+                    <button class="focus-ring flex h-8 w-full items-center gap-2 rounded-md px-2 text-left font-mono text-xs transition-colors hover:bg-accent hover:text-foreground"
+                            type="button" @onclick="() => Navigate(dir.FullPath)">
+                        <UiIcon Name="folder" CssClass="size-3.5 text-muted-foreground" />
+                        <span class="truncate">@dir.Name</span>
+                    </button>
+                }
+
+                @if (_browseListing.CurrentPath is not null
+                     && _browseListing.Directories.Count == 0
+                     && _browseListing.Error is null)
+                {
+                    <p class="px-2 py-3 text-center text-xs text-muted-foreground">no subfolders</p>
+                }
+            </div>
+
+            <div class="flex items-center gap-2 border-t px-3 py-2">
+                <span class="min-w-0 flex-1 truncate font-mono text-[0.64rem] text-muted-foreground">@(_browseListing.CurrentPath ?? "this computer")</span>
+                <Button Variant="ghost" Size="sm" OnClick="CloseBrowser">cancel</Button>
+                <Button Size="sm" Disabled="@(_browseListing.CurrentPath is null)" OnClick="ChooseFolder">use this folder</Button>
+            </div>
+        </section>
+    }
+}
