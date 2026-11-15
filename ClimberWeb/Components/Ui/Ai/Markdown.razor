@@ -1,8 +1,11 @@
 @using ClimberWeb.Services
 
-@* Renders the parser's records. Every string goes through Razor's encoder, so there is no
-   MarkupString or Html.Raw anywhere in the transcript path; links were scheme-checked by
-   MarkdownParser before they reached this component. *@
+@* AI Elements: the prose inside a Message, rendered from the app's own parser.
+
+   Every string goes through Razor's encoder, so there is no MarkupString or Raw
+   anywhere in the transcript path; links were scheme-checked by MarkdownParser
+   before they reached this component. A link renders as an Inline Citation, so a
+   link in prose carries the same hover detail as a source. *@
 <div class="ai-md">
     @foreach (var block in Source)
     {
@@ -49,13 +52,13 @@
         else if (block is MarkdownCodeBlock fenceBlock)
         {
             <div class="ai-md-fence">
-                <AiCodeBlock Text="@fenceBlock.Code" />
+                <CodeBlock Code="@fenceBlock.Code" Size="sm" Wrap />
             </div>
         }
         else if (block is MarkdownQuoteBlock quote)
         {
             <blockquote class="ai-md-quote">
-                <AiMarkdown Blocks="@quote.Children" />
+                <Markdown Blocks="@quote.Children" />
             </blockquote>
         }
         else if (block is MarkdownBreak)
@@ -74,8 +77,10 @@
     [Parameter]
     public IReadOnlyList<MarkdownBlock>? Blocks { get; set; }
 
-    // Streaming re-renders the same text many times, so parse once per distinct value:
-    // the log changes on every event and the parser is cheap, but it is not free.
+    // Links are numbered per rendered message so two citations to the same host stay
+    // distinguishable while a reader hovers one of them.
+    private int _citation;
+
     private IReadOnlyList<MarkdownBlock> Source
     {
         get
@@ -88,7 +93,7 @@
             if (_parsed is null || !string.Equals(_parsedText, Text, StringComparison.Ordinal))
             {
                 _parsedText = Text;
-                _parsed = MarkdownParser.Parse(Text);
+                _parsed = MarkdownParser.Parse(Text ?? string.Empty);
             }
 
             return _parsed;
@@ -130,13 +135,11 @@
                     builder.CloseElement();
                     break;
                 case MarkdownLink link:
-                    builder.OpenElement(seq++, "a");
-                    builder.AddAttribute(seq++, "class", "ai-md-link");
-                    builder.AddAttribute(seq++, "href", link.Href);
-                    builder.AddAttribute(seq++, "target", "_blank");
-                    builder.AddAttribute(seq++, "rel", "noopener noreferrer");
-                    builder.AddContent(seq++, Inlines(link.Children));
-                    builder.CloseElement();
+                    builder.OpenComponent<InlineCitation>(seq++);
+                    builder.AddAttribute(seq++, "Href", link.Href);
+                    builder.AddAttribute(seq++, "Index", ++_citation);
+                    builder.AddAttribute(seq++, "ChildContent", Inlines(link.Children));
+                    builder.CloseComponent();
                     break;
             }
         }

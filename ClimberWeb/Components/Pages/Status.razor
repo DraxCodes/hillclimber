@@ -1,30 +1,26 @@
 @page "/status"
-@rendermode InteractiveServer
 @inject IProjectStatusService ProjectStatus
 
 <PageTitle>status · hillclimber</PageTitle>
 
 <AuthGate OnUnlocked="LoadAsync">
+<div class="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:px-4">
 @if (_report is null)
 {
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[00]</span>
-            <span class="panel-title">status</span>
-        </div>
-        <p class="lede">Reading the repository…</p>
-    </section>
+    <PagePanel Index="0" Title="status">
+        <Spinner>Reading the repository…</Spinner>
+    </PagePanel>
 }
 else
 {
-    <p class="lede">Project health and history for this repository — read-only.</p>
+    <p class="max-w-prose text-sm text-muted-foreground">Project health and history for this repository — read-only.</p>
 
     @foreach (var warning in _report.Warnings)
     {
-        <p class="notice notice-info" role="status">@warning</p>
+        <Alert Tone="info" Icon="circle-alert">@warning</Alert>
     }
 
-    <dl class="telemetry" aria-label="Repository">
+    <dl class="telemetry mb-0" aria-label="Repository">
         <div class="cell">
             <dt>branch</dt>
             <dd class="sm">@(_report.Repo?.Branch ?? "—")</dd>
@@ -56,15 +52,10 @@ else
         </div>
     </dl>
 
-    <section class="panel panel-flush">
-        <div class="panel-head">
-            <span class="idx">[01]</span>
-            <span class="panel-title">changelog</span>
-            <span class="panel-meta">@_report.Changes.Count changes</span>
-        </div>
+    <PagePanel Index="1" Title="changelog" Meta="@($"{_report.Changes.Count} changes")" Flush>
         @if (_report.Changes.Count == 0)
         {
-            <p class="empty">No history to show.</p>
+            <p class="px-4 py-3.5 font-mono text-[0.78rem] text-muted-foreground sm:px-5">No history to show.</p>
         }
         else
         {
@@ -83,20 +74,12 @@ else
                 }
             </ol>
         }
-    </section>
+    </PagePanel>
 
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[02]</span>
-            <span class="panel-title">coverage &amp; tests</span>
-            @if (_report.Coverage?.Generated is { } generated)
-            {
-                <span class="panel-meta">@WhenLabel(generated)</span>
-            }
-        </div>
+    <PagePanel Index="2" Title="coverage &amp; tests" Meta="@(_report.Coverage?.Generated is { } generated ? WhenLabel(generated) : null)">
         @if (_report.Coverage is not { } coverage)
         {
-            <p class="empty">
+            <p class="font-mono text-[0.78rem] leading-relaxed text-muted-foreground">
                 Not measured yet. Run <code class="mono">scripts/status.ps1</code> to write
                 <code class="mono">status/coverage.json</code>.
             </p>
@@ -124,17 +107,12 @@ else
                 </div>
             }
         }
-    </section>
+    </PagePanel>
 
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[03]</span>
-            <span class="panel-title">iteration cadence</span>
-            <span class="panel-meta">commits per @(_report.CadenceUnit == CadenceUnit.Hour ? "hour" : "day")</span>
-        </div>
+    <PagePanel Index="3" Title="iteration cadence" Meta="@($"commits per {(_report.CadenceUnit == CadenceUnit.Hour ? "hour" : "day")}")">
         @if (_report.Cadence.Count == 0)
         {
-            <p class="empty">No commits to plot.</p>
+            <p class="font-mono text-[0.78rem] text-muted-foreground">No commits to plot.</p>
         }
         else
         {
@@ -165,17 +143,12 @@ else
                 </div>
             </div>
         }
-    </section>
+    </PagePanel>
 
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[04]</span>
-            <span class="panel-title">tracked issues</span>
-            <span class="panel-meta">@_report.Issues.Count open</span>
-        </div>
+    <PagePanel Index="4" Title="tracked issues" Meta="@($"{_report.Issues.Count} open")">
         @if (_report.Issues.Count == 0)
         {
-            <p class="empty">Nothing tracked and unstarted.</p>
+            <p class="font-mono text-[0.78rem] text-muted-foreground">Nothing tracked and unstarted.</p>
         }
         else
         {
@@ -185,24 +158,18 @@ else
                     <li class="issue">
                         <span class="issue-num mono">@issue.Number.ToString("00")</span>
                         <span class="issue-title">@issue.Title</span>
-                        <span class="chip issue-feature">@issue.Feature</span>
+                        <Badge Variant="outline" Class="font-mono">@issue.Feature</Badge>
                         <span class="issue-status">@issue.Status</span>
                     </li>
                 }
             </ul>
         }
-    </section>
+    </PagePanel>
 
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[05]</span>
-            <span class="panel-title">models &amp; workflow</span>
-            <span class="panel-meta">@_report.Workflow.Roles.Count agents</span>
-        </div>
-
-        <div class="model-row">
+    <PagePanel Index="5" Title="models &amp; workflow" Meta="@($"{_report.Workflow.Roles.Count} agents")">
+        <div class="model-row flex-wrap">
             <span class="label model-label">base model</span>
-            <span class="chip mono">@_report.Workflow.BaseModel</span>
+            <Badge Variant="outline" Class="font-mono">@_report.Workflow.BaseModel</Badge>
         </div>
 
         <p class="workflow-text">@_report.Workflow.BaseWorkflow</p>
@@ -229,11 +196,12 @@ else
             </ul>
         }
 
-        <p class="footnote dim">
+        <p class="mt-3 text-[0.74rem] leading-relaxed text-muted-foreground">
             Per-change model is the base default. git records no model per commit, so it is not fabricated here.
         </p>
-    </section>
+    </PagePanel>
 }
+</div>
 </AuthGate>
 
 @code {

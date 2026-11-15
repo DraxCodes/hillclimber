@@ -1,0 +1,13 @@
+<span class="@UiClass.Join("inline-flex items-center gap-2 text-muted-foreground text-sm", Class)" role="status" data-slot="spinner">
+    <UiIcon Name="loader" CssClass="@UiClass.Join("size-4 animate-spin", IconClass)" />
+    @if (ChildContent is not null)
+    {
+        <span>@ChildContent</span>
+    }
+</span>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? IconClass { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

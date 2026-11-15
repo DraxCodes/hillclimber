@@ -1,0 +1,18 @@
+@* AI Elements: TraceTitle (base primitive). *@
+<span data-slot="trace-title"
+      title="@Title"
+      class="@UiClass.Join(
+          "min-w-0 motion-reduce:shimmer-none",
+          Wrap ? "break-words whitespace-pre-wrap" : "truncate",
+          Class)">@ChildContent</span>
+
+@code {
+    /// <summary>Optional hover text, for a title that a narrow row truncates.</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Lets a long marker or message wrap instead of truncating.</summary>
+    [Parameter] public bool Wrap { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

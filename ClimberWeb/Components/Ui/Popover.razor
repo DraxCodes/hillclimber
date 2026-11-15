@@ -1,0 +1,78 @@
+<div class="relative inline-flex min-w-0"
+     data-slot="popover"
+     data-state="@(_open ? "open" : "closed")"
+     @onkeydown="OnKeyDown">
+    <button type="button"
+            id="@TriggerId"
+            class="@UiClass.Join(
+                       "focus-ring inline-flex h-7 min-w-0 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                       TriggerClass)"
+            aria-expanded="@_open"
+            aria-haspopup="dialog"
+            aria-controls="@Id"
+            data-slot="popover-trigger"
+            @onclick="Toggle">
+        @Trigger
+    </button>
+
+    @if (_open)
+    {
+        <div class="fixed inset-0 z-40" aria-hidden="true" @onclick="Close"></div>
+        <div id="@Id"
+             role="dialog"
+             aria-label="@Label"
+             tabindex="-1"
+             class="@UiClass.Join(
+                        "absolute z-50 w-72 max-w-[calc(100vw-2rem)] rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg",
+                        Placement == "up" ? "bottom-full mb-2" : "top-full mt-2",
+                        Align == "end" ? "right-0" : "left-0",
+                        PanelClass)"
+             data-slot="popover-content"
+             @onclick:stopPropagation="true"
+             @ref="_panel">
+            @Content
+        </div>
+    }
+</div>
+
+@code {
+    private readonly string Id = $"pop-{Guid.NewGuid():N}";
+    private bool _open;
+    private ElementReference _panel;
+
+    [Parameter, EditorRequired] public RenderFragment Trigger { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment Content { get; set; } = default!;
+    [Parameter] public string Label { get; set; } = "Options";
+    [Parameter] public string Placement { get; set; } = "down";
+    [Parameter] public string Align { get; set; } = "start";
+    [Parameter] public string? TriggerClass { get; set; }
+    [Parameter] public string? TriggerId { get; set; }
+    [Parameter] public string? PanelClass { get; set; }
+
+    private void Toggle()
+    {
+        _open = !_open;
+        if (_open)
+        {
+            _ = FocusPanelAsync();
+        }
+    }
+
+    private void Close() => _open = false;
+
+    /// <summary>Closes the panel. Public so a parent can dismiss it after an action.</summary>
+    public void ClosePanel() => _open = false;
+
+    private async Task FocusPanelAsync()
+    {
+        await Task.Yield();
+        try { await _panel.FocusAsync(); } catch (Exception) { /* detached during navigation */ }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Escape" || !_open) return;
+        _open = false;
+        await Task.Yield();
+    }
+}

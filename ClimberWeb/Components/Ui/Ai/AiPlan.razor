@@ -1,0 +1,50 @@
+@* AI Elements: Plan.
+
+   A multi-step handoff: the trigger reads "Plan: … 2 of 3 done" and each step is a
+   trace line whose icon and shimmer follow its state. While the plan is streaming
+   its running step shimmers; when it settles the rows stop. *@
+<Trace>
+    <TraceCollapsible Open="IsOpen" OnToggle="SetOpen">
+        <Trigger>
+            <TraceLine Status="@(IsStreaming ? "running" : null)">
+                <TraceIcon><UiIcon Name="route" CssClass="size-4" /></TraceIcon>
+                <TraceTitle>@Title</TraceTitle>
+                <TraceDescription>@Done of @Steps.Count done</TraceDescription>
+            </TraceLine>
+        </Trigger>
+        <ChildContent>
+            <Trace>
+                @foreach (var step in Steps)
+                {
+                    <TraceLine Status="@(IsStreaming ? step.TraceStatus : (step.Status == "pending" ? "pending" : null))">
+                        <TraceIcon>
+                            <UiIcon Name="@(step.Status switch { "done" => "circle-check", "running" => "circle-dot", "error" => "circle-alert", _ => "circle" })"
+                                    CssClass="size-4" />
+                        </TraceIcon>
+                        <TraceTitle>@step.Title</TraceTitle>
+                    </TraceLine>
+                }
+            </Trace>
+        </ChildContent>
+    </TraceCollapsible>
+</Trace>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "Plan";
+
+    [Parameter, EditorRequired] public IReadOnlyList<PlanStep> Steps { get; set; } = Array.Empty<PlanStep>();
+
+    /// <summary>True while the handoff is still moving; makes the open step shimmer.</summary>
+    [Parameter] public bool Running { get; set; }
+
+    private bool? _chosen;
+
+    // A plan opens by default — it is the shape of the work — until the reader closes it.
+    private bool IsOpen => _chosen ?? true;
+
+    private int Done => Steps.Count(step => step.Status is "done" or "error");
+
+    private bool IsStreaming => Running && Done < Steps.Count;
+
+    private void SetOpen(bool open) => _chosen = open;
+}

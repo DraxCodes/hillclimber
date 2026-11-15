@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="@StrokeWidth"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     class="@UiClass.Join("size-4 shrink-0", CssClass)"
+     aria-hidden="true"
+     focusable="false">
+    @switch (Name)
+    {
+        case "menu":
+            <path d="M4 6h16M4 12h16M4 18h16" />
+            break;
+        case "panel-left":
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="M9 3v18" />
+            break;
+        case "x":
+            <path d="M18 6 6 18M6 6l12 12" />
+            break;
+        case "sun":
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" />
+            break;
+        case "moon":
+            <path d="M20.4 13.4A8.2 8.2 0 1 1 10.6 3.6a6.4 6.4 0 0 0 9.8 9.8Z" />
+            break;
+        case "monitor":
+            <rect x="3" y="4" width="18" height="13" rx="2" />
+            <path d="M9 20h6M12 17v3" />
+            break;
+        case "chevron-down":
+            <path d="m6 9 6 6 6-6" />
+            break;
+        case "chevron-right":
+            <path d="m9 18 6-6-6-6" />
+            break;
+        case "arrow-up":
+            <path d="m5 12 7-7 7 7" />
+            <path d="M12 19V5" />
+            break;
+        case "arrow-down":
+            <path d="M12 5v14" />
+            <path d="m19 12-7 7-7-7" />
+            break;
+        case "square":
+            <rect width="14" height="14" x="5" y="5" rx="2" />
+            break;
+        case "plus":
+            <path d="M5 12h14M12 5v14" />
+            break;
+        case "folder":
+            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+            break;
+        case "settings":
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+            break;
+        case "copy":
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+            break;
+        case "check":
+            <path d="M20 6 9 17l-5-5" />
+            break;
+        case "circle":
+            <circle cx="12" cy="12" r="9" />
+            break;
+        case "circle-check":
+            <circle cx="12" cy="12" r="9" />
+            <path d="m8.5 12.2 2.4 2.4 4.6-4.8" />
+            break;
+        case "circle-alert":
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8v4.5" />
+            <circle cx="12" cy="16" r="0.6" fill="currentColor" stroke="none" />
+            break;
+        case "arrow-up-right":
+            <path d="M7 17 17 7" />
+            <path d="M7 7h10v10" />
+            break;
+        case "circle-dot":
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+            break;
+        case "loader":
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            break;
+        case "sparkles":
+            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+            break;
+        case "route":
+            <circle cx="6" cy="19" r="3" />
+            <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+            <circle cx="18" cy="5" r="3" />
+            break;
+        case "globe":
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18" />
+            <path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18" />
+            break;
+        case "file":
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6" />
+            <path d="M16 13H8M16 17H8M10 9H8" />
+            break;
+        case "terminal":
+            <path d="M4 17l6-6-6-6" />
+            <path d="M12 19h8" />
+            break;
+        case "pencil":
+            <path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
+            break;
+        case "search":
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+            break;
+        case "git-branch":
+            <line x1="6" x2="6" y1="3" y2="15" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
+            break;
+        case "activity":
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            break;
+        case "gauge":
+            <path d="m12 14 4-4" />
+            <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+            break;
+        case "lock":
+            <rect width="18" height="11" x="3" y="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            break;
+        case "unlock":
+            <rect width="18" height="11" x="3" y="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+            break;
+        case "external-link":
+            <path d="M15 3h6v6" />
+            <path d="M10 14 21 3" />
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            break;
+        case "message":
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            break;
+        case "clock":
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+            break;
+        case "hash":
+            <path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" />
+            break;
+        case "zap":
+            <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+            break;
+        default:
+            <circle cx="12" cy="12" r="9" />
+            break;
+    }
+</svg>
+
+@code {
+    /// <summary>A lucide-style glyph name. Unknown names fall back to a circle.</summary>
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = "circle";
+
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    [Parameter]
+    public string StrokeWidth { get; set; } = "1.7";
+}

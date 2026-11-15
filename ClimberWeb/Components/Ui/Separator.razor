@@ -1,0 +1,13 @@
+@if (Orientation == "vertical")
+{
+    <div role="none" class="@UiClass.Join("bg-border shrink-0 w-px self-stretch", Class)" data-slot="separator" data-orientation="vertical"></div>
+}
+else
+{
+    <div role="none" class="@UiClass.Join("bg-border shrink-0 h-px w-full", Class)" data-slot="separator" data-orientation="horizontal"></div>
+}
+
+@code {
+    [Parameter] public string Orientation { get; set; } = "horizontal";
+    [Parameter] public string? Class { get; set; }
+}

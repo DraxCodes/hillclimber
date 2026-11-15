@@ -1,0 +1,10 @@
+@* AI Elements: MessageContent. *@
+<div data-slot="message-content"
+     class="@UiClass.Join("flex w-full min-w-0 flex-col gap-2.5 wrap-break-word", Class)">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

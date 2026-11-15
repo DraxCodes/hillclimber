@@ -1,0 +1,8 @@
+<div class="@UiClass.Join("leading-none font-semibold", Class)" data-slot="card-title">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

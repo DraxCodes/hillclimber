@@ -1,0 +1,47 @@
+@using System.Globalization
+
+@* AI Elements: Inline Citation.
+
+   A link in prose is a small secondary chip that names the destination and opens
+   the source. The registry pairs it with a Hover Card; the port keeps the card's
+   markup and shows it on hover or keyboard focus with CSS only, so it works in a
+   Blazor render without a floating-position library. *@
+<span class="group/citation relative inline-flex max-w-full align-baseline">
+    <a href="@Href"
+       target="_blank"
+       rel="noopener noreferrer"
+       class="focus-ring inline-flex max-w-full items-baseline gap-1 rounded-md bg-secondary px-1.5 py-0.5 text-[0.78em] font-medium text-secondary-foreground transition-colors hover:bg-accent">
+        <span class="min-w-0 truncate">@ChildContent</span>
+        <UiIcon Name="external-link" CssClass="size-2.5 shrink-0 opacity-60" />
+        <span class="sr-only"> (opens in a new tab)</span>
+    </a>
+
+    <span class="pointer-events-none absolute bottom-full left-0 z-30 mb-1.5 hidden w-64 flex-col gap-1 rounded-lg border bg-popover p-2.5 text-left text-xs text-popover-foreground shadow-md group-hover/citation:flex group-focus-within/citation:flex">
+        <span class="font-medium">@SourceLabel</span>
+        <span class="break-all font-mono text-[0.68rem] text-muted-foreground">@Href</span>
+    </span>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Ordinal within the message, kept so the markup can name it.</summary>
+    [Parameter] public int Index { get; set; }
+
+    /// <summary>The host without a leading www, or the raw target when it will not parse.</summary>
+    private string SourceLabel
+    {
+        get
+        {
+            if (!Uri.TryCreate(Href, UriKind.Absolute, out var uri))
+            {
+                return Href;
+            }
+
+            return uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
+                ? uri.Host[4..]
+                : uri.Host;
+        }
+    }
+}

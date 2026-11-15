@@ -1,0 +1,14 @@
+@* AI Elements: Trace (base primitive).
+
+   Port of registry/base-rhea/ui/trace.tsx. A Trace is the vertical list that holds
+   trace lines; a line with a detail body becomes a collapsible row. The utility
+   classes are copied from the registry so the port cannot drift from the docs. *@
+<div data-slot="trace"
+     class="@UiClass.Join("flex w-full min-w-0 flex-col gap-2", Class)">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

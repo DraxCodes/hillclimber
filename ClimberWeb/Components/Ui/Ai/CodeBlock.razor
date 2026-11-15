@@ -1,0 +1,46 @@
+@* AI Elements: Code Block (base primitive used by Tool and Terminal).
+
+   `Size="sm"` is the size the tool and terminal elements use. The registry puts
+   the copy action in CodeBlockActions; the page already has one delegated copy
+   handler (`[data-copy]`), so the block exposes the same action here. *@
+<div data-slot="code-block"
+     data-size="@Size"
+     class="group/code-block relative flex w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-muted text-foreground ring-1 ring-foreground/5 data-[size=sm]:rounded-xl data-[size=sm]:text-xs dark:ring-foreground/10">
+    @if (Copyable && !string.IsNullOrEmpty(Code))
+    {
+        <div class="absolute end-2 top-2 z-10 opacity-0 transition-opacity group-focus-within/code-block:opacity-100 group-hover/code-block:opacity-100">
+            <button type="button"
+                    data-copy="@Code"
+                    class="focus-ring inline-flex h-7 items-center rounded-md border bg-background px-2 font-mono text-[0.66rem] text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Copy">
+                copy
+            </button>
+        </div>
+    }
+
+    <pre data-slot="code-block-content"
+         data-wrap="@(Wrap ? "true" : null)"
+         dir="ltr"
+         tabindex="0"
+         class="@UiClass.Join(
+             "min-h-0 min-w-0 overflow-auto px-4 py-4 text-start font-mono leading-relaxed outline-none",
+             "group-data-[size=sm]/code-block:px-3 group-data-[size=sm]/code-block:py-3",
+             "data-wrap:whitespace-pre-wrap data-wrap:wrap-break-word",
+             ContentClass)"><code data-slot="code-block-code" class="block min-w-max content-start data-wrap:min-w-0" data-wrap="@(Wrap ? "true" : null)">@Code</code></pre>
+</div>
+
+@code {
+    /// <summary>The text to show verbatim.</summary>
+    [Parameter] public string? Code { get; set; }
+
+    /// <summary>default or sm; sm is the tool/terminal size.</summary>
+    [Parameter] public string Size { get; set; } = "default";
+
+    /// <summary>Wraps long lines instead of scrolling horizontally.</summary>
+    [Parameter] public bool Wrap { get; set; }
+
+    /// <summary>Shows the copy action on hover and focus.</summary>
+    [Parameter] public bool Copyable { get; set; } = true;
+
+    [Parameter] public string? ContentClass { get; set; }
+}

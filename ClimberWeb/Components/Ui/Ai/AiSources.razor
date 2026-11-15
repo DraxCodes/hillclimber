@@ -1,0 +1,45 @@
+@* AI Elements: Sources.
+
+   The web or MCP targets the run reached. One trace row names the count; opening it
+   lists each real URL, newest first, with an external-link affordance. *@
+@if (Items.Count > 0)
+{
+    <Trace>
+        <TraceCollapsible Open="IsOpen" OnToggle="SetOpen">
+            <Trigger>
+                <TraceLine>
+                    <TraceIcon><UiIcon Name="globe" CssClass="size-4" /></TraceIcon>
+                    <TraceTitle>Used @Items.Count @(Items.Count == 1 ? "source" : "sources")</TraceTitle>
+                </TraceLine>
+            </Trigger>
+            <ChildContent>
+                <Trace>
+                    @foreach (var item in Items)
+                    {
+                        <a href="@item.Url" target="_blank" rel="noopener noreferrer" class="focus-ring rounded-lg" title="@item.Url">
+                            <TraceLine>
+                                <TraceTitle>@item.Host<span class="sr-only"> (opens in a new tab)</span></TraceTitle>
+                                @if (item.Path is { Length: > 0 } path)
+                                {
+                                    <TraceDescription Class="hidden max-w-56 truncate font-mono text-[0.66rem] sm:inline">@path</TraceDescription>
+                                }
+                                <TraceIcon><UiIcon Name="external-link" CssClass="size-3.5" /></TraceIcon>
+                            </TraceLine>
+                        </a>
+                    }
+                </Trace>
+            </ChildContent>
+        </TraceCollapsible>
+    </Trace>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SourceLink> Items { get; set; } = Array.Empty<SourceLink>();
+
+    private bool? _chosen;
+
+    // Sources open by default: the run went out to the web, which a reader came to see.
+    private bool IsOpen => _chosen ?? true;
+
+    private void SetOpen(bool open) => _chosen = open;
+}

@@ -1,0 +1,20 @@
+@* AI Elements: Message.
+
+   `align="end"` is the person's turn (right aligned); the default start is the
+   agent. Kept as a plain div so MessageContent, Trace and Bubble can sit inside. *@
+<div data-slot="message"
+     data-align="@Align"
+     class="@UiClass.Join(
+         "group/message relative flex w-full min-w-0 gap-2 text-sm",
+         "data-[align=end]:flex-row-reverse",
+         Class)">
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>start for the agent, end for the person.</summary>
+    [Parameter] public string Align { get; set; } = "start";
+
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -23,8 +23,8 @@
             } catch (e) { }
         })();
     </script>
+    <link rel="stylesheet" href="@Assets["tw.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
-    <link rel="stylesheet" href="@Assets["ai.css"]" />
     <link rel="stylesheet" href="@Assets["ClimberWeb.styles.css"]" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <ImportMap />
@@ -32,7 +32,7 @@
 </head>
 
 <body>
-    <Routes />
+    <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script>
@@ -96,6 +96,29 @@
 
             apply(pref());
         })();
+
+        // The layout is interactive, so the circuit re-renders the toggle after this
+        // inline script has run (and clears the icon it chose). Re-apply once the
+        // document is hydrated.
+        window.climberTheme = {
+            reapply: function () {
+                try {
+                    var pref = localStorage.getItem("hillclimber-theme") || "system";
+                    var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                    var resolved = pref === "system" ? (dark ? "dark" : "light") : pref;
+                    document.documentElement.setAttribute("data-theme", resolved);
+                    document.documentElement.setAttribute("data-theme-pref", pref);
+                    var icons = document.querySelectorAll("[data-theme-icon]");
+                    for (var i = 0; i < icons.length; i++) {
+                        if (icons[i].getAttribute("data-theme-icon") === pref) {
+                            icons[i].removeAttribute("hidden");
+                        } else {
+                            icons[i].setAttribute("hidden", "");
+                        }
+                    }
+                } catch (e) { }
+            }
+        };
     </script>
     <script>
         // Session + activity heartbeat for the PIN gate. Keeps a stable id in
@@ -199,89 +222,68 @@
                 });
             });
 
-            // Remember the most recently opened transcript disclosure so Escape has a target
-            // even when focus sits on the page body. Other page dialogs keep their own keys.
+            // Remember the most recently opened disclosure so Escape has a target even
+            // when focus sits on the page body. Disclosures are buttons owned by Blazor,
+            // so a toggle is just another click; the script only keeps the row in view.
             var lastOpened = null;
+            var pendingAnchor = null;
 
-            // A toggle fires after the browser has already grown the row, so the summary's
-            // position before the change is captured on the click (or Escape) that causes it.
-            var anchorPending = null;
-
-            function captureAnchor(summary) {
-                var details = summary && summary.parentElement;
-                if (!details || details.tagName !== "DETAILS") return;
-                anchorPending = { details: details, top: summary.getBoundingClientRect().top };
-            }
-
-            // Keep the clicked summary under the reader's eye: shift the feed by however far
-            // the summary moved, or align a block taller than the panel to the near edge.
-            // The arithmetic mirrors StepScrollMath.Target; the unit tests own the clamps.
-            function anchorDisclosure(details, beforeTop) {
+            // A Blazor state change lands after the click, so record where the trigger
+            // was and let the attribute change mark the moment the DOM has grown.
+            function settleAnchor() {
+                if (!pendingAnchor) return;
                 var feed = document.getElementById("log-feed");
-                if (!feed || !feed.contains(details)) return;
-                var summary = details.querySelector(":scope > summary");
-                if (!summary) return;
+                var trigger = pendingAnchor.trigger;
+                var beforeTop = pendingAnchor.top;
+                pendingAnchor = null;
+                if (!feed || !trigger.isConnected || !feed.contains(trigger)) return;
 
                 var feedRect = feed.getBoundingClientRect();
-                var afterTop = summary.getBoundingClientRect().top;
-                var body = details.querySelector(":scope > div");
-                var bodyRect = details.open && body ? body.getBoundingClientRect() : null;
-                var bodyHeight = bodyRect ? bodyRect.height : 0;
-                var tall = details.open && bodyHeight > feedRect.height - 60;
-                var delta = tall ? afterTop - feedRect.top : afterTop - beforeTop;
-
-                if (details.open && !tall && bodyHeight > 0 && bodyRect.bottom > 0) {
-                    var bodyBottomAfter = bodyRect.bottom - delta;
-                    if (bodyBottomAfter > feedRect.bottom + 2) {
-                        delta += bodyBottomAfter - feedRect.bottom;
-                    }
-                    var bodyTopAfter = bodyRect.top - delta;
-                    if (bodyTopAfter < feedRect.top - 2) {
-                        delta -= feedRect.top - bodyTopAfter;
-                    }
-                }
-
-                var summaryAfter = afterTop - delta;
-                if (summaryAfter < feedRect.top - 2) {
-                    delta -= feedRect.top - summaryAfter;
-                } else if (summaryAfter > feedRect.bottom + 2) {
-                    delta += summaryAfter - feedRect.bottom;
-                }
-
-                if (Math.abs(delta) < 2) return;
+                var afterTop = trigger.getBoundingClientRect().top;
+                var delta = afterTop - beforeTop;
 
                 var max = Math.max(0, feed.scrollHeight - feed.clientHeight);
                 var target = feed.scrollTop + delta;
                 target = isSolo(feed)
                     ? Math.max(0, Math.min(max, target))
                     : Math.min(0, Math.max(-max, target));
-                if (Math.abs(target - feed.scrollTop) < 0.5) return;
+                if (Math.abs(target - feed.scrollTop) >= 0.5) {
+                    var reduce = window.matchMedia
+                        && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                    feed.scrollTo({ top: target, behavior: reduce ? "auto" : "smooth" });
+                }
 
-                var reduce = window.matchMedia
-                    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                feed.scrollTo({ top: target, behavior: reduce ? "auto" : "smooth" });
+                syncLatest();
             }
 
-            document.addEventListener("click", function (e) {
-                var summary = e.target && e.target.closest ? e.target.closest("#log-feed summary") : null;
-                if (summary) captureAnchor(summary);
-            }, true);
+            new MutationObserver(function (records) {
+                if (!pendingAnchor) return;
+                for (var i = 0; i < records.length; i++) {
+                    var record = records[i];
+                    if (record.type === "attributes"
+                        && record.target === pendingAnchor.trigger
+                        && record.attributeName === "aria-expanded") {
+                        requestAnimationFrame(function () {
+                            requestAnimationFrame(settleAnchor);
+                        });
+                        return;
+                    }
+                }
+            }).observe(document.body, {
+                attributes: true,
+                subtree: true,
+                attributeFilter: ["aria-expanded"]
+            });
 
-            document.addEventListener("toggle", function (e) {
-                var details = e.target;
-                if (!details || details.tagName !== "DETAILS") return;
-                if (!details.closest || !details.closest("#log-feed")) return;
-                if (details.open) {
-                    lastOpened = details;
-                } else if (lastOpened === details) {
-                    lastOpened = null;
-                }
-                if (anchorPending && anchorPending.details === details) {
-                    var beforeTop = anchorPending.top;
-                    anchorPending = null;
-                    anchorDisclosure(details, beforeTop);
-                }
-                syncLatest();
+            document.addEventListener("click", function (e) {
+                var trigger = e.target && e.target.closest
+                    ? e.target.closest('[data-slot="trace-collapsible-trigger"]')
+                    : null;
+                if (!trigger) return;
+                var feed = document.getElementById("log-feed");
+                if (!feed || !feed.contains(trigger)) return;
+                pendingAnchor = { trigger: trigger, top: trigger.getBoundingClientRect().top };
+                if (trigger.getAttribute("aria-expanded") === "false") lastOpened = trigger;
             }, true);
 
             // The combined stream is column-reverse, so its live edge is scrollTop 0 and
@@ -326,27 +328,16 @@
             });
 
             // Switching tabs swaps the whole row set, which would otherwise drop where the
-            // reader was scrolled and every disclosure they had opened. Keep both per tab
-            // here, then let the page put them back once Blazor has patched the DOM.
+            // reader was scrolled. Keep it per tab here, then let the page put it back once
+            // Blazor has patched the DOM.
             var tabState = Object.create(null);
-
-            // Oldest first. Rows are rendered newest first and new work is always added at
-            // the chronological end, so this order is stable while a run grows.
-            function transcriptDetails(feed) {
-                return Array.prototype.slice.call(feed.querySelectorAll("details")).reverse();
-            }
 
             function saveTabState() {
                 var feed = document.getElementById("log-feed");
                 if (!feed) return;
                 var tab = feed.getAttribute("data-active-tab");
                 if (!tab) return;
-                tabState[tab] = {
-                    scroll: feed.scrollTop,
-                    open: transcriptDetails(feed).map(function (details) {
-                        return details.open ? 1 : 0;
-                    })
-                };
+                tabState[tab] = { scroll: feed.scrollTop };
             }
 
             function restoreTabState(tab) {
@@ -354,15 +345,6 @@
                 if (!feed) return;
                 var state = tabState[tab];
                 if (state) {
-                    var details = transcriptDetails(feed);
-                    for (var i = 0; i < details.length && i < state.open.length; i++) {
-                        if (state.open[i]) {
-                            details[i].setAttribute("open", "");
-                        } else {
-                            details[i].removeAttribute("open");
-                        }
-                    }
-
                     feed.scrollTop = state.scroll;
                 }
 
@@ -379,18 +361,50 @@
             document.addEventListener("keydown", function (e) {
                 if (e.key !== "Escape") return;
                 var active = document.activeElement;
-                var details = active && active.closest ? active.closest("#log-feed details[open]") : null;
-                if (!details && lastOpened && lastOpened.open) details = lastOpened;
-                if (!details) return;
-                var closingSummary = details.querySelector(":scope > summary");
-                if (closingSummary) captureAnchor(closingSummary);
-                details.removeAttribute("open");
-                var summary = details.querySelector("summary");
-                if (summary) summary.focus();
+                var trigger = active && active.closest
+                    ? active.closest('#log-feed [data-slot="trace-collapsible-trigger"]')
+                    : null;
+                if (trigger && trigger.getAttribute("aria-expanded") !== "true") trigger = null;
+                if (!trigger && lastOpened
+                    && lastOpened.isConnected
+                    && lastOpened.getAttribute("aria-expanded") === "true") {
+                    trigger = lastOpened;
+                }
+                if (!trigger) return;
+                pendingAnchor = { trigger: trigger, top: trigger.getBoundingClientRect().top };
+                trigger.click();
+                trigger.focus();
+                lastOpened = null;
             });
 
             return {
                 restoreTab: restoreTabState
+            };
+        })();
+    </script>
+    <script>
+        // Small UI helpers used by the shadcn ports. Kept separate from climberLog so
+        // the transcript script stays focused on the feed.
+        window.climberUi = (function () {
+            // Enter sends; Shift+Enter inserts a newline. Delegated so it survives
+            // re-renders, and only fires for the Prompt Input textarea.
+            document.addEventListener("keydown", function (e) {
+                if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+                var el = e.target;
+                if (!el || el.id !== "prompt") return;
+                e.preventDefault();
+                var send = document.querySelector("[data-send]");
+                if (send && !send.disabled) send.click();
+            });
+
+            return {
+                focusId: function (id) {
+                    var el = document.getElementById(id);
+                    if (!el) return false;
+                    try { el.scrollIntoView({ block: "nearest" }); } catch (e) { }
+                    el.focus();
+                    return true;
+                }
             };
         })();
     </script>

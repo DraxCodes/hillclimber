@@ -1,0 +1,8 @@
+<div class="@UiClass.Join("flex items-center px-6", Class)" data-slot="card-footer">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

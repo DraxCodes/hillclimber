@@ -1,0 +1,45 @@
+<div class="@Css"
+     role="@(Tone == "destructive" ? "alert" : "status")"
+     data-slot="alert"
+     data-tone="@Tone">
+    @if (Icon is not null)
+    {
+        <UiIcon Name="@Icon" CssClass="mt-0.5 size-4 shrink-0" />
+    }
+    <div class="min-w-0">
+        @if (!string.IsNullOrWhiteSpace(Title))
+        {
+            <div class="font-medium" data-slot="alert-title">@Title</div>
+        }
+        @if (ChildContent is not null)
+        {
+            <div class="text-sm opacity-90" data-slot="alert-description">@ChildContent</div>
+        }
+        @if (Actions is not null)
+        {
+            <div class="mt-2 flex flex-wrap items-center gap-2">@Actions</div>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly Dictionary<string, string> Tones = new()
+    {
+        ["info"] = "border-border bg-muted/60 text-foreground",
+        ["destructive"] = "border-destructive/40 bg-destructive/10 text-destructive",
+        ["warning"] = "border-orange/40 bg-orange/10 text-orange",
+        ["success"] = "border-green/40 bg-green/10 text-green",
+    };
+
+    private string Css => UiClass.Join(
+        "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm",
+        Tones.GetValueOrDefault(Tone, Tones["info"]),
+        Class);
+
+    [Parameter] public string Tone { get; set; } = "info";
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

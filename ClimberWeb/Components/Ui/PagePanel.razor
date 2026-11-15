@@ -1,0 +1,40 @@
+@* A page section: the shadcn Card shell plus the mono index/title/meta header
+   that the activity and status pages share. `.panel-title` and `.panel-meta`
+   stay on the real elements because the UI harnesses key off them. *@
+<Card Class="@UiClass.Join("gap-0! overflow-hidden py-0!", Class)">
+    <CardHeader Class="border-b px-4! py-2.5! sm:px-5!">
+        <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            @if (Index is { } index)
+            {
+                <span class="idx font-mono text-[0.72rem] tabular-nums" aria-hidden="true">@($"[{index:00}]")</span>
+            }
+            <h2 class="panel-title min-w-0 truncate font-mono text-[0.78rem] font-medium text-foreground">@Title</h2>
+            @if (!string.IsNullOrWhiteSpace(Meta))
+            {
+                <span class="panel-meta font-mono text-[0.7rem]">@Meta</span>
+            }
+        </div>
+    </CardHeader>
+    <CardContent Class="@UiClass.Join(Flush ? "p-0!" : "px-4! py-3.5! sm:px-5!", ContentClass)">
+        @ChildContent
+    </CardContent>
+</Card>
+
+@code {
+    /// <summary>The section number shown as [00]; omit to hide the marker.</summary>
+    [Parameter] public int? Index { get; set; }
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    /// <summary>Right-aligned meta text, e.g. "primary" or "3 days".</summary>
+    [Parameter] public string? Meta { get; set; }
+
+    /// <summary>Drop the body padding so a list can own its row rhythm.</summary>
+    [Parameter] public bool Flush { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter] public string? ContentClass { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

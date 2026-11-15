@@ -1,0 +1,8 @@
+<div class="@UiClass.Join("text-muted-foreground text-sm", Class)" data-slot="card-description">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

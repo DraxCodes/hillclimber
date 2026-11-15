@@ -1,0 +1,67 @@
+@* AI Elements: Task.
+
+   One delegate's work: a status icon that reads checked, spinning or failed, and a
+   body of steps. The body opens while the task runs and closes when it settles,
+   unless the reader opened it. *@
+<Trace>
+    <TraceCollapsible Open="IsOpen" OnToggle="SetOpen" KeepMounted>
+        <Trigger>
+            <TraceLine Status="@Status">
+                <TraceIcon>
+                    <UiIcon Name="@StatusIcon" CssClass="@UiClass.Join("size-4", Status == "running" ? "animate-spin" : null)" />
+                </TraceIcon>
+                <TraceTitle>@Title</TraceTitle>
+            </TraceLine>
+        </Trigger>
+        <ChildContent>
+            <Trace>
+                @foreach (var step in Steps)
+                {
+                    <TraceLine Status="@(step.Status == "done" ? null : step.TraceStatus)">
+                        <TraceTitle>@step.Title</TraceTitle>
+                    </TraceLine>
+                }
+            </Trace>
+            @if (Extra is not null)
+            {
+                <div class="flex flex-col gap-2 pt-1">@Extra</div>
+            }
+        </ChildContent>
+    </TraceCollapsible>
+</Trace>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public IReadOnlyList<PlanStep> Steps { get; set; } = Array.Empty<PlanStep>();
+
+    /// <summary>True while the task is still running; opens it and spins its icon.</summary>
+    [Parameter] public bool Running { get; set; }
+
+    /// <summary>
+    /// Extra body under the steps, for work that carries content rather than a step list: a
+    /// delegate's brief and the result it returned.
+    /// </summary>
+    [Parameter] public RenderFragment? Extra { get; set; }
+
+    private bool? _chosen;
+
+    private string Status => Steps.Any(step => step.Status == "error")
+        ? "error"
+        : Running || Steps.Any(step => step.Status == "running")
+            ? "running"
+            : null!;
+
+    private string StatusIcon => Status switch
+    {
+        "running" => "loader",
+        "error" => "circle-alert",
+        _ => "circle-check",
+    };
+
+    // A running task opens so its steps are visible; a delegate card with a brief and a
+    // result is the tab's whole content, so it opens too.
+    private bool IsOpen => _chosen ?? (Status == "running" || Extra is not null);
+
+    private void SetOpen(bool open) => _chosen = open;
+}

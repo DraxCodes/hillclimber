@@ -1,5 +1,4 @@
 @page "/activity"
-@rendermode InteractiveServer
 @implements IDisposable
 @inject IProviderRegistry Providers
 @inject IRunService Run
@@ -8,23 +7,20 @@
 <PageTitle>activity · hillclimber</PageTitle>
 
 <AuthGate OnUnlocked="LoadAsync">
+<div class="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:px-4">
 @if (!_loaded)
 {
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">[00]</span>
-            <span class="panel-title">activity</span>
-        </div>
-        <p class="lede">Checking providers…</p>
-    </section>
+    <PagePanel Index="0" Title="activity">
+        <Spinner>Checking providers…</Spinner>
+    </PagePanel>
 }
 else
 {
-    <p class="lede">@Lede</p>
+    <p class="max-w-prose text-sm text-muted-foreground">@Lede</p>
 
     @foreach (var note in Providers.Notes)
     {
-        <p class="notice notice-info" role="status">@note</p>
+        <Alert Tone="info" Icon="circle-alert">@note</Alert>
     }
 
     var panel = 0;
@@ -33,21 +29,16 @@ else
         var provider = Providers.Providers[i];
         var catalogue = CatalogueReport(provider.Id);
         var spend = SpendReportFor(provider.Id);
-        <section class="panel">
-            <div class="panel-head">
-                <span class="idx">@($"[{panel++:00}]")</span>
-                <span class="panel-title">@PanelTitle(provider)</span>
-                <span class="panel-meta">@(i == 0 ? "primary" : "fallback")</span>
-            </div>
+        <PagePanel Index="@(panel++)" Title="@PanelTitle(provider)" Meta="@(i == 0 ? "primary" : "fallback")">
 
             @if (catalogue is { } report)
             {
-                <div class="conn-line">
+                <div class="conn-line flex-wrap">
                     <span class="dot dot-@report.StateTone" aria-hidden="true"></span>
                     <span class="conn-state">@report.StateLabel</span>
                     @if (report.Model is { } model)
                     {
-                        <span class="chip mono">@model</span>
+                        <Badge Variant="outline" Class="font-mono">@model</Badge>
                     }
                 </div>
 
@@ -70,15 +61,15 @@ else
                 }
                 else if (report.Message is { } message)
                 {
-                    <p class="empty">@message</p>
+                    <p class="font-mono text-[0.78rem] text-muted-foreground">@message</p>
                 }
 
                 @foreach (var note in report.Notes)
                 {
-                    <p class="notice notice-info" role="status">@note</p>
+                    <Alert Tone="info" Icon="circle-alert" Class="mt-2">@note</Alert>
                 }
 
-                <p class="footnote dim">
+                <p class="mt-3 text-[0.74rem] leading-relaxed text-muted-foreground">
                     @provider.DisplayName prices tokens in its OpenAI-compatible catalogue, so its
                     figures are estimates from opencode's <code class="mono">step_finish</code> tokens
                     times catalogue pricing. Runs are not persisted.
@@ -86,12 +77,12 @@ else
             }
             else if (spend is { } spendReport)
             {
-                <div class="conn-line">
+                <div class="conn-line flex-wrap">
                     <span class="dot dot-@spendReport.Connection.StateTone" aria-hidden="true"></span>
                     <span class="conn-state">@spendReport.Connection.StateLabel</span>
                     @if (spendReport.Connection.IsFreeTier && spendReport.Connection.Connected)
                     {
-                        <span class="chip">free tier</span>
+                        <Badge Variant="secondary">free tier</Badge>
                     }
                 </div>
 
@@ -114,29 +105,25 @@ else
                 }
                 else if (spendReport.Connection.Message is { } message)
                 {
-                    <p class="empty">@message</p>
+                    <p class="font-mono text-[0.78rem] text-muted-foreground">@message</p>
                 }
 
                 @foreach (var note in spendReport.Notes)
                 {
-                    <p class="notice notice-info" role="status">@note</p>
+                    <Alert Tone="info" Icon="circle-alert" Class="mt-2">@note</Alert>
                 }
             }
             else
             {
-                <p class="empty">
+                <p class="font-mono text-[0.78rem] text-muted-foreground">
                     @provider.DisplayName has no API surface configured; opencode runs it directly.
                 </p>
             }
-        </section>
+        </PagePanel>
 
         @if (spend is not null)
         {
-            <section class="panel">
-                <div class="panel-head">
-                    <span class="idx">@($"[{panel++:00}]")</span>
-                    <span class="panel-title">@($"{provider.DisplayName.ToLowerInvariant()} account spend")</span>
-                </div>
+            <PagePanel Index="@(panel++)" Title="@($"{provider.DisplayName.ToLowerInvariant()} account spend")">
                 @if (spend.Account is { } account)
                 {
                     <div class="spend-row">
@@ -156,24 +143,19 @@ else
                 }
                 else
                 {
-                    <p class="empty">Account total is unavailable — a management key is required.</p>
+                    <p class="font-mono text-[0.78rem] text-muted-foreground">Account total is unavailable — a management key is required.</p>
                 }
-            </section>
+            </PagePanel>
         }
 
         @if (spend is not null)
         {
             var daily = DailyFor(provider.Id);
             var models = ModelsFor(provider.Id);
-            <section class="panel">
-                <div class="panel-head">
-                    <span class="idx">@($"[{panel++:00}]")</span>
-                    <span class="panel-title">@($"{provider.DisplayName.ToLowerInvariant()} activity")</span>
-                    <span class="panel-meta">@daily.Count day@(daily.Count == 1 ? "" : "s")</span>
-                </div>
+            <PagePanel Index="@(panel++)" Title="@($"{provider.DisplayName.ToLowerInvariant()} activity")" Meta="@($"{daily.Count} day{(daily.Count == 1 ? "" : "s")}")">
                 @if (daily.Count == 0)
                 {
-                    <p class="empty">No activity in the last 30 days.</p>
+                    <p class="font-mono text-[0.78rem] text-muted-foreground">No activity in the last 30 days.</p>
                 }
                 else
                 {
@@ -204,17 +186,12 @@ else
                         </div>
                     </div>
                 }
-            </section>
+            </PagePanel>
 
-            <section class="panel panel-flush">
-                <div class="panel-head">
-                    <span class="idx">@($"[{panel++:00}]")</span>
-                    <span class="panel-title">@($"{provider.DisplayName.ToLowerInvariant()} by model")</span>
-                    <span class="panel-meta">@models.Count models</span>
-                </div>
+            <PagePanel Index="@(panel++)" Title="@($"{provider.DisplayName.ToLowerInvariant()} by model")" Meta="@($"{models.Count} models")" Flush>
                 @if (models.Count == 0)
                 {
-                    <p class="empty" style="padding: 0.9rem 1rem;">No per-model activity.</p>
+                    <p class="px-4 py-3.5 font-mono text-[0.78rem] text-muted-foreground sm:px-5">No per-model activity.</p>
                 }
                 else
                 {
@@ -230,15 +207,11 @@ else
                         }
                     </ul>
                 }
-            </section>
+            </PagePanel>
         }
     }
 
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">@($"[{panel++:00}]")</span>
-            <span class="panel-title">this session</span>
-        </div>
+    <PagePanel Index="@(panel++)" Title="this session">
         <div class="spend-row">
             <div class="spend-stat">
                 <span class="spend-num">@SpendFormat.Usd((double)SessionEstimate)</span>
@@ -249,18 +222,13 @@ else
                 <span class="spend-lbl">tokens this session</span>
             </div>
         </div>
-        <p class="footnote dim">
+        <p class="mt-3 text-[0.74rem] leading-relaxed text-muted-foreground">
             Estimated from opencode's <code class="mono">step_finish</code> tokens times each
             provider's catalogue pricing. Runs are not persisted.
         </p>
-    </section>
+    </PagePanel>
 
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">@($"[{panel++:00}]")</span>
-            <span class="panel-title">this climb</span>
-            <span class="panel-meta">@ClimbStatusLabel</span>
-        </div>
+    <PagePanel Index="@(panel++)" Title="this climb" Meta="@ClimbStatusLabel">
         <div class="spend-row">
             <div class="spend-stat">
                 <span class="spend-num">@ClimbSpendText</span>
@@ -271,26 +239,23 @@ else
                 <span class="spend-lbl">best score</span>
             </div>
         </div>
-        <p class="tokens dim">tokens: @ClimbTokens</p>
-        <p class="footnote dim">
+        <p class="mt-2 font-mono text-[0.72rem] text-muted-foreground">tokens: @ClimbTokens</p>
+        <p class="mt-3 text-[0.74rem] leading-relaxed text-muted-foreground">
             Summed live from opencode's own <code class="mono">step_finish</code> events;
             estimated and reported figures are kept separate. Runs are not persisted, so this
             reflects the current/last run only.
         </p>
-    </section>
+    </PagePanel>
 
-    <section class="panel">
-        <div class="panel-head">
-            <span class="idx">@($"[{panel++:00}]")</span>
-            <span class="panel-title">saved with skills</span>
-        </div>
-        <p class="empty">Not measured.</p>
-        <p class="footnote dim">
+    <PagePanel Index="@(panel++)" Title="saved with skills">
+        <p class="font-mono text-[0.78rem] text-muted-foreground">Not measured.</p>
+        <p class="mt-3 text-[0.74rem] leading-relaxed text-muted-foreground">
             There is no honest baseline for what the same work would have cost without the skills,
-            so no number is invented here. Matches how <a href="/status">status</a> treats per-change model.
+            so no number is invented here. Matches how <a class="text-accent-text underline underline-offset-2" href="/status">status</a> treats per-change model.
         </p>
-    </section>
+    </PagePanel>
 }
+</div>
 </AuthGate>
 
 @code {

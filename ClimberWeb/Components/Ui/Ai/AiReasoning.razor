@@ -1,0 +1,44 @@
+@* AI Elements: Reasoning.
+
+   The model's thinking, streamed as a trace line that opens while it streams and
+   collapses as soon as the stream ends — a reader who opened it keeps it open. *@
+@if (string.IsNullOrWhiteSpace(Text))
+{
+    <Trace>
+        <TraceLine Status="@(Running ? "running" : null)">
+            <TraceIcon><UiIcon Name="sparkles" CssClass="size-4" /></TraceIcon>
+            <TraceTitle>@(Running ? "Thinking" : "Thought")</TraceTitle>
+        </TraceLine>
+    </Trace>
+}
+else
+{
+    <Trace>
+        <TraceCollapsible Open="IsOpen" OnToggle="SetOpen" InnerClass="whitespace-pre-wrap">
+            <Trigger>
+                <TraceLine Status="@(Running ? "running" : null)">
+                    <TraceIcon><UiIcon Name="sparkles" CssClass="size-4" /></TraceIcon>
+                    <TraceTitle>@(Running ? "Thinking" : "Thought")</TraceTitle>
+                </TraceLine>
+            </Trigger>
+            <ChildContent>
+                <Markdown Text="@Text" />
+            </ChildContent>
+        </TraceCollapsible>
+    </Trace>
+}
+
+@code {
+    /// <summary>The thought stream so far.</summary>
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+
+    /// <summary>True while this thought is still arriving.</summary>
+    [Parameter] public bool Running { get; set; }
+
+    private bool? _chosen;
+
+    // A reader's click wins; otherwise the thought is open only while it streams.
+    private bool IsOpen => _chosen ?? Running;
+
+    private void SetOpen(bool open) => _chosen = open;
+}

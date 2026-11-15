@@ -45,6 +45,7 @@ const VIEWS = [
   {
     id: 'home-browser', path: '/', unlock: true,
     ready: async (page) => {
+      await page.locator('#folder-trigger').click();
       await page.locator('.browse-btn').click();
       await page.locator('.browser').waitFor({ state: 'visible', timeout: 10_000 });
     },
@@ -225,28 +226,38 @@ function auditPage({ consoleErrors }) {
     // An outline/outer box-shadow is painted outside the border box, so judge its
     // contrast against what sits behind the element, not the element's own fill.
     const bg = backgroundOf(el.parentElement ?? el).colour;
-    let ok = false;
-    const style = cs.outlineStyle;
-    const width = parseFloat(cs.outlineWidth) || 0;
 
-    if (style === 'auto' && width >= 1) ok = true;
-    if (!ok && style !== 'none' && width >= 2) {
-      const outline = parseColor(cs.outlineColor);
-      if (outline) {
-        const colour = outline.a >= 1 ? outline : over(outline, bg);
-        if (ratio(colour, bg) >= 3) ok = true;
+    // A composed field (the prompt textarea) may paint its focus ring on the
+    // shell around it, which is what the user actually sees. Accept a ring on
+    // the nearest ancestor that responds to focus-within, then fall back to the
+    // element's own outline or shadow.
+    const hasRing = (style, target) => {
+      if (style.outlineStyle === 'auto' && (parseFloat(style.outlineWidth) || 0) >= 1) return true;
+      if (style.outlineStyle !== 'none' && (parseFloat(style.outlineWidth) || 0) >= 2) {
+        const outline = parseColor(style.outlineColor);
+        if (outline) {
+          const colour = outline.a >= 1 ? outline : over(outline, target);
+          if (ratio(colour, target) >= 3) return true;
+        }
       }
-    }
-    if (!ok) {
-      for (const match of cs.boxShadow.matchAll(/rgba?\([^)]+\)/g)) {
+      for (const match of style.boxShadow.matchAll(/rgba?\([^)]+\)/g)) {
         const shadow = parseColor(match[0]);
         if (!shadow) continue;
-        const colour = shadow.a >= 1 ? shadow : over(shadow, bg);
-        if (ratio(colour, bg) >= 3) { ok = true; break; }
+        const colour = shadow.a >= 1 ? shadow : over(shadow, target);
+        if (ratio(colour, target) >= 3) return true;
+      }
+      return false;
+    };
+
+    let ok = hasRing(cs, bg);
+    if (!ok && /^(input|textarea|select)$/.test(el.tagName.toLowerCase())) {
+      for (let node = el.parentElement; !ok && node && node !== document.body; node = node.parentElement) {
+        if (!node.matches(':focus-within')) continue;
+        ok = hasRing(getComputedStyle(node), backgroundOf(node.parentElement ?? node).colour);
       }
     }
     if (!ok) {
-      fail('focus', `${describe(el)} ${style}/${width.toFixed(0)}px, shadow: ${cs.boxShadow}`);
+      fail('focus', `${describe(el)} ${cs.outlineStyle}/${(parseFloat(cs.outlineWidth) || 0).toFixed(0)}px, shadow: ${cs.boxShadow}`);
     }
   }
 

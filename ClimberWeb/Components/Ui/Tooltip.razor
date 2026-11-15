@@ -1,0 +1,21 @@
+<span class="group relative inline-flex min-w-0" data-slot="tooltip">
+    <span aria-describedby="@Id" class="inline-flex min-w-0">@ChildContent</span>
+    <span id="@Id"
+          role="tooltip"
+          class="@UiClass.Join(
+                     "pointer-events-none absolute z-50 w-max max-w-72 rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md",
+                     "opacity-0 transition-opacity delay-100 group-hover:opacity-100 group-focus-within:opacity-100",
+                     Placement == "bottom" ? "top-full mt-1.5" : "bottom-full mb-1.5",
+                     Align == "end" ? "right-0" : "left-1/2 -translate-x-1/2")">
+        @Text
+    </span>
+</span>
+
+@code {
+    private readonly string Id = $"tip-{Guid.NewGuid():N}";
+
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public string Placement { get; set; } = "top";
+    [Parameter] public string Align { get; set; } = "center";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

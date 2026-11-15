@@ -1,0 +1,56 @@
+@* AI Elements: TraceCollapsible (base primitive).
+
+   The registry builds this on a headless Collapsible whose content animates its
+   measured height. In a Blazor port the open state lives in C# (so a re-render
+   cannot lose a reader's choice) and the content uses the same enter animation
+   instead of a measured-height transition. The trigger keeps the official ARIA
+   contract: a real button with aria-expanded, and a chevron that rotates from it
+   through the group-aria-expanded variant. *@
+<div data-slot="trace-collapsible" class="@UiClass.Join("flex w-full min-w-0 flex-col", Class)">
+    <button type="button"
+            data-slot="trace-collapsible-trigger"
+            aria-expanded="@(Open ? "true" : "false")"
+            class="group/trace-collapsible-trigger flex w-fit max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-lg text-left text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 has-[[data-status=error]]:text-destructive"
+            @onclick="Toggle">
+        @Trigger
+        <span data-slot="trace-icon"
+              aria-hidden="true"
+              class="flex size-4 shrink-0 items-center justify-center transition-transform group-aria-expanded/trace-collapsible-trigger:rotate-90">
+            <UiIcon Name="chevron-right" CssClass="size-4" />
+        </span>
+    </button>
+
+    @if (Open || KeepMounted)
+    {
+        <div data-slot="trace-collapsible-content" class="@(Open ? "min-w-0 overflow-hidden" : "hidden")">
+            <div data-slot="trace-collapsible-content-inner"
+                 class="@UiClass.Join(
+                     "mt-2 mb-1 ml-[calc(0.5rem-1px)] min-w-0 border-l pr-1 pl-4 leading-relaxed wrap-break-word text-muted-foreground",
+                     InnerClass)">
+                @ChildContent
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>The open state. The owner decides it so it survives re-renders.</summary>
+    [Parameter] public bool Open { get; set; }
+
+    /// <summary>Raised with the state the reader asked for.</summary>
+    [Parameter] public EventCallback<bool> OnToggle { get; set; }
+
+    /// <summary>Keeps the content in the DOM while closed (for streaming output).</summary>
+    [Parameter] public bool KeepMounted { get; set; }
+
+    /// <summary>The line shown on the trigger; the component appends the chevron.</summary>
+    [Parameter, EditorRequired] public RenderFragment Trigger { get; set; } = default!;
+
+    /// <summary>The disclosed body.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public string? InnerClass { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private Task Toggle() => OnToggle.InvokeAsync(!Open);
+}

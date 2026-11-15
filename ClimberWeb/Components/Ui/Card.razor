@@ -1,0 +1,8 @@
+<div class="@UiClass.Join("bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm", Class)" data-slot="card">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

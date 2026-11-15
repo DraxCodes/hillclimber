@@ -1,0 +1,9 @@
+@* AI Elements: TraceDescription (base primitive). The right-hand meta on a line,
+   for example "3 of 4 done". *@
+<span data-slot="trace-description"
+      class="@UiClass.Join("shrink-0 text-muted-foreground/70 tabular-nums", Class)">@ChildContent</span>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

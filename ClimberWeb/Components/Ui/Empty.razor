@@ -1,0 +1,39 @@
+<div class="@UiClass.Join(
+         "flex min-w-0 flex-1 flex-col items-center justify-center text-center",
+         Bordered ? "gap-4 rounded-lg border border-dashed p-8" : "gap-2.5 p-4",
+         Class)" data-slot="empty">
+    @if (Icon is not null)
+    {
+        <div class="@UiClass.Join(
+                 "flex size-10 items-center justify-center rounded-lg text-muted-foreground",
+                 Bordered ? "bg-muted" : "bg-transparent")" data-slot="empty-icon">
+            <UiIcon Name="@Icon" CssClass="size-5" />
+        </div>
+    }
+    <div class="flex max-w-sm flex-col items-center gap-1.5" data-slot="empty-header">
+        @if (!string.IsNullOrWhiteSpace(Title))
+        {
+            <div class="text-base font-medium tracking-tight" data-slot="empty-title">@Title</div>
+        }
+        @if (ChildContent is not null)
+        {
+            <div class="text-muted-foreground text-sm" data-slot="empty-description">@ChildContent</div>
+        }
+    </div>
+    @if (Action is not null)
+    {
+        <div class="flex w-full max-w-sm flex-col items-center gap-2" data-slot="empty-content">@Action</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Draws the dashed container. Off when the empty state sits inside another surface.</summary>
+    [Parameter] public bool Bordered { get; set; } = true;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Action { get; set; }
+}

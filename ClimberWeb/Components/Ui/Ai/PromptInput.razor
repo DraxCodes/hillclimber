@@ -1,0 +1,167 @@
+@using Microsoft.AspNetCore.Components.Web
+@inherits Microsoft.AspNetCore.Components.ComponentBase
+
+<div class="rounded-xl border bg-background shadow-xs transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring"
+     data-slot="prompt-input"
+     data-state="@(Running ? "running" : "idle")">
+
+    <div class="flex flex-wrap items-center gap-1.5 px-2 pt-2" data-slot="prompt-input-tools">
+        <Popover Label="Target folder" Placement="up" Align="start" TriggerId="folder-trigger" @ref="_folderPopover">
+            <Trigger>
+                <UiIcon Name="folder" CssClass="size-3.5" />
+                <span class="max-w-40 truncate sm:max-w-56">@FolderLabel</span>
+            </Trigger>
+            <Content>
+                <div class="space-y-2">
+                    <div class="text-xs font-medium">target folder</div>
+                    <input id="folder"
+                           class="focus-ring h-8 w-full rounded-md border bg-background px-2 font-mono text-xs"
+                           type="text"
+                           value="@Folder"
+                           placeholder="C:\path\to\your\repo"
+                           disabled="@Disabled"
+                           @onchange="OnFolderInput" />
+                    <div class="flex items-center justify-between gap-2">
+                        <Button Variant="outline" Size="sm" Class="browse-btn" Disabled="@Disabled" OnClick="Browse">browse</Button>
+                        <Button Variant="ghost" Size="sm" OnClick="CloseFolderPopover">done</Button>
+                    </div>
+                </div>
+            </Content>
+        </Popover>
+
+        @if (ShowMaxIterations)
+        {
+            <Popover Label="Max iterations" Placement="up" Align="start" @ref="_maxPopover">
+                <Trigger>
+                    <UiIcon Name="route" CssClass="size-3.5" />
+                    <span>@MaxIterations iterations</span>
+                </Trigger>
+                <Content>
+                    <div class="space-y-2">
+                        <div class="text-xs font-medium">max iterations</div>
+                        <input id="max"
+                               class="focus-ring h-8 w-20 rounded-md border bg-background px-2 font-mono text-xs"
+                               type="number"
+                               min="1"
+                               value="@MaxIterations"
+                               disabled="@Disabled"
+                               @onchange="MaxChanged" />
+                        <div class="flex justify-end">
+                            <Button Variant="ghost" Size="sm" OnClick="CloseMaxPopover">done</Button>
+                        </div>
+                    </div>
+                </Content>
+            </Popover>
+        }
+
+        <span class="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md border border-transparent px-2 text-xs text-muted-foreground"
+              data-slot="agent-chip"
+              title="@AgentNote">
+            <UiIcon Name="git-branch" CssClass="size-3.5" />
+            <span class="truncate">@AgentLabel</span>
+        </span>
+
+        @if (CanRecall)
+        {
+            <button type="button"
+                    class="focus-ring ml-auto inline-flex h-7 items-center rounded-md px-2 text-xs text-muted-foreground underline-offset-2 transition-colors hover:bg-accent hover:text-foreground hover:underline"
+                    @onclick="Recall">
+                use last prompt
+            </button>
+        }
+    </div>
+
+    <textarea id="prompt"
+              class="block max-h-44 min-h-[3.5rem] w-full resize-none bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
+              rows="@Rows"
+              placeholder="@Placeholder"
+              aria-label="@AriaLabel"
+              disabled="@Disabled"
+              @bind="Value"
+              @bind:event="oninput"
+              @ref="Element"></textarea>
+
+    <div class="flex flex-wrap items-center gap-2 px-2 pb-2" data-slot="prompt-input-footer">
+        <div class="flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 bg-muted/40 px-2 py-1"
+             data-slot="model-selector"
+             title="@ModelText">
+            <UiIcon Name="zap" CssClass="size-3.5 shrink-0 text-muted-foreground" />
+            <span class="min-w-0 break-all font-mono text-[0.66rem] leading-tight text-muted-foreground">@ModelText</span>
+        </div>
+
+        <div class="ml-auto flex items-center gap-1.5">
+            @if (Running)
+            {
+                <Button Variant="destructive" Size="icon" Class="size-8 rounded-full" AriaLabel="Stop" Title="Stop" OnClick="Stop" data-stop="true">
+                    <UiIcon Name="square" CssClass="size-3.5" />
+                </Button>
+            }
+            else
+            {
+                <Button Variant="default" Size="icon" Class="size-8 rounded-full" AriaLabel="Send" Title="Send" Disabled="@(!CanSend)"
+                        OnClick="Send" data-send="true">
+                    <UiIcon Name="arrow-up" CssClass="size-4" />
+                </Button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private Popover? _folderPopover;
+    private Popover? _maxPopover;
+
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Running { get; set; }
+    [Parameter] public bool CanSend { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "";
+    [Parameter] public string AriaLabel { get; set; } = "Prompt";
+    [Parameter] public string ModelText { get; set; } = "";
+    [Parameter] public string Folder { get; set; } = "";
+    [Parameter] public string FolderLabel { get; set; } = "target folder";
+    [Parameter] public bool ShowMaxIterations { get; set; }
+    [Parameter] public int MaxIterations { get; set; } = 5;
+    [Parameter] public string AgentLabel { get; set; } = "";
+    [Parameter] public string AgentNote { get; set; } = "";
+    [Parameter] public bool CanRecall { get; set; }
+    [Parameter] public int Rows { get; set; } = 2;
+    [Parameter] public EventCallback OnSend { get; set; }
+    [Parameter] public EventCallback OnStop { get; set; }
+    [Parameter] public EventCallback OnBrowse { get; set; }
+    [Parameter] public EventCallback OnRecall { get; set; }
+    [Parameter] public EventCallback<string> FolderChanged { get; set; }
+    [Parameter] public EventCallback<int> MaxIterationsChanged { get; set; }
+
+    /// <summary>The textarea element, so the page can focus it after a run settles.</summary>
+    public ElementReference Element { get; private set; }
+
+    private async Task Send()
+    {
+        if (CanSend && !Disabled)
+        {
+            await OnSend.InvokeAsync();
+        }
+    }
+
+    private Task Stop() => OnStop.InvokeAsync();
+    private Task Browse() => OnBrowse.InvokeAsync();
+    private Task Recall() => OnRecall.InvokeAsync();
+
+    private Task OnFolderInput(ChangeEventArgs args)
+    {
+        return FolderChanged.InvokeAsync(args.Value?.ToString() ?? "");
+    }
+
+    private async Task MaxChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            await MaxIterationsChanged.InvokeAsync(Math.Max(1, value));
+        }
+    }
+
+    private void CloseFolderPopover() => _folderPopover?.ClosePanel();
+    private void CloseMaxPopover() => _maxPopover?.ClosePanel();
+}

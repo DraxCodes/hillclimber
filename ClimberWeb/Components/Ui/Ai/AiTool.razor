@@ -1,0 +1,102 @@
+@using ClimberWeb.Services
+
+@* AI Elements: Tool and Terminal.
+
+   A tool call is one trace row; a shell call is a Terminal, whose body shows the
+   command it ran and the output opencode captured. A failed call opens its output
+   so the reader sees the failure without a click. *@
+@if (Detail is null)
+{
+    <Trace>
+        <TraceLine Status="@TraceStatus">
+            <TraceIcon><UiIcon Name="@IconName" CssClass="size-4" /></TraceIcon>
+            <TraceTitle Title="@Title">@Title</TraceTitle>
+            @if (!string.IsNullOrEmpty(Description))
+            {
+                <TraceDescription>@Description</TraceDescription>
+            }
+        </TraceLine>
+    </Trace>
+}
+else
+{
+    <Trace>
+        <TraceCollapsible Open="IsOpen" OnToggle="SetOpen">
+            <Trigger>
+                <TraceLine Status="@TraceStatus">
+                    <TraceIcon><UiIcon Name="@IconName" CssClass="size-4" /></TraceIcon>
+                    <TraceTitle Title="@Title">@Title</TraceTitle>
+                    @if (ExitLabel is not null)
+                    {
+                        <TraceDescription Class="@ExitClass">@ExitLabel</TraceDescription>
+                    }
+                    else if (!string.IsNullOrEmpty(Description))
+                    {
+                        <TraceDescription>@Description</TraceDescription>
+                    }
+                </TraceLine>
+            </Trigger>
+            <ChildContent>
+                @if (Command is not null)
+                {
+                    <div class="mb-1.5 flex items-baseline gap-1.5 font-mono text-xs">
+                        <span class="select-none text-muted-foreground" aria-hidden="true">$</span>
+                        <code class="min-w-0 break-all text-foreground">@Command</code>
+                    </div>
+                }
+
+                <CodeBlock Code="@Detail" Size="sm" Wrap />
+            </ChildContent>
+        </TraceCollapsible>
+    </Trace>
+}
+
+@code {
+    /// <summary>The one-line label, for example "Ran dotnet test".</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    /// <summary>terminal, file, pencil, search, globe, subagent or gear.</summary>
+    [Parameter] public string Icon { get; set; } = "gear";
+
+    [Parameter] public string? Description { get; set; }
+
+    /// <summary>The step's display state; a failure opens its output.</summary>
+    [Parameter] public StepStatus Status { get; set; }
+
+    /// <summary>Expandable output, or null for a row with nothing to expand.</summary>
+    [Parameter] public string? Detail { get; set; }
+
+    /// <summary>The shell command when the call ran one; renders the Terminal body.</summary>
+    [Parameter] public string? Command { get; set; }
+
+    [Parameter] public int? ExitCode { get; set; }
+
+    private bool? _chosen;
+
+    private string? TraceStatus => Status switch
+    {
+        StepStatus.Running => "running",
+        StepStatus.Failed => "error",
+        _ => null,
+    };
+
+    private string IconName => Icon switch
+    {
+        "terminal" => "terminal",
+        "file" => "file",
+        "pencil" => "pencil",
+        "search" => "search",
+        "globe" => "globe",
+        "subagent" => "git-branch",
+        _ => "settings",
+    };
+
+    private string? ExitLabel => ExitCode is int code ? $"exit {code}" : null;
+
+    private string ExitClass => ExitCode is int code && code != 0 ? "text-destructive" : string.Empty;
+
+    // A settled, successful call stays closed; a failure opens to its output.
+    private bool IsOpen => _chosen ?? Status == StepStatus.Failed;
+
+    private void SetOpen(bool open) => _chosen = open;
+}

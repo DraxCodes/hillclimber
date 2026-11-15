@@ -1,0 +1,550 @@
+/* ============================================================================
+   shadcn/ui layer for hillclimber
+   ----------------------------------------------------------------------------
+   Tailwind 4 with the shadcn token names mapped onto the app's existing
+   palette. Preflight is intentionally omitted: app.css already normalises the
+   document and the legacy screens still depend on its defaults.
+
+   Build:  npm run css        (from ClimberWeb/)
+   Watch:  npm run css:watch
+   Output: wwwroot/tw.css is committed so `dotnet run` needs no Node.
+   ========================================================================= */
+
+@layer theme, base, components, legacy, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+@source "../../Components/**/*.razor";
+@source "../../Components/**/*.cs";
+
+/* Our theme is an attribute, not a class, and not the OS preference alone. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+    --color-background: var(--bg);
+    --color-foreground: var(--ink);
+    --color-card: var(--surface);
+    --color-card-foreground: var(--ink);
+    --color-popover: var(--surface);
+    --color-popover-foreground: var(--ink);
+    --color-primary: var(--accent-strong);
+    --color-primary-foreground: var(--accent-ink);
+    --color-secondary: var(--surface-2);
+    --color-secondary-foreground: var(--ink);
+    --color-muted: var(--surface-2);
+    --color-muted-foreground: var(--ink-3);
+    --color-accent: var(--surface-2);
+    --color-accent-foreground: var(--ink);
+    --color-destructive: var(--red);
+    --color-destructive-foreground: var(--accent-ink);
+    --color-border: var(--line);
+    --color-input: var(--line-2);
+    --color-ring: var(--focus);
+    --color-sidebar: var(--surface);
+    --color-sidebar-foreground: var(--ink);
+    --color-sidebar-border: var(--line);
+    --color-sidebar-accent: var(--surface-2);
+    --color-sidebar-accent-foreground: var(--ink);
+
+    --color-green: var(--green);
+    --color-orange: var(--orange);
+    --color-red: var(--red);
+
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", "Cascadia Mono", "Cascadia Code", "JetBrains Mono", "Fira Code", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --radius-sm: calc(var(--radius) - 3px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: var(--radius);
+    --radius-2xl: var(--radius);
+    --radius-3xl: var(--radius);
+    --radius-4xl: var(--radius);
+
+    --animate-shimmer: shimmer 1.8s linear infinite;
+    --animate-rail-in: rail-in 160ms ease-out;
+}
+
+@keyframes shimmer {
+    0% { background-position: 180% 0; }
+    100% { background-position: -180% 0; }
+}
+
+@keyframes rail-in {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@layer base {
+    * {
+        border-color: var(--line);
+    }
+
+    /* Preflight is intentionally omitted, so normalise the controls the shadcn
+       ports rely on: the user agent's ButtonFace fill and borders otherwise leak
+       through on every unstyled <button> the ports compose. */
+    :where(button, input, select, textarea) {
+        font: inherit;
+        color: inherit;
+        letter-spacing: inherit;
+    }
+
+    :where(button, [role="button"]) {
+        background-color: transparent;
+        border: 0;
+        padding: 0;
+        margin: 0;
+    }
+
+    body {
+        background: var(--bg);
+        color: var(--ink);
+    }
+
+    ::selection {
+        background: color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+
+    /* Blazor's unhandled-error bar. The framework's JS reveals it with an inline
+       `display: block`, so keep the base hidden and lay it out as a toast without
+       fighting that inline style. */
+    #blazor-error-ui {
+        display: none;
+        position: fixed;
+        right: 0.75rem;
+        bottom: 0.75rem;
+        left: 0.75rem;
+        z-index: 1000;
+        max-width: 42rem;
+        margin-inline: auto;
+        padding: 0.6rem 0.9rem;
+        border: 1px solid var(--red);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        box-shadow: 0 1px 2px rgba(32, 29, 29, 0.08), 0 12px 32px -18px rgba(32, 29, 29, 0.5);
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+    }
+
+    #blazor-error-ui .reload {
+        margin-left: 0.75rem;
+        color: var(--accent-text);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    #blazor-error-ui .dismiss {
+        position: absolute;
+        top: 50%;
+        right: 0.7rem;
+        transform: translateY(-50%);
+        cursor: pointer;
+        padding: 0 0.25rem;
+        color: var(--ink-3);
+    }
+}
+
+@layer components {
+    /* One focus contract for every shadcn port: two-tone ring that stays legible
+       on both surface and accent fills. */
+    .focus-ring {
+        outline: none;
+    }
+
+    /* Outline, not a shadow: ports carry their own shadow utilities, and a
+       utility-layer shadow would paint over a component-layer ring. */
+    .focus-ring:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+    }
+
+    .shimmer-text {
+        background: linear-gradient(90deg, var(--ink-3) 20%, var(--ink) 40%, var(--ink-3) 60%);
+        background-size: 220% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: var(--animate-shimmer);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .shimmer-text {
+            animation: none;
+            background: none;
+            color: var(--ink-3);
+        }
+    }
+
+    /* Native <dialog> and popover resets so they match the token surface. */
+    .ui-popover {
+        margin: 0;
+        inset: auto;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--ink);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 1px 2px rgba(32, 29, 29, 0.06), 0 18px 44px -28px rgba(32, 29, 29, 0.55);
+        padding: 0.5rem;
+    }
+
+    .ui-popover::backdrop {
+        background: transparent;
+    }
+}
+
+/* Shimmer, ported from shadcn's `shimmer` utility (shadcn/tailwind.css). A running
+   trace title sweeps its own foreground across the text; reduced motion keeps the
+   title legible and still. */
+@utility shimmer {
+    --shimmer-image: linear-gradient(
+        90deg,
+        color-mix(in oklch, currentColor 25%, transparent) 0%,
+        currentColor 45%,
+        color-mix(in oklch, currentColor 25%, transparent) 90%
+    );
+    background-image: var(--shimmer-image);
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    background-clip: text;
+    -webkit-background-clip: text;
+    animation: climber-shimmer var(--shimmer-duration, 2s) linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+        background-image: none;
+        color: inherit;
+    }
+}
+
+@utility shimmer-none {
+    --shimmer-image: none;
+    animation: none;
+    background-image: none;
+    color: inherit;
+}
+
+@keyframes climber-shimmer {
+    0% { background-position: 150% 0; }
+    100% { background-position: -50% 0; }
+}
+
+@layer components {
+    /* ---- prose in a message ---------------------------------------------
+       Ported from the retired ai.css so the hand-written transcript prose and
+       the shadcn Message/Bubble surface share one type rhythm. */
+
+    .ai-md {
+        min-width: 0;
+        font-family: var(--font-sans);
+        font-size: 0.875rem;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+    }
+
+    /* Blocks carry their own rhythm; the message already spaces the group. */
+    .ai-md > :first-child { margin-top: 0; }
+    .ai-md > :last-child { margin-bottom: 0; }
+
+    .ai-md-p {
+        margin: 0 0 0.6rem;
+    }
+
+    .ai-md-heading {
+        margin: 0.9rem 0 0.45rem;
+        color: var(--ink);
+        font-family: var(--font-sans);
+        font-weight: 600;
+        line-height: 1.35;
+    }
+
+    h3.ai-md-heading { font-size: 1rem; }
+    h4.ai-md-heading { font-size: 0.94rem; }
+    h5.ai-md-heading { color: var(--ink-2); font-size: 0.9rem; }
+
+    .ai-md-list {
+        margin: 0.1rem 0 0.65rem;
+        padding-left: 1.35rem;
+    }
+
+    .ai-md-list li {
+        margin: 0.12rem 0;
+        padding-left: 0.1rem;
+    }
+
+    .ai-md-list li::marker {
+        color: var(--ink-3);
+    }
+
+    .ai-md strong {
+        color: var(--ink);
+        font-weight: 600;
+    }
+
+    .ai-md em {
+        font-style: italic;
+    }
+
+    .ai-md-code {
+        padding: 0.05rem 0.28rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 0.82em;
+        overflow-wrap: anywhere;
+    }
+
+    .ai-md-fence {
+        margin: 0.2rem 0 0.7rem;
+    }
+
+    .ai-md-fence [data-slot="code-block-content"] {
+        max-height: 18rem;
+    }
+
+    .ai-md-quote {
+        margin: 0.2rem 0 0.7rem;
+        padding: 0.15rem 0 0.05rem 0.75rem;
+        border-left: 2px solid var(--line-2);
+        color: var(--ink-2);
+    }
+
+    .ai-md-rule {
+        margin: 0.9rem 0;
+        border: 0;
+        border-top: 1px solid var(--line);
+    }
+}
+
+@layer components {
+    /* ---- transcript -----------------------------------------------------
+       The feed is a reverse scroller: the newest row sits at the bottom and the
+       live edge is scrollTop 0, which is what climberLog's scroll math assumes. */
+
+    .log {
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 0.6rem;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 1rem 1rem 1.25rem;
+        background: var(--surface-2);
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        line-height: 1.55;
+        overscroll-behavior: contain;
+        /* The disclosure anchor owns the offset adjustment; browser scroll anchoring
+           would apply its own shift first and make the two disagree. */
+        overflow-anchor: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .log.solo {
+        flex-direction: column;
+    }
+
+    /* An empty transcript has no live edge to pin, so centre its prompt instead of
+       letting a tall empty state spill past the reverse scroller's top edge. */
+    .log.empty {
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    /* Ease the hard clip where rows scroll under the tab strip. The colour must
+       match the feed's own surface, not the page background. */
+    .log-shell::before {
+        content: "";
+        position: absolute;
+        inset-inline: 0;
+        top: 0;
+        z-index: 1;
+        height: 1rem;
+        pointer-events: none;
+        background: linear-gradient(to bottom, var(--surface-2), transparent);
+    }
+
+    .log-item {
+        min-width: 0;
+    }
+
+    /* Raw lines keep their original colouring; structured rows live in ai.css. */
+    .log-line {
+        color: var(--ink-2);
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .log-raw .log-line {
+        padding: 0.25rem 0.5rem;
+        border-left: 2px solid var(--line);
+        background: color-mix(in srgb, var(--bg) 55%, transparent);
+        font-size: 0.72rem;
+    }
+
+    .log-line.cmd { color: var(--ink); }
+    .log-line.ok { color: var(--green); }
+    .log-line.warn { color: var(--orange); }
+    .log-line.err { color: var(--red); }
+    .log-line.dim { color: var(--ink-3); }
+
+    .log-working {
+        display: inline-flex;
+        flex: 0 1 auto;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
+        color: var(--accent-text);
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.01em;
+    }
+
+    .log-working-dot {
+        flex: none;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: log-pulse 1.4s ease-out infinite;
+    }
+
+    @keyframes log-pulse {
+        0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+        70% { box-shadow: 0 0 0 6px transparent; }
+        100% { box-shadow: 0 0 0 0 transparent; }
+    }
+
+    .log-working-what {
+        min-width: 0;
+        max-width: 30ch;
+        overflow: hidden;
+        color: var(--ink-2);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .log-working-elapsed {
+        flex: none;
+        color: var(--ink-3);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .log-latest {
+        display: inline-flex;
+        position: absolute;
+        right: 0.75rem;
+        bottom: 0.75rem;
+        z-index: 10;
+        align-items: center;
+        gap: 0.25rem;
+        min-height: 24px;
+        padding: 0.1rem 0.5rem;
+        border: 1px solid var(--line-2);
+        border-radius: 999px;
+        background: var(--surface);
+        box-shadow: 0 1px 2px rgba(32, 29, 29, 0.08), 0 8px 20px -12px rgba(32, 29, 29, 0.45);
+        color: var(--ink-2);
+        font-family: var(--font-mono);
+        font-size: 0.66rem;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+    }
+
+    .log-latest[hidden] { display: none; }
+    .log-latest:hover { border-color: var(--accent); color: var(--accent-text); }
+    .log-latest:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus);
+    }
+
+    /* Subagent tabs: the main stream plus one tab per agent seen in this run. */
+    .outtabs {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 1px;
+        padding: 0.4rem 0.75rem 0;
+        border-bottom: 1px solid var(--line);
+        /* One row always: a wrapped second row puts the active underline on the
+           wrong line. Narrow screens scroll the strip instead. */
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .outtabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .outtab {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        color: var(--ink-3);
+        background: transparent;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        padding: 0.3rem 0.6rem;
+        cursor: pointer;
+    }
+
+    .outtab:hover:not(.active) { color: var(--ink-2); }
+    .outtab.active { color: var(--ink); border-bottom-color: var(--accent); }
+    .outtab:focus-visible {
+        outline: none;
+        border-radius: var(--radius-sm);
+        box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus);
+    }
+
+    .outtab-dot {
+        flex: none;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: log-pulse 1.4s ease-out infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .log-working-dot,
+        .outtab-dot { animation: none; }
+    }
+
+    .log::-webkit-scrollbar { width: 10px; height: 10px; }
+    .log::-webkit-scrollbar-thumb {
+        background: var(--line-2);
+        border-radius: 10px;
+        border: 3px solid transparent;
+        background-clip: content-box;
+    }
+    .log::-webkit-scrollbar-track { background: transparent; }
+
+    /* ---- method + provider controls ------------------------------------- */
+
+    .method { color: var(--ink-3); }
+    .method:hover:not(:disabled):not(.active) { color: var(--ink); }
+    .method.active {
+        background: var(--surface);
+        color: var(--ink);
+        box-shadow: 0 1px 2px rgba(32, 29, 29, 0.08);
+    }
+
+    .providerbar .method { border-color: transparent; }
+    .providerbar .method.active {
+        border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+        color: var(--accent-text);
+        box-shadow: none;
+    }
+
+    .st-idle { color: var(--ink-2); }
+    .st-running { color: var(--accent-text); }
+    .st-completed { color: var(--green); }
+    .st-stopped { color: var(--orange); }
+    .st-failed { color: var(--red); }
+}
