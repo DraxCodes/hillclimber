@@ -36,10 +36,11 @@ public sealed record OutputItem(
 /// <summary>
 /// Folds a run's display-ready log entries into transcript rows. A <c>step_start</c> opens a
 /// turn, its reasoning and tool calls join it, and <c>step_finish</c> closes it with a footer.
-/// Prose belongs to the reader, not the fold: text that arrives during a turn renders just
-/// after it, and text outside a turn renders on its own. Errors and plain lines end the
-/// current turn and render as their own rows. Pure and order-preserving, so it is cheap to
-/// test and to call on every render.
+/// Prose belongs to the reader, not the fold: text is never hidden inside a turn, so text that
+/// arrives during one closes that turn and renders in place, and the activity after it opens
+/// the next. Unknown events join the turn they arrive in, or stand alone between turns. Errors
+/// and plain lines end the current turn and render as their own rows. Pure and order-preserving,
+/// so it is cheap to test and to call on every render.
 /// </summary>
 public static class LogGrouper
 {
@@ -56,9 +57,7 @@ public static class LogGrouper
         var items = new List<OutputItem>();
         var turn = new List<LogEntry>();
 
-        // Text is the answer, so it is never folded. Text that arrives while a turn is open
-        // is buffered and rendered directly after that turn; text outside a turn is its own row.
-        var pending = new List<LogEntry>();
+        // Text is the answer, so it is never folded. Consecutive text becomes one message.
         var message = new List<LogEntry>();
 
         void FlushMessage()
@@ -85,28 +84,17 @@ public static class LogGrouper
             }
 
             turn.Clear();
-
-            if (pending.Count > 0)
-            {
-                items.Add(new OutputItem(OutputItemKind.Message, pending.ToArray()));
-                pending.Clear();
-            }
         }
 
         foreach (var entry in entries)
         {
             switch (entry.Kind)
             {
+                // Prose is the reader's, so it renders where it arrived: closing the turn
+                // keeps it out of the fold instead of pushing it past the work that follows.
                 case LogKind.Text:
-                    if (turn.Count > 0)
-                    {
-                        pending.Add(entry);
-                    }
-                    else
-                    {
-                        message.Add(entry);
-                    }
-
+                    FlushTurn();
+                    message.Add(entry);
                     break;
 
                 // A thought belongs with the activity it explains. An empty thought
@@ -137,9 +125,16 @@ public static class LogGrouper
                     FlushTurn(entry);
                     break;
 
+                // An unknown event is not a boundary: inside a turn it folds in as one quiet
+                // row, and between turns it stands alone rather than opening a turn of its own.
                 case LogKind.Unrecognized:
+                    if (turn.Count > 0)
+                    {
+                        turn.Add(entry);
+                        break;
+                    }
+
                     FlushMessage();
-                    FlushTurn();
                     items.Add(new OutputItem(OutputItemKind.Unrecognized, new[] { entry }));
                     break;
 

@@ -13,6 +13,22 @@ public sealed record TurnView(string Summary, StepStatus Status, bool Open, stri
 /// </summary>
 public static class TurnPresentation
 {
+    /// <summary>
+    /// The rows to show for a tab. A row left <c>running</c> after its run stopped is history,
+    /// not live work — the stream simply ends without a status — so it settles.
+    /// </summary>
+    /// <param name="entries">The tab's entries, in chronological order.</param>
+    /// <param name="live">True while the run itself is still streaming.</param>
+    public static IReadOnlyList<LogEntry> Settled(IReadOnlyList<LogEntry> entries, bool live)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        return live ? entries : entries.Select(Settle).ToArray();
+    }
+
+    /// <summary>Drops the <c>running</c> status from a row whose run is no longer live.</summary>
+    public static LogEntry Settle(LogEntry entry) =>
+        entry.Status == StepStatus.Running ? entry with { Status = StepStatus.None } : entry;
+
     /// <summary>Builds the turn view for <paramref name="entries"/> and its optional footer.</summary>
     /// <param name="entries">The turn's reasoning and tool rows, in chronological order.</param>
     /// <param name="footer">The <c>step_finish</c> that closed the turn, or null.</param>

@@ -102,4 +102,28 @@ public class TurnPresentationTests
         Assert.Equal("Thought", completed.Summary);
         Assert.Equal("Thinking…", running.Summary);
     }
+
+    [Fact]
+    public void ARunningRowSettlesOnlyOnceItsRunStops()
+    {
+        var running = Tool(StepStatus.Running);
+
+        var live = TurnPresentation.Settled([running], live: true);
+        var settled = TurnPresentation.Settled([running], live: false);
+
+        Assert.Same(running, live[0]);
+        Assert.Equal(StepStatus.None, settled[0].Status);
+    }
+
+    [Fact]
+    public void SettlingLeavesFinishedRowsExactlyAsTheyWere()
+    {
+        var done = Tool();
+        var failed = Tool(StepStatus.Failed);
+
+        var settled = TurnPresentation.Settled([done, failed], live: false);
+
+        Assert.Same(done, settled[0]);
+        Assert.Same(failed, settled[1]);
+    }
 }

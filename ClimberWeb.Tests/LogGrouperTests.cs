@@ -62,7 +62,7 @@ public class LogGrouperTests
     }
 
     [Fact]
-    public void ProseDuringATurnRendersJustAfterIt()
+    public void ProseDuringATurnKeepsItsChronologicalPlace()
     {
         var items = LogGrouper.Group([
             Tool("shell", 1),
@@ -71,10 +71,23 @@ public class LogGrouperTests
         ]);
 
         Assert.Equal(
-            new[] { OutputItemKind.Turn, OutputItemKind.Message },
+            new[] { OutputItemKind.Turn, OutputItemKind.Message, OutputItemKind.Turn },
             items.Select(item => item.Kind));
-        Assert.Equal(new[] { "shell", "read" }, items[0].Entries.Select(entry => entry.Text));
+        Assert.Equal(new[] { "shell" }, items[0].Entries.Select(entry => entry.Text));
         Assert.Equal("done", items[1].Entries.Single().Text);
+        Assert.Equal(new[] { "read" }, items[2].Entries.Select(entry => entry.Text));
+    }
+
+    [Fact]
+    public void ProseBeforeAStepFinishLeavesTheFooterAsAQuietMarker()
+    {
+        var finish = Finish(3);
+        var items = LogGrouper.Group([Tool("shell", 1), Text("done", 2), finish]);
+
+        Assert.Equal(
+            new[] { OutputItemKind.Turn, OutputItemKind.Message, OutputItemKind.Marker },
+            items.Select(item => item.Kind));
+        Assert.Same(finish, items[2].Entries[0]);
     }
 
     [Fact]
@@ -166,15 +179,28 @@ public class LogGrouperTests
     }
 
     [Fact]
-    public void UnrecognizedEventBecomesItsOwnQuietRow()
+    public void UnrecognizedEventBetweenTurnsBecomesItsOwnQuietRow()
     {
         var unknown = Entry(LogKind.Unrecognized, "session.updated", 2);
-        var items = LogGrouper.Group([Tool("shell", 1), unknown, Tool("read", 3)]);
+        var items = LogGrouper.Group([Tool("shell", 1), Finish(2), unknown, Tool("read", 4)]);
 
         Assert.Equal(
             new[] { OutputItemKind.Turn, OutputItemKind.Unrecognized, OutputItemKind.Turn },
             items.Select(item => item.Kind));
         Assert.Same(unknown, items[1].Entries[0]);
+    }
+
+    [Fact]
+    public void UnrecognizedEventInsideATurnStaysInItsPlace()
+    {
+        var unknown = Entry(LogKind.Unrecognized, "session.updated", 2);
+        var items = LogGrouper.Group([Tool("shell", 1), unknown, Tool("read", 3)]);
+
+        var item = Assert.Single(items);
+        Assert.Equal(OutputItemKind.Turn, item.Kind);
+        Assert.Equal(
+            new[] { "shell", "session.updated", "read" },
+            item.Entries.Select(entry => entry.Text));
     }
 
     [Fact]

@@ -646,10 +646,7 @@ else
     /// the stream simply ends without a status, so a leftover "running" is history, not live.
     /// </summary>
     private IReadOnlyList<LogEntry> DisplayEntries =>
-        ActiveRunning ? VisibleEntries : VisibleEntries.Select(Settle).ToArray();
-
-    private static LogEntry Settle(LogEntry entry) =>
-        entry.Status == StepStatus.Running ? entry with { Status = StepStatus.None } : entry;
+        TurnPresentation.Settled(VisibleEntries, ActiveRunning);
 
     private void SelectOutputTab(string tab) => _outputTab = tab;
 
@@ -681,6 +678,13 @@ else
         @if (entry.Kind == LogKind.Reasoning)
         {
             <AiReasoning @key="entry.Raw" Text="@entry.Text" />
+        }
+        else if (entry.Kind == LogKind.Unrecognized)
+        {
+            // An unknown event that arrived mid-step keeps the turn's order but never
+            // announces the renderer's gap.
+            var known = ToolPresentation.ForEvent(entry);
+            <AiTraceLine @key="entry.Raw" Icon="@known.Icon" Title="@known.Title" Detail="@known.Detail" />
         }
         else
         {
