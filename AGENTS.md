@@ -6,14 +6,18 @@ This repo ships an opt-in hillclimb setup: the `.opencode/agents/` trio
 (`task-orchestrator`, `plan-architect`, `quality-gatekeeper`), the `/hillclimb`
 command, and the `hillclimb` skill.
 
-When a task has a clear, measurable objective — coverage, warnings, build/test
-time, bundle size, response time — ask whether to run the hillclimb workflow
-before implementing it directly. It is opt-in, so don't assume; a one-line
-question is enough.
+When a task is quality-sensitive — UI, UX, visual, copy or docs — or has a clear,
+measurable objective (coverage, warnings, build/test time, bundle size, response
+time), ask whether to run the hillclimb workflow before implementing it directly.
+It is opt-in, so don't assume; a one-line question is enough.
+
+The gate is the 1–10 rubric in `docs/agents/hillclimb-rubric.md`: below 8, name the
+specific flaws and iterate; 8 or above, ship unless the task explicitly demands a
+10. Tests and build are a floor, not the iterate/stop signal.
 
 ## Working preferences
 
-Three standing preferences, chosen deliberately and recorded here so fresh sessions
+Four standing preferences, chosen deliberately and recorded here so fresh sessions
 and handoffs inherit them without re-asking:
 
 1. **Pick the approach before coding.** For any non-trivial feature, settle the
@@ -32,6 +36,12 @@ and handoffs inherit them without re-asking:
    Playwright harness under `scripts/ui`, which drives real `opencode` runs) may be
    skipped, but say plainly that they were **not run** rather than implying they
    passed.
+4. **Gate hillclimb on perceived quality, not statistics.** Use the 1–10 rubric in
+   `docs/agents/hillclimb-rubric.md` as written: score from seeded screenshots and
+   a first-run/keyboard read-through; below 8 means name the specific flaws and
+   iterate, 8 or above means ship unless the task says `Target score: 10`. Keep
+   tests, build and the free harnesses as a floor — a green number never
+   substitutes for the rubric.
 
 ## Session hygiene
 
