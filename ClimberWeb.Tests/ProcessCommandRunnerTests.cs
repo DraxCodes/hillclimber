@@ -13,13 +13,28 @@ public sealed class ProcessCommandRunnerCollection
 }
 
 /// <summary>
-/// Integration-level checks for the real process-based runner. These use <c>dotnet</c>,
-/// which is guaranteed to be present because the tests themselves run on it.
+/// Integration-level checks for the real process-based runner. The children are
+/// minimal, always-present executables — a shell that echoes a line, and <c>ping</c>
+/// for a long-running process — so real process behaviour is covered without paying
+/// the .NET host's startup cost on every run.
 /// </summary>
 [Collection(ProcessCommandRunnerCollection.Name)]
 public class ProcessCommandRunnerTests
 {
+    private const string EchoedLine = "streamed-line";
+
     private readonly ProcessCommandRunner _runner = new();
+
+    /// <summary>
+    /// A minimal child that writes one line and exits. Spawning the shell costs about ten
+    /// milliseconds, whereas <c>dotnet</c> pays the .NET host's ~50 ms startup on every
+    /// run, which dominated this test's duration. The payload is a <c>const</c>, so no
+    /// external value can reach the shell line.
+    /// </summary>
+    private static CommandRequest Echo() =>
+        OperatingSystem.IsWindows()
+            ? new CommandRequest(Path.Combine(Environment.SystemDirectory, "cmd.exe"), new[] { "/c", $"echo {EchoedLine}" }, Directory.GetCurrentDirectory())
+            : new CommandRequest("/bin/sh", new[] { "-c", $"echo {EchoedLine}" }, Directory.GetCurrentDirectory());
 
     [Fact]
     public async Task RunsProcess_CapturesOutput_AndStreamsLines()
@@ -27,13 +42,13 @@ public class ProcessCommandRunnerTests
         var streamed = new List<string>();
 
         var result = await _runner.RunAsync(
-            new CommandRequest("dotnet", new[] { "--version" }, Directory.GetCurrentDirectory()),
+            Echo(),
             line => { lock (streamed) streamed.Add(line); },
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.False(string.IsNullOrWhiteSpace(result.StandardOutput));
-        Assert.Contains(streamed, line => line.Trim().Length > 0);
+        Assert.Contains(EchoedLine, result.StandardOutput);
+        Assert.Contains(streamed, line => line.Trim() == EchoedLine);
     }
 
     [Fact]
@@ -80,28 +95,39 @@ public class ProcessCommandRunnerTests
     {
         if (!OperatingSystem.IsWindows())
         {
-            return; // exercises cmd.exe and ping, which are Windows-only
+            return; // ping's -n flag and its output format are Windows-only
         }
 
         using var cts = new CancellationTokenSource();
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        // Pin the executable so a hijacked PATH cannot swap it.
+        var ping = Path.Combine(Environment.SystemDirectory, "ping.exe");
+
         var run = _runner.RunAsync(
             new CommandRequest(
-                "cmd.exe",
-                new[] { "/c", "echo ready & ping -n 30 127.0.0.1 >nul" },
+                ping,
+                new[] { "-n", "30", "127.0.0.1" },
                 Directory.GetCurrentDirectory()),
             line =>
             {
-                if (line.Contains("ready", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrWhiteSpace(line))
                 {
                     started.TrySetResult();
                 }
             },
             cts.Token);
 
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        cts.Cancel();
+        try
+        {
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            // Cancel even if the first line never arrives, so a failed wait cannot leave
+            // the ping child running for its full 30 seconds.
+            cts.Cancel();
+        }
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
     }
