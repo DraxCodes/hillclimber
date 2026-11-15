@@ -81,7 +81,7 @@
               @oninput="OnInput"
               @ref="Element"></textarea>
 
-    <div class="flex flex-wrap items-center gap-2 px-2 pb-2" data-slot="prompt-input-footer">
+    <div class="flex flex-wrap items-center gap-2 px-2 pt-2 pb-2" data-slot="prompt-input-footer">
         <div class="flex min-w-0 items-center gap-1.5 rounded-md border border-border/70 bg-muted/40 px-2 py-1"
              data-slot="model-selector"
              title="@ModelText">
@@ -98,9 +98,9 @@
             }
             else
             {
-                <Button Variant="secondary" Size="icon-xs" Class="disabled:opacity-100 disabled:text-muted-foreground/70" AriaLabel="Send" Title="Send" Disabled="@(!CanSend)"
+                <Button Variant="secondary" Size="xs" Class="disabled:opacity-100 disabled:text-muted-foreground/70" AriaLabel="Submit" Title="Submit" Disabled="@(!CanSend)"
                         OnClick="Send" data-send="true">
-                    <UiIcon Name="arrow-up" CssClass="size-3.5" />
+                    Submit
                 </Button>
             }
         </div>
