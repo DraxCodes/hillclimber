@@ -598,6 +598,7 @@ else
     private string? _sessionId;
     private DotNetObjectReference<Home>? _selfRef;
     private CancellationTokenSource? _expiryCts;
+    private readonly CancellationTokenSource _clockCts = new();
     private readonly Dictionary<string, ProviderReport?> _catalogueReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SpendReport?> _spendReports = new(StringComparer.OrdinalIgnoreCase);
     private string _providerId = string.Empty;
@@ -1105,6 +1106,8 @@ else
         Run.StateChanged += OnRunStateChanged;
         Climber.StateChanged += OnClimbStateChanged;
 
+        _ = WatchClockAsync(_clockCts.Token);
+
         ResetProvider();
 
         if (string.IsNullOrWhiteSpace(_folderPath))
@@ -1115,6 +1118,36 @@ else
         ResolveAgents();
         RebuildEntries();
         await RefreshProviderSurfacesAsync();
+    }
+
+    /// <summary>
+    /// Repaints once a second while a run is active so the elapsed clocks advance even
+    /// when the stream is quiet. Output lines already drive their own renders; this only
+    /// fills the gaps between them.
+    /// </summary>
+    private async Task WatchClockAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!AnyRunning)
+                {
+                    continue;
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page is gone.
+        }
+        catch (ObjectDisposedException)
+        {
+            // The circuit is gone.
+        }
     }
 
     private void OnRunStateChanged(RunState state)
@@ -1589,6 +1622,8 @@ else
         Climber.StateChanged -= OnClimbStateChanged;
         _expiryCts?.Cancel();
         _expiryCts?.Dispose();
+        _clockCts.Cancel();
+        _clockCts.Dispose();
         _selfRef?.Dispose();
     }
 }
