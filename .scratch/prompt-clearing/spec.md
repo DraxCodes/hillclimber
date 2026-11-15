@@ -55,30 +55,38 @@ put back with one click, without reintroducing a double-fire path.
 
 ## How we know it is done
 
-- `dotnet test` stays green at 253 tests — this is a component-only change and no test
-  covers `Home.razor`; assert by inspection plus the browser check below, and say plainly
-  that no automated test covers it.
+- `dotnet test` stays green, with new unit tests over a pure `ClimberWeb.Services.PromptBox`
+  that owns the launch decision, the clear, the last prompt, and the owed focus. `Home.razor`
+  itself still has no component test (no bUnit here), so the page wiring is covered by the
+  browser checks below and review, not by a unit test — say that plainly.
 - Browser check of one short run through Surplus only, against the throwaway fixture
   target, stopped immediately: the box is empty while the run streams, and after the run
   settles "use last prompt" appears and restores exactly the text that was sent.
-- The failed-launch path is confirmed to leave the prompt intact (the existing empty-prompt
-  validation in `scripts/ui/surfaces.mjs` covers the throw; a manual check is enough).
+- The failed-launch path is covered by unit tests over `PromptBox.Launch` and by the
+  existing empty-prompt validation in `scripts/ui/surfaces.mjs`.
 - Assertions for 4 and 5 are added to the existing paid `scripts/ui/surfaces.mjs`, which
   adds no runs of its own; whether that harness was executed is reported plainly.
 
 ## Evidence
 
-- **Tests:** `dotnet test --nologo` → **253 passed, 0 failed, 0 skipped** (385 ms), a fresh
-  build of both projects. No test covers `Home.razor`; this change adds none, so the count is
-  unchanged by design.
+- **Tests:** `dotnet test --nologo` → **269 passed, 0 failed, 0 skipped** (331 ms), a fresh
+  build of both projects: 16 new cases in `Climberweb.Tests/PromptBoxTests.cs` over
+  `ClimberWeb/Services/PromptBox.cs`. They cover the clear-and-remember on a successful
+  launch, the text and last prompt surviving a rejected launch, the focus never being owed
+  after a rejection, the recall rules (nothing started, running, text present, whitespace
+  counts as empty), recall restoring the exact text and hiding again, and the focus being
+  claimed once and only when unlocked and idle. The page wiring is **not** unit-tested: no
+  bUnit or component-test surface exists in this repo.
 - **Free browser harnesses** (no tokens): `theme-nav.mjs` → 0 failures, no console errors;
   `providers.mjs` → 15 checks, 0 failures; `security.mjs` → 0 failures.
 - **Browser:** a temporary Playwright check (`%TEMP%\climb-ui\prompt-clearing-check.mjs`,
-  outside the repo) → **10 checks, 0 failures, 0 console errors**, run twice (before and after
-  the review fixes): a rejected start shows `A prompt is required.` and keeps the text; the
-  box is empty while the run streams; the emptied box takes focus once idle; a settled run
-  offers the last prompt back; recall restores the exact text; the affordance hides again.
-- **Spend:** each of those two checks started **one** short run and stopped it immediately —
+  outside the repo) → **10 checks, 0 failures, 0 console errors**, run three times (before the
+  review fixes, after them, and after the `PromptBox` extraction): a rejected start shows
+  `A prompt is required.` and keeps the text; the box is empty while the run streams; the
+  emptied box takes focus once idle; a settled run offers the last prompt back; recall
+  restores the exact text; the affordance hides again. Screenshots confirm the empty focused
+  box while streaming and the recall link once idle.
+- **Spend:** each of those three checks started **one** short run and stopped it immediately —
   `est. $0.00`, 0 tokens, echoed as `--model surplus/deepseek-v4.1-flash-1017` with no
   `openrouter/`.
 - **Surplus-only caveat:** the running app has **two** providers configured (Surplus primary,
@@ -95,6 +103,9 @@ put back with one click, without reintroducing a double-fire path.
   harness assertions were tightened in the same pass (launch-time rather than settle-time,
   focus, diagnostics); `RecallLastPrompt` lost an unreachable null-coalesce; README gained the
   handoff bullet.
+- **Follow-up:** the reviewers' "the trap is only covered by hand" finding was answered by
+  extracting `PromptBox` (its `Launch` owns the try/catch ordering) and unit-testing it, so the
+  clear-after-success rule is now a test rather than a comment.
 
 ## Fixed point for review
 

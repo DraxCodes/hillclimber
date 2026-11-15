@@ -182,9 +182,9 @@ else
                       rows="3"
                       placeholder="@PromptPlaceholder"
                       disabled="@AnyRunning"
-                      @ref="_promptBox"
-                      @bind="_prompt"></textarea>
-            @if (CanRecallPrompt)
+                      @ref="_promptElement"
+                      @bind="_prompt.Text"></textarea>
+            @if (_prompt.CanRecall(AnyRunning))
             {
                 <button class="prompt-recall" type="button" @onclick="RecallLastPrompt">use last prompt</button>
             }
@@ -426,10 +426,8 @@ else
     private ClimberState _climb = new();
     private RunMethod _method = RunMethod.Run;
     private string _folderPath = string.Empty;
-    private string _prompt = string.Empty;
-    private string? _lastPrompt;
-    private ElementReference _promptBox;
-    private bool _focusPromptWhenIdle;
+    private readonly PromptBox _prompt = new();
+    private ElementReference _promptElement;
     private AgentSelection _agents = new(Array.Empty<WorkflowRole>(), null);
     private IReadOnlyList<LogEntry> _entries = Array.Empty<LogEntry>();
     private string _outputTab = PrimaryTab;
@@ -500,10 +498,6 @@ else
     private string PromptPlaceholder => _method == RunMethod.Run
         ? "What should this run do?"
         : "What should each iteration try to accomplish?";
-
-    /// <summary>The last started prompt, offered back once the box is empty and no run holds it.</summary>
-    private bool CanRecallPrompt =>
-        !AnyRunning && !string.IsNullOrWhiteSpace(_lastPrompt) && string.IsNullOrWhiteSpace(_prompt);
 
     private string StatusKey => ActiveStatus.ToString().ToLowerInvariant();
 
@@ -806,12 +800,11 @@ else
     {
         // The box is disabled while a run is active, so focus waits for a render where it
         // is usable again — normally the one where the run settles.
-        if (_focusPromptWhenIdle && _unlocked && !AnyRunning)
+        if (_prompt.TakeFocus(_unlocked, AnyRunning))
         {
-            _focusPromptWhenIdle = false;
             try
             {
-                await _promptBox.FocusAsync();
+                await _promptElement.FocusAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or JSException)
             {
@@ -950,7 +943,7 @@ else
         _outputTab = PrimaryTab;
 
         var folder = _folderPath.Trim();
-        var prompt = _prompt.Trim();
+        var prompt = _prompt.Text.Trim();
         var preflight = Preflight.Check(folder, _method);
         if (!preflight.CanRun)
         {
@@ -999,10 +992,13 @@ else
         var selection = ProviderSelection.From(provider, PricingFor(provider));
         var fallbacks = Providers.FallbacksAfter(provider.Id);
 
-        try
+        // StartAsync throws synchronously for invalid input / concurrent runs and returns a
+        // task that completes when the run finishes; we don't await it here. The box takes the
+        // prompt only if that call succeeded, so a rejected launch keeps the text for a retry.
+        // Clearing here — not in Start — keeps the provider fallback offer working, because
+        // StartOnFallback re-enters Start and re-reads the box.
+        var failure = _prompt.Launch(prompt, () =>
         {
-            // StartAsync throws synchronously for invalid input / concurrent runs and returns a
-            // task that completes when the run finishes; we don't await it here.
             if (_method == RunMethod.Hillclimb)
             {
                 _ = Climber.StartAsync(new ClimberOptions(
@@ -1012,28 +1008,16 @@ else
             {
                 _ = Run.StartAsync(new RunOptions(folder, prompt, _agents.DefaultAgent, selection, fallbacks));
             }
-        }
-        catch (Exception ex)
-        {
-            _error = StripParameterSuffix(ex.Message);
-            return;
-        }
+        });
 
-        // The run owns the prompt now. Clearing here — not in Start — keeps the provider
-        // fallback offer working, because StartOnFallback re-enters Start and re-reads _prompt.
-        _lastPrompt = prompt;
-        _prompt = string.Empty;
-        _focusPromptWhenIdle = true;
+        if (failure is not null)
+        {
+            _error = StripParameterSuffix(failure.Message);
+        }
     }
 
     /// <summary>Puts the last started prompt back, for a re-run or a tweak.</summary>
-    private void RecallLastPrompt()
-    {
-        if (_lastPrompt is { } last)
-        {
-            _prompt = last;
-        }
-    }
+    private void RecallLastPrompt() => _prompt.Recall();
 
     /// <summary>Catalogue pricing for a token estimate, when the provider publishes it.</summary>
     private ProviderPricing? PricingFor(RegisteredProvider provider) =>
