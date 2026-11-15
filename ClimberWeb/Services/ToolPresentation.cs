@@ -1,18 +1,5 @@
 namespace ClimberWeb.Services;
 
-/// <summary>How a trace row presents a step's completion state.</summary>
-public enum TraceStatus
-{
-    /// <summary>Done, or no status reported.</summary>
-    None,
-
-    /// <summary>Still running.</summary>
-    Running,
-
-    /// <summary>Failed.</summary>
-    Failed,
-}
-
 /// <summary>The display primitives a <c>AiTraceLine</c> needs, independent of log parsing.</summary>
 /// <param name="Icon">One of: terminal, file, pencil, search, globe, subagent, gear.</param>
 /// <param name="Title">The one-line label, for example "Ran dotnet test".</param>
@@ -23,7 +10,7 @@ public sealed record TraceView(
     string Icon,
     string Title,
     string? Description,
-    TraceStatus Status,
+    StepStatus Status,
     string? Detail);
 
 /// <summary>
@@ -54,18 +41,29 @@ public static class ToolPresentation
 
     private static TraceView SubagentView(LogEntry entry, bool primaryTab)
     {
-        var status = MapStatus(entry.Status);
+        var status = entry.Status;
         var agent = string.IsNullOrEmpty(entry.Text) || entry.Text == "subagent" ? null : entry.Text;
 
+        // Status is carried in text, not only in colour: a failed subagent must read as
+        // failed on both the primary tab and its own tab. The state leads the title so a
+        // narrow row can clip the tail without hiding it.
         if (primaryTab)
         {
-            var title = agent is null ? "subagent — see its tab" : $"{agent} — see its tab";
+            var title = $"{StatePrefix(status)}{agent ?? "subagent"} — see its tab";
             return new TraceView("subagent", title, null, status, null);
         }
 
-        var tabTitle = agent is null ? "Ran subagent" : $"{agent} subagent";
+        var tabTitle = $"{StatePrefix(status)}{(agent is null ? "Ran subagent" : $"{agent} subagent")}";
         return new TraceView("subagent", tabTitle, entry.ToolInput, status, entry.ToolOutput);
     }
+
+    /// <summary>Formats a non-done state as a title prefix, or an empty string for done.</summary>
+    private static string StatePrefix(StepStatus status) => status switch
+    {
+        StepStatus.Running => "Running: ",
+        StepStatus.Failed => "Failed: ",
+        _ => string.Empty,
+    };
 
     private static TraceView ToolView(LogEntry entry)
     {
@@ -80,12 +78,12 @@ public static class ToolPresentation
         };
 
         var (subject, remainder) = SplitInput(entry.ToolInput, keys);
-        var status = MapStatus(entry.Status);
+        var status = entry.Status;
 
         var title = status switch
         {
-            TraceStatus.Running => subject is null ? $"Running {entry.Text}" : $"{progressive} {subject}",
-            TraceStatus.Failed => subject is null ? $"Failed to run {entry.Text}" : $"Failed to {action} {subject}",
+            StepStatus.Running => subject is null ? $"Running {entry.Text}" : $"{progressive} {subject}",
+            StepStatus.Failed => subject is null ? $"Failed to run {entry.Text}" : $"Failed to {action} {subject}",
             _ => subject is null ? $"Ran {entry.Text}" : $"{verb} {subject}",
         };
 
@@ -137,13 +135,6 @@ public static class ToolPresentation
 
         return (null, input);
     }
-
-    private static TraceStatus MapStatus(ToolStatus status) => status switch
-    {
-        ToolStatus.Running => TraceStatus.Running,
-        ToolStatus.Failed => TraceStatus.Failed,
-        _ => TraceStatus.None,
-    };
 
     private static string Truncate(string value, int maxLength) =>
         value.Length <= maxLength ? value : string.Concat(value.AsSpan(0, maxLength - 1), "…");

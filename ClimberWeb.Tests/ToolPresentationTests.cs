@@ -8,14 +8,14 @@ public class ToolPresentationTests
         string name,
         string? input = null,
         string? output = null,
-        ToolStatus status = ToolStatus.None) =>
+        StepStatus status = StepStatus.None) =>
         new("raw", "12:00:00", LogKind.Tool, name, input, output, status);
 
     private static LogEntry Subagent(
         string agent,
         string? prompt = null,
         string? output = null,
-        ToolStatus status = ToolStatus.None) =>
+        StepStatus status = StepStatus.None) =>
         new("raw", "12:00:00", LogKind.Subagent, agent, prompt, output, status);
 
     [Fact]
@@ -26,7 +26,7 @@ public class ToolPresentationTests
         Assert.Equal("terminal", view.Icon);
         Assert.Equal("Ran dotnet test", view.Title);
         Assert.Null(view.Description);
-        Assert.Equal(TraceStatus.None, view.Status);
+        Assert.Equal(StepStatus.None, view.Status);
         Assert.Equal("269 passed", view.Detail);
     }
 
@@ -34,23 +34,44 @@ public class ToolPresentationTests
     public void FailedShellUsesTheFailedVerb()
     {
         var view = ToolPresentation.For(
-            Tool("shell", "command=dotnet build", "error CS1002", ToolStatus.Failed),
+            Tool("shell", "command=dotnet build", "error CS1002", StepStatus.Failed),
             primaryTab: true);
 
         Assert.Equal("Failed to run dotnet build", view.Title);
-        Assert.Equal(TraceStatus.Failed, view.Status);
+        Assert.Equal(StepStatus.Failed, view.Status);
         Assert.Equal("error CS1002", view.Detail);
+    }
+
+    [Fact]
+    public void FailedReadKeepsItsOwnVerb()
+    {
+        var view = ToolPresentation.For(
+            Tool("read", "filePath=src/Foo.cs", "denied", StepStatus.Failed),
+            primaryTab: true);
+
+        Assert.Equal("Failed to read src/Foo.cs", view.Title);
+        Assert.Equal(StepStatus.Failed, view.Status);
+    }
+
+    [Fact]
+    public void FailedEditKeepsItsOwnVerb()
+    {
+        var view = ToolPresentation.For(
+            Tool("edit", "filePath=src/Foo.cs", "denied", StepStatus.Failed),
+            primaryTab: true);
+
+        Assert.Equal("Failed to edit src/Foo.cs", view.Title);
     }
 
     [Fact]
     public void RunningShellUsesTheRunningVerb()
     {
         var view = ToolPresentation.For(
-            Tool("shell", "command=dotnet test", status: ToolStatus.Running),
+            Tool("shell", "command=dotnet test", status: StepStatus.Running),
             primaryTab: true);
 
         Assert.Equal("Running dotnet test", view.Title);
-        Assert.Equal(TraceStatus.Running, view.Status);
+        Assert.Equal(StepStatus.Running, view.Status);
         Assert.Null(view.Detail);
     }
 
@@ -58,7 +79,7 @@ public class ToolPresentationTests
     public void RunningReadUsesTheProgressiveVerb()
     {
         var view = ToolPresentation.For(
-            Tool("read", "filePath=src/Foo.cs", status: ToolStatus.Running),
+            Tool("read", "filePath=src/Foo.cs", status: StepStatus.Running),
             primaryTab: true);
 
         Assert.Equal("Reading src/Foo.cs", view.Title);
@@ -173,11 +194,35 @@ public class ToolPresentationTests
     public void FailedSubagentKeepsTheFailedStatus()
     {
         var view = ToolPresentation.For(
-            Subagent("plan-architect", "Produce a plan.", "boom", ToolStatus.Failed),
+            Subagent("plan-architect", "Produce a plan.", "boom", StepStatus.Failed),
             primaryTab: false);
 
-        Assert.Equal(TraceStatus.Failed, view.Status);
+        Assert.Equal(StepStatus.Failed, view.Status);
+        Assert.Equal("Failed: plan-architect subagent", view.Title);
         Assert.Equal("boom", view.Detail);
+    }
+
+    [Fact]
+    public void FailedSubagentOnThePrimaryTabSaysFailed()
+    {
+        var view = ToolPresentation.For(
+            Subagent("plan-architect", "Produce a plan.", "boom", StepStatus.Failed),
+            primaryTab: true);
+
+        Assert.Equal("Failed: plan-architect — see its tab", view.Title);
+        Assert.Equal(StepStatus.Failed, view.Status);
+        Assert.Null(view.Detail);
+    }
+
+    [Fact]
+    public void RunningSubagentOnThePrimaryTabSaysRunning()
+    {
+        var view = ToolPresentation.For(
+            Subagent("plan-architect", "Produce a plan.", status: StepStatus.Running),
+            primaryTab: true);
+
+        Assert.Equal("Running: plan-architect — see its tab", view.Title);
+        Assert.Equal(StepStatus.Running, view.Status);
     }
 
     [Fact]

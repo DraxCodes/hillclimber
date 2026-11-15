@@ -59,14 +59,14 @@ public class LogFormatterTests
     }
 
     [Theory]
-    [InlineData("\"completed\"", ToolStatus.None)]
-    [InlineData("\"running\"", ToolStatus.Running)]
-    [InlineData("\"pending\"", ToolStatus.Running)]
-    [InlineData("\"in_progress\"", ToolStatus.Running)]
-    [InlineData("\"error\"", ToolStatus.Failed)]
-    [InlineData("\"failed\"", ToolStatus.Failed)]
-    [InlineData("\"mystery\"", ToolStatus.None)]
-    public void MapsToolStateStatus(string stateStatus, ToolStatus expected)
+    [InlineData("\"completed\"", StepStatus.None)]
+    [InlineData("\"running\"", StepStatus.Running)]
+    [InlineData("\"pending\"", StepStatus.Running)]
+    [InlineData("\"in_progress\"", StepStatus.Running)]
+    [InlineData("\"error\"", StepStatus.Failed)]
+    [InlineData("\"failed\"", StepStatus.Failed)]
+    [InlineData("\"mystery\"", StepStatus.None)]
+    public void MapsToolStateStatus(string stateStatus, StepStatus expected)
     {
         var line = Stamped(
             "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":"
@@ -80,12 +80,12 @@ public class LogFormatterTests
     }
 
     [Fact]
-    public void MissingToolStatusReadsAsNone()
+    public void MissingStepStatusReadsAsNone()
     {
         var line = Stamped(
             "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"input\":{\"command\":\"echo hi\"}}}}");
 
-        Assert.Equal(ToolStatus.None, LogFormatter.Parse(line).Status);
+        Assert.Equal(StepStatus.None, LogFormatter.Parse(line).Status);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class LogFormatterTests
 
         var entry = LogFormatter.Parse(line);
 
-        Assert.Equal(ToolStatus.Failed, entry.Status);
+        Assert.Equal(StepStatus.Failed, entry.Status);
         Assert.Equal("error CS1002", entry.ToolOutput);
     }
 
@@ -110,6 +110,19 @@ public class LogFormatterTests
     }
 
     [Fact]
+    public void ObjectShapedToolErrorFallsBackToRawJson()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"read\",\"state\":{\"status\":\"error\",\"input\":{\"filePath\":\"src/Foo.cs\"},\"error\":{\"message\":\"denied\"}}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Tool, entry.Kind);
+        Assert.Equal(StepStatus.Failed, entry.Status);
+        Assert.Contains("\"message\":\"denied\"", entry.ToolOutput);
+    }
+
+    [Fact]
     public void FailedSubagentCarriesStatusAndErrorText()
     {
         var line = Stamped(
@@ -118,7 +131,7 @@ public class LogFormatterTests
         var entry = LogFormatter.Parse(line);
 
         Assert.Equal(LogKind.Subagent, entry.Kind);
-        Assert.Equal(ToolStatus.Failed, entry.Status);
+        Assert.Equal(StepStatus.Failed, entry.Status);
         Assert.Equal("boom", entry.ToolOutput);
     }
 

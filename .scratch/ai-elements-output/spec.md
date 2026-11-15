@@ -55,20 +55,20 @@ pattern without redesigning the panel again.
 
 ### 1. Data: carry tool status
 
-`LogEntry` (a positional record) gains an optional `ToolStatus Status`:
+`LogEntry` (a positional record) gains an optional `StepStatus Status`:
 
 ```csharp
-public enum ToolStatus { None, Running, Failed }
+public enum StepStatus { None, Running, Failed }
 
 public sealed record LogEntry(
     string Raw, string Timestamp, LogKind Kind, string Text,
     string? ToolInput = null, string? ToolOutput = null,
-    ToolStatus Status = ToolStatus.None);
+    StepStatus Status = StepStatus.None);
 ```
 
 `LogFormatter.ToolEntry` reads `part.state.status`:
 
-| opencode `state.status` | `ToolStatus` |
+| opencode `state.status` | `StepStatus` |
 | --- | --- |
 | `running`, `pending`, `in_progress` | `Running` |
 | `error`, `failed` | `Failed` |
@@ -115,13 +115,11 @@ New `ClimberWeb/Services/ToolPresentation.cs`, pure and unit-testable, mapping a
 to the primitives the `Ai` components understand:
 
 ```csharp
-public enum TraceStatus { None, Running, Failed }
-
 public sealed record TraceView(
     string Icon,        // terminal | file | pencil | search | globe | subagent | gear
     string Title,       // "Ran dotnet test" / "Failed to run …" / "Read src/Foo.cs"
     string? Description,
-    TraceStatus Status,
+    StepStatus Status,  // one shared status vocabulary for parsing and presentation
     string? Detail);    // expanded content, null means no <details>
 ```
 
@@ -134,12 +132,13 @@ Title rules:
 | `edit`, `write`, `patch` | `Edited <path>` | output |
 | `glob`, `grep`, `list` | `Searched <pattern>` | output |
 | `webfetch` | `Fetched <url>` | output |
-| `subagent` (primary tab) | `<agent> — see its tab` | none |
-| `subagent` (its tab) | `<agent> subagent` | prompt as description, result as detail |
+| `subagent` (primary tab) | `<agent> — see its tab`, prefixed `Running:`/`Failed:` | none |
+| `subagent` (its tab) | `<agent> subagent`, same prefix | prompt as description, result as detail |
 | anything else | `Ran <tool>` | output; the input summary becomes the description |
 
-Status changes the verb: `Running <…>` for `Running`, `Failed to run <…>` for `Failed`.
-A known input key (`command`, `path`/`filePath`, `pattern`, `url`) becomes the title; the
+Status changes the verb: `Running <…>` for `Running` and `Failed to <verb> <…>` for `Failed`, so a
+failed read says "Failed to read src/Foo.cs" rather than the generic "Failed to run …". A
+known input key (`command`, `path`/`filePath`, `pattern`, `url`) becomes the title; the
 remaining input summary becomes the description only when it adds information. Long titles
 are truncated to 80 characters with `…`; the full value lives in the expanded detail for
 tools whose output is present.
@@ -151,9 +150,9 @@ Primitive APIs, independent of `LogEntry` so the layer is reusable:
 ```razor
 <AiTraceGroup Summary="4 steps">
     <AiTraceLine Icon="terminal" Title="Ran dotnet test"
-                 Status="TraceStatus.None" Detail="@output" />
-    <AiTraceLine Icon="pencil" Title="Failed to run edit"
-                 Status="TraceStatus.Failed" Detail="@error" />
+                 Status="StepStatus.None" Detail="@output" />
+    <AiTraceLine Icon="pencil" Title="Failed to edit src/Foo.cs"
+                 Status="StepStatus.Failed" Detail="@error" />
 </AiTraceGroup>
 
 <AiMessage Text="@prose" />
@@ -239,7 +238,7 @@ and the `.log-line` classes for `Plain` lines; the old `.log-tool-*`, `.log-suba
    raw `tool` name is never the whole title.
 4. A tool with output expands to a wrapped, height-capped code block; a tool without output
    is a single non-expandable row.
-5. A failed tool is red, says "Failed to run …", and starts expanded; a successful tool
+5. A failed tool is red, says "Failed to <verb> …", and starts expanded; a successful tool
    starts collapsed; a running tool shows a running state.
 6. `StepFinish` renders as a dim marker with the existing cost/token summary; `StepStart`
    is invisible.
@@ -313,6 +312,8 @@ and the `.log-line` classes for `Plain` lines; the old `.log-tool-*`, `.log-suba
 
 **Unit tests.** `dotnet test --nologo` after the seed was removed:
 `Passed! - Failed: 0, Passed: 306, Skipped: 0, Total: 306, Duration: 361 ms`.
+After the review fixes the suite is **311 passing, 0 failed, 0 skipped** (final run 315 ms),
+and `scripts/status.ps1` confirms the same counts with 63.11% line coverage.
 `dotnet build ClimberWeb --nologo`: 0 warnings, 0 errors.
 
 **Seeded browser check.** App started with `CLIMBER_SEED=1` (throwaway
@@ -332,10 +333,16 @@ and the `.log-line` classes for `Plain` lines; the old `.log-tool-*`, `.log-suba
   its prompt and unwrapped result.
 - No horizontal overflow at 375px in either theme; zero console errors.
 
+**Review-fix check.** Second seeded run (`%TEMP%\climb-ui\review-fixes-check.mjs`, 6 checks,
+all passed) plus a 375px screenshot: the error marker starts `12:00:15 · `, the failed
+subagent reads `Failed: plan-architect — see its tab` / `Failed: plan-architect subagent`,
+its detail is open with the error text, and no overflow or console errors at 375px.
+
 **Screenshots** (`%TEMP%\climb-ui-shots`): `transcript-900-{light,dark}.png`,
 `transcript-375-{light,dark}.png`, plus `transcript-expanded-*` with the scroller opened
 only for review. Reviewed: grouped activity reads as one block, mono rows stay dense, the
 failure is red and pre-expanded, prose is sans and untimestamped, markers are quiet.
+`review-fixes-900-{light,dark}.png` and `review-fixes-375-light.png` cover the follow-up.
 
 **Free harnesses** (app running, no seed):
 
@@ -349,6 +356,31 @@ failure is red and pre-expanded, prose is sans and untimestamped, markers are qu
 executed; only its `.log-line` → `.log-item` selectors were updated, unverified by any run.
 
 **Cleanup.** Seed and hook removed; `git status` lists only the intended files.
+
+## Post-review decisions
+
+`/code-review 6149542` raised two judgement calls; both are settled here.
+
+1. **Failure wording — keep it per-verb.** The review noted the implementation says
+   "Failed to read src/Foo.cs" where the spec's template said "Failed to run …". The
+   per-verb form is clearer and grammatically right; the rule above was amended and
+   `ToolPresentationTests` now covers read and edit failures as well as shell.
+2. **One status vocabulary.** `ToolStatus` (parser) and `TraceStatus` (presentation) held the
+   same three values with a pass-through mapper. They are now a single `StepStatus` in
+   `ClimberWeb/Services/StepStatus.cs`, used by `LogEntry`, `TraceView` and `AiTraceLine`.
+
+Four factual findings were fixed in the same pass:
+
+- Error markers keep their timestamp: the error row uses `MarkerText`, so it reads
+  `12:00:15 · Provider …` like a step-finish marker.
+- A running or failed subagent says so in text on both tabs: `Running: plan-architect — see
+  its tab`, `Failed: plan-architect subagent`. The state leads the title so a narrow row can
+  clip the tail without hiding it, and `.ai-trace-desc` is capped at 40% so a long prompt
+  cannot squeeze the title.
+- An object-shaped `state.error` falls back to its raw JSON, so a failed tool still has an
+  expandable body.
+- `README.md` and the committed `status/coverage.json` were regenerated to 311 passing and
+  63.11% line coverage.
 
 ## Fixed point for review
 

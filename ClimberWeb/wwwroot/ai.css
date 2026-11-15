@@ -86,7 +86,9 @@ summary.ai-trace-row:focus-visible {
 }
 
 .ai-trace-desc {
+    flex: 0 1 auto;
     min-width: 0;
+    max-width: 40%;
     overflow: hidden;
     color: var(--ink-3);
     font-family: var(--font-mono);

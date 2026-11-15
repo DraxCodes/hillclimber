@@ -32,19 +32,6 @@ public enum LogKind
     Error,
 }
 
-/// <summary>The completion state of a tool call, read from opencode's <c>part.state.status</c>.</summary>
-public enum ToolStatus
-{
-    /// <summary>Completed successfully, or no status was reported.</summary>
-    None,
-
-    /// <summary>Still running; the UI shows a running step.</summary>
-    Running,
-
-    /// <summary>Failed; the UI shows an error step with its output opened.</summary>
-    Failed,
-}
-
 /// <summary>A log line prepared for display.</summary>
 /// <param name="Raw">The original line exactly as it lives in <c>ClimberState.Logs</c>.</param>
 /// <param name="Timestamp">The <c>HH:mm:ss</c> stamp, or empty when the line carries none.</param>
@@ -55,7 +42,7 @@ public enum ToolStatus
 /// </param>
 /// <param name="ToolInput">One-line summary of the tool input; may be empty.</param>
 /// <param name="ToolOutput">Tool output, or the error text when a tool failed; may be null.</param>
-/// <param name="Status">The tool's completion state; <see cref="ToolStatus.None"/> for non-tools.</param>
+/// <param name="Status">The step's completion state; <see cref="StepStatus.None"/> for non-steps.</param>
 public sealed record LogEntry(
     string Raw,
     string Timestamp,
@@ -63,7 +50,7 @@ public sealed record LogEntry(
     string Text,
     string? ToolInput = null,
     string? ToolOutput = null,
-    ToolStatus Status = ToolStatus.None);
+    StepStatus Status = StepStatus.None);
 
 /// <summary>
 /// Turns the run's log feed into display-ready <see cref="LogEntry"/> rows. Lines the
@@ -183,8 +170,8 @@ public sealed class LogFormatter
         var hasState = part.TryGetProperty("state", out var state) && state.ValueKind == JsonValueKind.Object;
         var input = hasState && state.TryGetProperty("input", out var rawInput) ? rawInput : default;
         var output = hasState ? GetString(state, "output") : null;
-        var error = hasState ? GetString(state, "error") : null;
-        var status = hasState ? ReadStatus(state) : ToolStatus.None;
+        var error = hasState ? GetText(state, "error") : null;
+        var status = hasState ? ReadStatus(state) : StepStatus.None;
 
         // A failed call often carries only `state.error`; keep it as the expandable body.
         var detail = string.IsNullOrEmpty(output) ? error : output;
@@ -205,18 +192,18 @@ public sealed class LogFormatter
     }
 
     /// <summary>Maps opencode's tool <c>state.status</c> onto the display status.</summary>
-    private static ToolStatus ReadStatus(JsonElement state) => GetString(state, "status") switch
+    private static StepStatus ReadStatus(JsonElement state) => GetString(state, "status") switch
     {
-        "running" or "pending" or "in_progress" => ToolStatus.Running,
-        "error" or "failed" => ToolStatus.Failed,
-        _ => ToolStatus.None,
+        "running" or "pending" or "in_progress" => StepStatus.Running,
+        "error" or "failed" => StepStatus.Failed,
+        _ => StepStatus.None,
     };
 
     /// <summary>
     /// A <c>subagent</c> call: the agent name, its (flattened) prompt, and its result with
     /// opencode's <c>&lt;subagent …&gt;…&lt;/subagent&gt;</c> wrapper removed.
     /// </summary>
-    private static LogEntry SubagentEntry(LogEntry plain, JsonElement input, string? output, ToolStatus status)
+    private static LogEntry SubagentEntry(LogEntry plain, JsonElement input, string? output, StepStatus status)
     {
         var isObject = input.ValueKind == JsonValueKind.Object;
         var agent = isObject ? GetString(input, "agent") : null;
@@ -346,6 +333,26 @@ public sealed class LogFormatter
         && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
+
+    /// <summary>
+    /// Reads a property as text, accepting a string or falling back to its raw JSON. Tool
+    /// errors are usually strings, but an object-shaped error must still have an expandable
+    /// body rather than disappearing.
+    /// </summary>
+    private static string? GetText(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out var value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Null or JsonValueKind.Undefined => null,
+            _ => value.GetRawText(),
+        };
+    }
 
     private static string Flatten(string value) =>
         value.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ').Trim();

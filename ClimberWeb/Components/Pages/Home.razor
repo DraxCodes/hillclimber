@@ -322,7 +322,7 @@ else
                 else if (item.Kind == OutputItemKind.Error)
                 {
                     <div class="log-item" @key="key">
-                        <AiMarker Text="@item.Entries[0].Text" Tone="MarkerTone.Error" />
+                        <AiMarker Text="@MarkerText(item.Entries[0])" Tone="MarkerTone.Error" />
                     </div>
                 }
                 else if (item.Kind == OutputItemKind.Marker)

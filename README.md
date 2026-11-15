@@ -6,8 +6,8 @@
 
 <br clear="left" />
 
-[![tests](https://img.shields.io/badge/tests-253%20passing-brightgreen)](#testing)
-[![coverage](https://img.shields.io/badge/coverage-62.26%25-yellowgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-311%20passing-brightgreen)](#testing)
+[![coverage](https://img.shields.io/badge/coverage-63.11%25-yellowgreen)](#testing)
 [![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://learn.microsoft.com/aspnet/core/blazor/)
 [![personal use](https://img.shields.io/badge/license-personal%20use-lightgrey)](#license)
@@ -186,7 +186,7 @@ throttling, tool-output logging, filesystem scope, and the OpenRouter base-URL o
 
 ```
 ClimberWeb/            Blazor Server app (pages, services, auth, command runner)
-ClimberWeb.Tests/      xUnit tests (253 passing)
+ClimberWeb.Tests/      xUnit tests (311 passing)
 scripts/               status/coverage, fixture, and Playwright UI checks
 status/                committed coverage/test artifact read by /status
 fixtures/              throwaway sample project for climb proofs
@@ -242,7 +242,7 @@ the first does not, and never approves a fallback. Exit codes: `0` all checks pa
 check failed, `2` refused to continue (configuration, connection, or a paid run that did
 not use Surplus).
 
-Current state: **253 tests passing, 0 failed, 0 skipped**, **62.26% line coverage**. The
+Current state: **311 tests passing, 0 failed, 0 skipped**, **63.11% line coverage**. The
 token-spending `surfaces.mjs` harness is **not run** as part of the default checks.
 
 ## License

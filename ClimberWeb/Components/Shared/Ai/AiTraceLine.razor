@@ -2,7 +2,7 @@
 
 @if (Detail is not null)
 {
-    <details class="ai-trace-line @StatusClass" open="@(Status == TraceStatus.Failed)">
+    <details class="ai-trace-line @StatusClass" open="@(Status == StepStatus.Failed)">
         <summary class="ai-trace-row">
             <AiIcon Name="@Icon" />
             <span class="ai-trace-title">@Title</span>
@@ -46,7 +46,7 @@ else
 
     /// <summary>The step's display state; a failure opens its detail.</summary>
     [Parameter]
-    public TraceStatus Status { get; set; }
+    public StepStatus Status { get; set; }
 
     /// <summary>Expandable output. Null renders a plain row with no disclosure.</summary>
     [Parameter]
@@ -54,8 +54,8 @@ else
 
     private string StatusClass => Status switch
     {
-        TraceStatus.Running => "ai-status-running",
-        TraceStatus.Failed => "ai-status-error",
+        StepStatus.Running => "ai-status-running",
+        StepStatus.Failed => "ai-status-error",
         _ => string.Empty,
     };
 }
