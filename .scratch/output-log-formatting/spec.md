@@ -62,7 +62,9 @@ A JSON event with a string `type` but no `part` is an error when the type is `er
 real opencode shape carries `error.data.message` at the root); otherwise it stays `Plain`.
 An event with a `part` whose type this renderer does not know becomes `Unrecognized`: one
 quiet row whose raw payload is available behind a disclosure, so the data is still there
-without filling the feed with debug JSON.
+without filling the feed with debug JSON. The row is titled by its own event type as
+lowercase prose (`session.updated` reads `session updated`); it never says "unrecognised
+event", which describes the renderer's gap rather than the run.
 
 `LogEntry` carries opencode's human tool title (`part.state.title`) and an optional exit
 code from `part.state.metadata.exit` (numeric). Both are optional and degrade to today's
@@ -96,8 +98,12 @@ the full command; status/exit; and the output. Non-shell tools keep the trace-ro
 
 - `AiTurn` — one `<details>`: summary line, body of activity rows, optional footer.
 - `AiReasoning` — collapsed `<details>`, dim prose body.
-- `AiTerminalCard` — title, `$ command`, status/exit, copy button outside the summary,
-  scrollable output body.
+- `AiTerminalCard` — title, `$ command`, status/exit, copy button in the card header,
+  scrollable output body. The header is a `<summary>`, so the copy button sits inside an
+  interactive element; an activation on it does not toggle the card (verified in the
+  keyboard probe), which keeps the button before the disclosure in tab order. Moving it
+  outside the summary would either put it after the output body or need a non-disclosure
+  header layout, so the deviation is kept and recorded here.
 - Existing `AiTraceLine`, `AiTraceGroup`, `AiMessage`, `AiMarker`, `AiCodeBlock` are
   reused; `AiTraceGroup` retires if the turn fully replaces it.
 
@@ -106,10 +112,11 @@ All components take primitives, never `LogEntry`.
 ### 5. Copy and jump-to-latest
 
 One small inline script in `App.razor` (event-delegated, like the theme script) provides
-`climberCopy(text)` and listens for scroll on `#log-feed`. The feed is `column-reverse`, so
-the live edge is `scrollTop === 0`; the button uses `Math.abs(scrollTop) > 32`, is hidden
-via the `hidden` attribute when at the edge (so it leaves the tab order), and scrolls back
-with `scrollTop = 0`.
+`climberCopy(text)` and listens for scroll (capture phase) on `#log-feed`. The feed is
+`column-reverse`, so the live edge is `scrollTop === 0`; the header's jump-to-latest button
+uses `Math.abs(scrollTop) > 32`, is hidden via the `hidden` attribute when at the edge (so it
+leaves the tab order), and returns with `scrollTop = 0`. It sits in the output panel header
+rather than floating over the feed, so it never covers the row it points at.
 
 ### 6. Styling
 
@@ -164,7 +171,72 @@ package. Card height is chosen against the seeded 200-line output at 900 and 375
 
 ## Evidence (to fill per iteration)
 
-Baseline and per-iteration scores, shots, read-through and floor output go here.
+Seeded captures live in `%TEMP%\climb-ui-shots` and are never committed. The seed is
+`ClimberWeb/SeedSampleLogs.cs` plus one `ActiveLogs` hook in `Home.razor`; both are removed
+before the final report.
+
+| Iteration | Change | Score | Verdict |
+| --- | --- | --- | --- |
+| baseline (`aa3cff0`) | raw JSON on the normal path, no turn structure | 4 | — |
+| 1 | reasoning and unknown events rendered, no raw JSON | 6 | KEEP |
+| 2 | terminal card, human titles, exit code, copy, Escape | 6 | KEEP (no delta) |
+| 3 | one turn per step boundary, footer, quiet unknown row | 7 | KEEP |
+| 4 | per-row status colour, 24px copy target, jump-to-latest, quiet fallback row | 7 | KEEP (no delta) |
+| 5 | stopped turns settle, subagent tab reads top-down, closed disclosures unlaid | 7 | STOP (two flat iterations) |
+| 6 | tab switch keeps open rows and scroll, solo feed sizes to rows, title wraps, head count dropped | 8 | SHIP |
+
+Read-through and probe results for iteration 4 (`i4c-*` shots):
+
+- 0 console errors; 0 raw-JSON plain lines; 2 turns (`Working in 2 steps`,
+  `Worked in 5 steps · 2 failed`); footer
+  `tool calls · $0.000208 · 221 in / 116 out · cache 7296 read · 17 reasoning`.
+- Copy: 32×24 px, label `copied`, clipboard exact (`dotnet watch test --project …`), the
+  card does not toggle; Escape closes an open disclosure and returns focus to its summary.
+- Jump to latest: hidden at the live edge, shown when scrolled back (24 px tall in the
+  panel header, so it never covers a row), returns `scrollTop` to 0 and hides itself.
+- Status colour: a successful `read` and a successful subagent row inside the failed turn
+  compute to the normal ink; only the failed rows and the failed summary are red.
+- Subagent tab: one `plan-architect subagent` row with its prompt, no turn chrome and no
+  false "Working" state.
+- Floor: `dotnet test` 341 passed, 0 failed; `theme-nav`, `security` and `providers` pass;
+  `polish.mjs` 560 checks, 0 defects, UI polish score 100. `surfaces.mjs` (paid) not run.
+
+Known and deferred: disclosure state (turn, reasoning, terminal) resets when the reader
+switches Output tabs, because the tab switch re-renders the feed. (Resolved in iteration 6.)
+
+Iteration 5 (`i6-*` shots) answers the two flaws iteration 4 left:
+
+- A turn with no `step_finish` reads as history once its run stops: the seeded interrupted
+  turn reads `Stopped after 2 steps` (collapsed) instead of a shimmering `Working in 2
+  steps` beside an `idle` status card, and a row left with status `running` renders as
+  settled text. The check is a statement about the run, not about the event stream.
+- A subagent tab reads top-down with its prompt at full width (`plan-architect subagent`
+  plus the whole prompt) instead of one row pinned under a blank panel.
+- Closed disclosures are no longer laid out (`display: none` on the closed body), so folded
+  work costs no layout and the polish harness stops measuring rows a reader cannot reach:
+  `polish.mjs` back to 560 checks, 0 defects, UI polish score 100.
+- 344 tests pass, 0 failed. `theme-nav`, `security` and `providers` pass. `surfaces.mjs`
+  (paid) not run.
+
+Iteration 6 (`i7-*` shots) closes the two defects the gatekeeper named at STOP, rather
+than polishing:
+
+- Switching Output tabs keeps the reader's place. The open disclosures and scroll offset
+  are saved per tab from a capture-phase click listener (`data-outtab` marks the tab
+  buttons, `data-active-tab` the feed) and restored by `climberLog.restoreTab` from
+  `OnAfterRenderAsync` after Blazor patches the new rows. Probe: opening a turn and a
+  command card, scrolling to `scrollTop -180`, switching to `Plan Architect` and back
+  gives `sameScroll: true`, `sameOpen: true`, `sameDetails: true` (10 disclosures, 4 open
+  on both sides). This also makes the delivered jump-to-latest survive a tab round trip.
+- `.log.solo` drops the `46dvh` height and sizes to its rows: the one-row subagent tab is
+  74 px of feed holding 74 px of rows (0 % blank, was ~86 %), 164 px at 375.
+- The two nits: a trace title wraps instead of ellipsizing on a panel narrower than
+  560 px (probe reports 0 clipped titles at 375; a solo prompt takes its own full-width
+  line), and the header's raw `18 events` count is gone — the head is `[03] output` with
+  the `latest` pill right-aligned.
+- 344 tests pass, 0 failed. `theme-nav` 0 failures, `security` 0 failures, `providers`
+  15 checks 0 failures, `polish.mjs` 560 checks 0 defects / UPS 100. `surfaces.mjs`
+  (paid) not run. 0 console errors, 0 horizontal overflow in the feed at 375 and 900.
 
 ## Fixed point for review
 
