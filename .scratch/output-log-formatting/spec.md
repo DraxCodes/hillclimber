@@ -251,12 +251,37 @@ rule reaching from `ai.css` into a page class) are recorded as smells for a late
    service, not the page).
 2. Prose arriving during a turn now closes that turn and renders in place, then the work
    after it opens the next turn — chronological, and still never folded. A `step_finish`
-   that lands after prose renders as the quiet cost marker.
+   that lands after prose attaches to the turn it closed; only a step that produced nothing
+   but prose leaves a quiet cost marker.
 3. An unknown event inside a turn folds in as its quiet row instead of splitting the turn;
    between turns it still stands alone. The turn body routes it through
    `ToolPresentation.ForEvent`, so it never reads "Ran session.updated".
 
-Floor after the follow-ups: 348 tests pass, 0 failed.
+Floor after the follow-ups: 349 tests pass, 0 failed.
+
+## Live demo (unseeded, two real Surplus runs)
+
+A "run" against this repo ("read GLOSSARY.md, then README.md") exercised the shipped path end
+to end, 35–36 s per run:
+
+- Two turns, `Worked in 1 step` and `Worked in 2 steps · 1 failed`; the missing
+  `GLOSSARY.md` reads `Failed to read …GLOSSARY.md` in red and opens its turn, and the
+  README read beside it keeps the ordinary ink.
+- Narration lands where it happened: `I'll read both files.` sits above the two reads, and
+  the final answer is its own message after the last turn.
+- No raw JSON at the live edge; the only `Plain` lines are the runner's own
+  (`$ opencode run …`, `===== Completed =====`, `Spend this run: est. $…`), which is the
+  fallback working as designed.
+- A prose-only step's cost line reads exactly like a turn footer
+  (`stop · $0 · 168 in / 307 out · cache 11776 read · 17 reasoning`), with no event
+  timestamp.
+- Keyboard: Enter opens a disclosure, Escape closes it and returns focus to its summary.
+  0 console errors; feed at the live edge with jump-to-latest hidden.
+
+Follow-up found by the demo: `AiMessage` renders markdown as literal text, so a real answer
+shows `**bold**` and backticks verbatim. Seeded prose never contained markdown, so the
+hillclimb never surfaced it; it needs its own spec (which markdown subset, and whether inline
+only or block too).
 
 ## Fixed point for review
 
