@@ -1,0 +1,144 @@
+@using ClimberWeb.Services
+
+@* Renders the parser's records. Every string goes through Razor's encoder, so there is no
+   MarkupString or Html.Raw anywhere in the transcript path; links were scheme-checked by
+   MarkdownParser before they reached this component. *@
+<div class="ai-md">
+    @foreach (var block in Source)
+    {
+        if (block is MarkdownParagraph paragraph)
+        {
+            <p class="ai-md-p">@Inlines(paragraph.Inlines)</p>
+        }
+        else if (block is MarkdownHeading heading)
+        {
+            if (heading.Level <= 1)
+            {
+                <h3 class="ai-md-heading">@Inlines(heading.Inlines)</h3>
+            }
+            else if (heading.Level == 2)
+            {
+                <h4 class="ai-md-heading">@Inlines(heading.Inlines)</h4>
+            }
+            else
+            {
+                <h5 class="ai-md-heading">@Inlines(heading.Inlines)</h5>
+            }
+        }
+        else if (block is MarkdownListBlock list)
+        {
+            if (list.Ordered)
+            {
+                <ol class="ai-md-list">
+                    @foreach (var item in list.Items)
+                    {
+                        <li>@Inlines(item.Inlines)</li>
+                    }
+                </ol>
+            }
+            else
+            {
+                <ul class="ai-md-list">
+                    @foreach (var item in list.Items)
+                    {
+                        <li>@Inlines(item.Inlines)</li>
+                    }
+                </ul>
+            }
+        }
+        else if (block is MarkdownCodeBlock fenceBlock)
+        {
+            <div class="ai-md-fence">
+                <AiCodeBlock Text="@fenceBlock.Code" />
+            </div>
+        }
+        else if (block is MarkdownQuoteBlock quote)
+        {
+            <blockquote class="ai-md-quote">
+                <AiMarkdown Blocks="@quote.Children" />
+            </blockquote>
+        }
+        else if (block is MarkdownBreak)
+        {
+            <hr class="ai-md-rule" />
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Markdown source. Ignored when <see cref="Blocks"/> is supplied.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>Already-parsed blocks, used by the recursive quote renderer.</summary>
+    [Parameter]
+    public IReadOnlyList<MarkdownBlock>? Blocks { get; set; }
+
+    // Streaming re-renders the same text many times, so parse once per distinct value:
+    // the log changes on every event and the parser is cheap, but it is not free.
+    private IReadOnlyList<MarkdownBlock> Source
+    {
+        get
+        {
+            if (Blocks is not null)
+            {
+                return Blocks;
+            }
+
+            if (_parsed is null || !string.Equals(_parsedText, Text, StringComparison.Ordinal))
+            {
+                _parsedText = Text;
+                _parsed = MarkdownParser.Parse(Text);
+            }
+
+            return _parsed;
+        }
+    }
+
+    private IReadOnlyList<MarkdownBlock>? _parsed;
+    private string? _parsedText;
+
+    // Built by hand rather than as Razor markup so adjacent inline runs carry no stray
+    // whitespace: `<strong>bold</strong>text` must not become `<strong> bold</strong>`.
+    private RenderFragment Inlines(IReadOnlyList<MarkdownInline> runs) => builder =>
+    {
+        // Sequence numbers only have to increase within one fragment; a counter keeps them
+        // unique without every case re-deriving the same numbers by hand.
+        var seq = 0;
+
+        foreach (var run in runs)
+        {
+            switch (run)
+            {
+                case MarkdownText text:
+                    builder.AddContent(seq++, text.Text);
+                    break;
+                case MarkdownCodeSpan codeSpan:
+                    builder.OpenElement(seq++, "code");
+                    builder.AddAttribute(seq++, "class", "ai-md-code");
+                    builder.AddContent(seq++, codeSpan.Text);
+                    builder.CloseElement();
+                    break;
+                case MarkdownStrong strong:
+                    builder.OpenElement(seq++, "strong");
+                    builder.AddContent(seq++, Inlines(strong.Children));
+                    builder.CloseElement();
+                    break;
+                case MarkdownEmphasis emphasis:
+                    builder.OpenElement(seq++, "em");
+                    builder.AddContent(seq++, Inlines(emphasis.Children));
+                    builder.CloseElement();
+                    break;
+                case MarkdownLink link:
+                    builder.OpenElement(seq++, "a");
+                    builder.AddAttribute(seq++, "class", "ai-md-link");
+                    builder.AddAttribute(seq++, "href", link.Href);
+                    builder.AddAttribute(seq++, "target", "_blank");
+                    builder.AddAttribute(seq++, "rel", "noopener noreferrer");
+                    builder.AddContent(seq++, Inlines(link.Children));
+                    builder.CloseElement();
+                    break;
+            }
+        }
+    };
+}

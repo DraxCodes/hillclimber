@@ -1,7 +1,9 @@
-<div class="ai-message">@Text</div>
+<div class="ai-message">
+    <AiMarkdown Text="@Text" />
+</div>
 
 @code {
-    /// <summary>Prose with its line breaks preserved.</summary>
+    /// <summary>Prose, rendered as the parser's safe markdown subset.</summary>
     [Parameter, EditorRequired]
     public string Text { get; set; } = string.Empty;
 }
