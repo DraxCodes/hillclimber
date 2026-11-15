@@ -33,6 +33,9 @@ throwaway script. It runs on the LAN so a phone can drive it, behind a PIN.
   own, and the primary tab keeps a marker pointing at the delegated work.
 - **Telemetry** — status, spend, tokens, elapsed time, iteration, best score, and last test
   result, streamed from OpenCode's own events.
+- **Prompt handoff** — the instruction leaves the prompt box as soon as a run or climb takes
+  it (so the same text can't be fired twice), and an idle box offers the last prompt back
+  with one click.
 - **Pluggable providers** — an ordered `Climber:Providers` registry. The first provider is
   primary; later providers are offered only after explicit approval, one approved step at a
   time. Any OpenAI-compatible catalogue, an OpenRouter-style management API, or a provider

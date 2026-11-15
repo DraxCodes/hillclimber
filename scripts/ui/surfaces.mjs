@@ -201,6 +201,10 @@ await shot(page, 'home.png');
 await setField('#folder', FIXTURE);
 await setField('#prompt', 'Say hello in one short line.');
 await start();
+// The clear belongs at launch, not at settle: the box is empty 150ms after the click,
+// long before the 2.5s settle below.
+await page.waitForTimeout(150);
+check('prompt clears as soon as the run starts', (await page.inputValue('#prompt')).trim() === '', `status ${await status()}`);
 await settle();
 check('run starts and settles', ['running', 'completed', 'stopped', 'failed'].includes(await status()), await status());
 check('run live output panel fills', (await page.locator('.log-line').count()) > 0);
@@ -209,6 +213,18 @@ check('output labels the running agent', primaryTab.includes('orchestrator') || 
 await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});
 await page.waitForTimeout(1200);
 check('run stop returns to a settled state', ['stopped', 'completed', 'failed', 'idle'].includes(await status()));
+
+// --- the cleared prompt is offered back, and the box takes focus ----------
+const focused = await page.evaluate(() => document.activeElement?.id ?? '');
+check('the emptied box takes focus once idle', focused === 'prompt', focused || 'no element');
+const recall = page.locator('.prompt-recall');
+check('a settled run offers the last prompt back', (await recall.count()) === 1, `count ${await recall.count()}`);
+if ((await recall.count()) === 1) {
+  await recall.click();
+  await page.waitForTimeout(250);
+  check('recall restores the prompt that was sent', (await page.inputValue('#prompt')) === 'Say hello in one short line.', await page.inputValue('#prompt'));
+  check('recall hides once the box has text again', (await recall.count()) === 0);
+}
 const runLog = await logText();
 const runCommand = (runLog.match(/--model[=\s]+\S+/) ?? [''])[0];
 const runOnSurplus = surplusCommand(runLog) && !openRouterCommand(runLog);
@@ -229,6 +245,7 @@ await start();
 await settle();
 check('climb starts and settles', ['running', 'completed', 'stopped', 'failed'].includes(await status()), await status());
 check('climb live output panel fills', (await page.locator('.log-line').count()) > 0);
+check('goal clears once the climb takes it', (await page.inputValue('#prompt')).trim() === '', await page.inputValue('#prompt'));
 await shot(page, 'hillclimb.png');
 await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});
 await page.waitForTimeout(1200);

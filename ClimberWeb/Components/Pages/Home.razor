@@ -182,7 +182,12 @@ else
                       rows="3"
                       placeholder="@PromptPlaceholder"
                       disabled="@AnyRunning"
+                      @ref="_promptBox"
                       @bind="_prompt"></textarea>
+            @if (CanRecallPrompt)
+            {
+                <button class="prompt-recall" type="button" @onclick="RecallLastPrompt">use last prompt</button>
+            }
         </div>
 
         @if (_method == RunMethod.Hillclimb)
@@ -422,6 +427,9 @@ else
     private RunMethod _method = RunMethod.Run;
     private string _folderPath = string.Empty;
     private string _prompt = string.Empty;
+    private string? _lastPrompt;
+    private ElementReference _promptBox;
+    private bool _focusPromptWhenIdle;
     private AgentSelection _agents = new(Array.Empty<WorkflowRole>(), null);
     private IReadOnlyList<LogEntry> _entries = Array.Empty<LogEntry>();
     private string _outputTab = PrimaryTab;
@@ -492,6 +500,10 @@ else
     private string PromptPlaceholder => _method == RunMethod.Run
         ? "What should this run do?"
         : "What should each iteration try to accomplish?";
+
+    /// <summary>The last started prompt, offered back once the box is empty and no run holds it.</summary>
+    private bool CanRecallPrompt =>
+        !AnyRunning && !string.IsNullOrWhiteSpace(_lastPrompt) && string.IsNullOrWhiteSpace(_prompt);
 
     private string StatusKey => ActiveStatus.ToString().ToLowerInvariant();
 
@@ -792,6 +804,21 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // The box is disabled while a run is active, so focus waits for a render where it
+        // is usable again — normally the one where the run settles.
+        if (_focusPromptWhenIdle && _unlocked && !AnyRunning)
+        {
+            _focusPromptWhenIdle = false;
+            try
+            {
+                await _promptBox.FocusAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or JSException)
+            {
+                // Circuit gone, or the box left the page (the session re-locked mid-run).
+            }
+        }
+
         if (!firstRender)
         {
             return;
@@ -989,6 +1016,22 @@ else
         catch (Exception ex)
         {
             _error = StripParameterSuffix(ex.Message);
+            return;
+        }
+
+        // The run owns the prompt now. Clearing here — not in Start — keeps the provider
+        // fallback offer working, because StartOnFallback re-enters Start and re-reads _prompt.
+        _lastPrompt = prompt;
+        _prompt = string.Empty;
+        _focusPromptWhenIdle = true;
+    }
+
+    /// <summary>Puts the last started prompt back, for a re-run or a tweak.</summary>
+    private void RecallLastPrompt()
+    {
+        if (_lastPrompt is { } last)
+        {
+            _prompt = last;
         }
     }
 

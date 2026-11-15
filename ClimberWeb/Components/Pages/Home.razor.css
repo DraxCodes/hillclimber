@@ -261,6 +261,28 @@
     max-width: 170px;
 }
 
+/* Recall for the prompt the box drops once a run takes it */
+.prompt-recall {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 0.4rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--ink-3);
+    cursor: pointer;
+}
+
+.prompt-recall:hover {
+    color: var(--ink);
+}
+
+.prompt-recall:focus-visible {
+    outline: none;
+    color: var(--ink);
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 5px var(--focus);
+}
+
 /* Agents resolved from the target folder's .opencode/agents */
 .agent-line {
     display: flex;
