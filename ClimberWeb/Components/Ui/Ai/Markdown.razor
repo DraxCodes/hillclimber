@@ -61,6 +61,32 @@
                 <Markdown Blocks="@quote.Children" />
             </blockquote>
         }
+        else if (block is MarkdownTableBlock table)
+        {
+            <div class="ai-md-table">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            @foreach (var cell in table.Header)
+                            {
+                                <TableHead Class="@Cell(cell.Align)">@Inlines(cell.Inlines)</TableHead>
+                            }
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var row in table.Rows)
+                        {
+                            <TableRow>
+                                @foreach (var cell in row)
+                                {
+                                    <TableCell Class="@Cell(cell.Align)">@Inlines(cell.Inlines)</TableCell>
+                                }
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            </div>
+        }
         else if (block is MarkdownBreak)
         {
             <hr class="ai-md-rule" />
@@ -102,6 +128,16 @@
 
     private IReadOnlyList<MarkdownBlock>? _parsed;
     private string? _parsedText;
+
+    // A cell keeps a readable floor width. Without it a five-column table on a phone gives each
+    // column 50px and the prose breaks every third character; with it the table outgrows the
+    // column and the container scrolls, which is how a wide table is meant to behave.
+    private static string Cell(MarkdownTableAlign align) => align switch
+    {
+        MarkdownTableAlign.Center => "min-w-24 text-center",
+        MarkdownTableAlign.Right => "min-w-24 text-right",
+        _ => "min-w-24",
+    };
 
     // Built by hand rather than as Razor markup so adjacent inline runs carry no stray
     // whitespace: `<strong>bold</strong>text` must not become `<strong> bold</strong>`.

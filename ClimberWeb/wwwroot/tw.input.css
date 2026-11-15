@@ -302,6 +302,15 @@
         margin: 0.2rem 0 0.7rem;
     }
 
+    /* A grid with a zero-minimum track keeps a wide table's min-content width from inflating
+       every flex ancestor above it, which is what made the whole card grow and clip instead of
+       the table scrolling inside its own container. */
+    .ai-md-table {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        margin: 0.2rem 0 0.7rem;
+    }
+
     .ai-md-fence [data-slot="code-block-content"] {
         max-height: 18rem;
     }

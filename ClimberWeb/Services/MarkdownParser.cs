@@ -24,6 +24,23 @@ public sealed record MarkdownCodeBlock(string Code, string? Language) : Markdown
 /// <summary>A <c>&gt;</c> quote, parsed recursively so it can hold paragraphs and lists.</summary>
 public sealed record MarkdownQuoteBlock(IReadOnlyList<MarkdownBlock> Children) : MarkdownBlock;
 
+/// <summary>A pipe table. Every row carries the header's column count.</summary>
+public sealed record MarkdownTableBlock(
+    IReadOnlyList<MarkdownTableCell> Header,
+    IReadOnlyList<IReadOnlyList<MarkdownTableCell>> Rows) : MarkdownBlock;
+
+/// <summary>One table cell. <paramref name="Align"/> comes from the delimiter row's colons.</summary>
+public sealed record MarkdownTableCell(IReadOnlyList<MarkdownInline> Inlines, MarkdownTableAlign Align);
+
+/// <summary>The alignment a table column asked for; <see cref="None"/> renders as the default left.</summary>
+public enum MarkdownTableAlign
+{
+    None,
+    Left,
+    Center,
+    Right,
+}
+
 /// <summary>A horizontal rule (<c>---</c>, <c>***</c>, <c>___</c>).</summary>
 public sealed record MarkdownBreak : MarkdownBlock;
 
@@ -47,7 +64,8 @@ public sealed record MarkdownLink(IReadOnlyList<MarkdownInline> Children, string
 
 /// <summary>
 /// Parses the small markdown subset opencode answers actually use — paragraphs, headings,
-/// bullet and numbered lists, fenced code, quotes, bold, italic, inline code and links —
+/// bullet and numbered lists, fenced code, quotes, pipe tables, bold, italic, inline code
+/// and links —
 /// into display records. Pure, so the renderer can be a thin Razor component and the tests
 /// can assert every shape without a browser. It never produces raw HTML: the only HTML in
 /// the output is written by Razor markup, and a link is emitted only when its target is
@@ -60,6 +78,7 @@ public static class MarkdownParser
     private static readonly Regex Heading = new(@"^(#{1,6})\s+(.*)$", RegexOptions.Compiled);
     private static readonly Regex OrderedItem = new(@"^(\d{1,9})[.)]\s+(.+)$", RegexOptions.Compiled);
     private static readonly Regex Rule = new(@"^ {0,3}([-*_])( *\1){2,} *$", RegexOptions.Compiled);
+    private static readonly Regex DelimiterCell = new(@"^:?-+:?$", RegexOptions.Compiled);
 
     /// <summary>Parses <paramref name="text"/> into blocks. Blank input yields no blocks.</summary>
     public static IReadOnlyList<MarkdownBlock> Parse(string? text)
@@ -175,8 +194,18 @@ public static class MarkdownParser
                 continue;
             }
 
+            if (TryTable(lines, index, out var table, out var tableLength))
+            {
+                blocks.Add(table);
+                index += tableLength;
+                continue;
+            }
+
             var paragraph = new List<string>();
-            while (index < lines.Length && !string.IsNullOrWhiteSpace(lines[index]) && !StartsBlock(lines[index]))
+            while (index < lines.Length
+                   && !string.IsNullOrWhiteSpace(lines[index])
+                   && !StartsBlock(lines[index])
+                   && !TryTable(lines, index, out _, out _))
             {
                 paragraph.Add(lines[index]);
                 index++;
@@ -367,6 +396,198 @@ public static class MarkdownParser
         var trimmed = line.TrimStart();
         var value = trimmed.Length > 0 && trimmed[0] == '>' ? trimmed[1..] : trimmed;
         return value.StartsWith(' ') ? value[1..] : value;
+    }
+
+    /// <summary>
+    /// Reads a pipe table at <paramref name="start"/>: a header row, a delimiter row of dashes
+    /// with optional colons, then body rows until a blank line or a different block. The
+    /// delimiter row has to carry a pipe of its own, so a bare <c>---</c> stays a rule.
+    /// </summary>
+    private static bool TryTable(
+        IReadOnlyList<string> lines,
+        int start,
+        out MarkdownTableBlock table,
+        out int consumed)
+    {
+        table = null!;
+        consumed = 0;
+
+        if (start + 1 >= lines.Count)
+        {
+            return false;
+        }
+
+        var header = SplitRow(lines[start]);
+        if (header.Count == 0 || !TryDelimiter(lines[start + 1], out var alignments))
+        {
+            return false;
+        }
+
+        if (alignments.Count != header.Count)
+        {
+            return false;
+        }
+
+        var rows = new List<IReadOnlyList<MarkdownTableCell>>();
+        var index = start + 2;
+
+        while (index < lines.Count
+               && !string.IsNullOrWhiteSpace(lines[index])
+               && !StartsBlock(lines[index]))
+        {
+            var cells = SplitRow(lines[index]);
+            if (cells.Count == 0)
+            {
+                break;
+            }
+
+            rows.Add(PadRow(cells, alignments));
+            index++;
+        }
+
+        table = new MarkdownTableBlock(PadRow(header, alignments), rows);
+        consumed = index - start;
+        return true;
+    }
+
+    private static bool TryDelimiter(string line, out IReadOnlyList<MarkdownTableAlign> alignments)
+    {
+        alignments = Array.Empty<MarkdownTableAlign>();
+
+        if (!line.Contains('|'))
+        {
+            return false;
+        }
+
+        var cells = SplitRow(line);
+        if (cells.Count == 0)
+        {
+            return false;
+        }
+
+        var result = new List<MarkdownTableAlign>(cells.Count);
+        foreach (var cell in cells)
+        {
+            if (!DelimiterCell.IsMatch(cell))
+            {
+                return false;
+            }
+
+            var left = cell.StartsWith(':');
+            var right = cell.EndsWith(':');
+            result.Add((left, right) switch
+            {
+                (true, true) => MarkdownTableAlign.Center,
+                (false, true) => MarkdownTableAlign.Right,
+                (true, false) => MarkdownTableAlign.Left,
+                _ => MarkdownTableAlign.None,
+            });
+        }
+
+        alignments = result;
+        return true;
+    }
+
+    /// <summary>
+    /// Splits one table row on pipes that are neither escaped nor inside a code span, and drops
+    /// the empty cells a leading or trailing boundary pipe produces. No pipe at all yields no
+    /// cells, which is what keeps ordinary prose out of table detection.
+    /// </summary>
+    private static IReadOnlyList<string> SplitRow(string line)
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var cells = new List<string>();
+        var cell = new StringBuilder();
+        var hasPipe = false;
+        var fence = 0;
+
+        for (var index = 0; index < trimmed.Length; index++)
+        {
+            var ch = trimmed[index];
+
+            if (ch == '\\' && index + 1 < trimmed.Length && trimmed[index + 1] == '|')
+            {
+                cell.Append('|');
+                index++;
+                continue;
+            }
+
+            if (ch == '`')
+            {
+                var run = 1;
+                while (index + run < trimmed.Length && trimmed[index + run] == '`')
+                {
+                    run++;
+                }
+
+                if (fence == 0)
+                {
+                    fence = run;
+                }
+                else if (run == fence)
+                {
+                    fence = 0;
+                }
+
+                cell.Append(trimmed, index, run);
+                index += run - 1;
+                continue;
+            }
+
+            if (ch == '|' && fence == 0)
+            {
+                hasPipe = true;
+                cells.Add(cell.ToString().Trim());
+                cell.Clear();
+                continue;
+            }
+
+            cell.Append(ch);
+        }
+
+        if (!hasPipe)
+        {
+            return Array.Empty<string>();
+        }
+
+        if (!trimmed.StartsWith('|'))
+        {
+            cells.Add(cell.ToString().Trim());
+        }
+        else if (cells.Count > 0)
+        {
+            // A leading boundary pipe produced an empty first cell, not an empty column.
+            cells.RemoveAt(0);
+        }
+
+        // A row ending on a boundary pipe leaves one empty cell behind, not an extra column.
+        if (cells.Count > 0 && cells[^1].Length == 0
+            && trimmed.EndsWith('|') && !trimmed.EndsWith("\\|", StringComparison.Ordinal))
+        {
+            cells.RemoveAt(cells.Count - 1);
+        }
+
+        return cells;
+    }
+
+    private static IReadOnlyList<MarkdownTableCell> PadRow(
+        IReadOnlyList<string> cells,
+        IReadOnlyList<MarkdownTableAlign> alignments)
+    {
+        var row = new List<MarkdownTableCell>(alignments.Count);
+
+        for (var column = 0; column < alignments.Count; column++)
+        {
+            var text = column < cells.Count ? cells[column] : string.Empty;
+            row.Add(new MarkdownTableCell(ParseInline(text), alignments[column]));
+        }
+
+        return row;
     }
 
     private static bool TryCodeSpan(string text, int start, out MarkdownInline run, out int consumed)

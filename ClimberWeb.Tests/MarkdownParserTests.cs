@@ -227,4 +227,79 @@ public class MarkdownParserTests
 
         Assert.Equal("<script>alert('x')</script>", Plain(paragraph.Inlines));
     }
+
+    [Fact]
+    public void APipeTableBecomesAHeaderAndRows()
+    {
+        var table = Assert.IsType<MarkdownTableBlock>(
+            Single("| agent | runs |\n| --- | --- |\n| planner | 3 |\n| gatekeeper | **2** |"));
+
+        Assert.Equal(["agent", "runs"], table.Header.Select(cell => Plain(cell.Inlines)));
+
+        Assert.Equal(2, table.Rows.Count);
+        Assert.Equal(["planner", "3"], table.Rows[0].Select(cell => Plain(cell.Inlines)));
+        Assert.Equal(["gatekeeper", "2"], table.Rows[1].Select(cell => Plain(cell.Inlines)));
+        Assert.IsType<MarkdownStrong>(Assert.Single(table.Rows[1][1].Inlines));
+    }
+
+    [Fact]
+    public void TableCellsReadEdgePipesAndAlignment()
+    {
+        var table = Assert.IsType<MarkdownTableBlock>(
+            Single("name|size|when\n:---|:---:|---:\na|1|now"));
+
+        Assert.Equal(
+            [MarkdownTableAlign.Left, MarkdownTableAlign.Center, MarkdownTableAlign.Right],
+            table.Header.Select(cell => cell.Align));
+        Assert.Equal(["a", "1", "now"], table.Rows[0].Select(cell => Plain(cell.Inlines)));
+    }
+
+    [Fact]
+    public void TableRowsPadToTheHeaderWidth()
+    {
+        var table = Assert.IsType<MarkdownTableBlock>(Single("|a|b|c|\n|-|-|-|\n|1|2|"));
+
+        Assert.Equal(3, table.Rows[0].Count);
+        Assert.Equal(string.Empty, Plain(table.Rows[0][2].Inlines));
+    }
+
+    [Fact]
+    public void PipesInsideCodeAndEscapesStayInOneCell()
+    {
+        var table = Assert.IsType<MarkdownTableBlock>(
+            Single("| command |\n| --- |\n| `a \\| b` |\n| x \\| y |"));
+
+        Assert.Single(table.Header);
+        Assert.Equal("a | b", Plain(table.Rows[0][0].Inlines));
+        Assert.Equal("x | y", Plain(table.Rows[1][0].Inlines));
+    }
+
+    [Fact]
+    public void ATableRightAfterProseDoesNotSwallowTheProse()
+    {
+        var blocks = MarkdownParser.Parse("intro\n|a|b|\n|---|---|\n|1|2|\n\nafter");
+
+        Assert.Collection(
+            blocks,
+            block => Assert.Equal("intro", Plain(Assert.IsType<MarkdownParagraph>(block).Inlines)),
+            block => Assert.IsType<MarkdownTableBlock>(block),
+            block => Assert.Equal("after", Plain(Assert.IsType<MarkdownParagraph>(block).Inlines)));
+    }
+
+    [Fact]
+    public void PipesWithoutADelimiterRowStayProse()
+    {
+        var blocks = MarkdownParser.Parse("a | b\nc | d");
+
+        var paragraph = Assert.IsType<MarkdownParagraph>(Assert.Single(blocks));
+        Assert.Equal("a | b\nc | d", Plain(paragraph.Inlines));
+    }
+
+    [Fact]
+    public void ARuleIsNotATableDelimiter()
+    {
+        var blocks = MarkdownParser.Parse("name\n---\nvalue");
+
+        Assert.DoesNotContain(blocks, block => block is MarkdownTableBlock);
+    }
 }

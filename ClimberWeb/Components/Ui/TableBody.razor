@@ -1,0 +1,8 @@
+<tbody class="@UiClass.Join("[&_tr:last-child]:border-0", Class)" data-slot="table-body">
+    @ChildContent
+</tbody>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

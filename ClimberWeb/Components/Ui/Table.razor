@@ -1,0 +1,13 @@
+<div class="@UiClass.Join("relative w-full overflow-x-auto", Class)" data-slot="table-container">
+    @* text-align is set here rather than on each cell so it inherits: a column can then opt
+       into text-right/text-center without fighting the base rule. border-collapse is required
+       for the row borders: the separate borders model ignores a border on a tr. *@
+    <table class="w-full border-collapse caption-bottom text-left text-sm" data-slot="table">
+        @ChildContent
+    </table>
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

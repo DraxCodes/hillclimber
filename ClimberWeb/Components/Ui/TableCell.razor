@@ -1,0 +1,10 @@
+@* Cells wrap. shadcn's table-cell is whitespace-nowrap for data grids, but these cells hold
+   prose from an answer, so a long sentence has to wrap rather than widen the table. *@
+<td class="@UiClass.Join("p-2 align-middle", Class)" data-slot="table-cell">
+    @ChildContent
+</td>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

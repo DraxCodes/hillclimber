@@ -1,0 +1,8 @@
+<th scope="col" class="@UiClass.Join("text-foreground h-9 whitespace-nowrap px-2 align-middle font-medium", Class)" data-slot="table-head">
+    @ChildContent
+</th>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -1,0 +1,8 @@
+<tr class="@UiClass.Join("border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted", Class)" data-slot="table-row">
+    @ChildContent
+</tr>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -1,0 +1,8 @@
+<thead class="@UiClass.Join("[&_tr]:border-b", Class)" data-slot="table-header">
+    @ChildContent
+</thead>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
