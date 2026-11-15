@@ -141,9 +141,16 @@ code {
 .cov-num {
     font-family: var(--font-mono);
     font-weight: 600;
-    font-size: 1.5rem;
+    /* Shrink the figures before they can overflow a narrow three-up row. */
+    font-size: clamp(1.05rem, 4.8vw, 1.5rem);
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 340px) {
+    .cov-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 .cov-lbl {
@@ -312,10 +319,13 @@ code {
 }
 
 .role-desc {
-    flex: 1;
-    min-width: 0;
+    /* A real minimum basis makes the row wrap the description onto its own line
+       when the name, tag and model leave too little room, at any viewport. */
+    flex: 1 1 min(16rem, 100%);
+    min-width: min(16rem, 100%);
     font-size: 0.8rem;
     color: var(--ink-2);
+    overflow-wrap: anywhere;
 }
 
 .role-model {
