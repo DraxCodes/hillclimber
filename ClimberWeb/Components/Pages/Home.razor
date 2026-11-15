@@ -319,6 +319,19 @@ else
                         </AiTraceGroup>
                     </div>
                 }
+                else if (item.Kind == OutputItemKind.Reasoning)
+                {
+                    <div class="log-item" @key="key">
+                        <AiReasoning Text="@MessageText(item)" />
+                    </div>
+                }
+                else if (item.Kind == OutputItemKind.Unrecognized)
+                {
+                    var unknown = item.Entries[0];
+                    <div class="log-item" @key="key">
+                        <AiTraceLine Icon="gear" Title="@($"Unrecognised event · {unknown.Text}")" Detail="@unknown.Raw" />
+                    </div>
+                }
                 else if (item.Kind == OutputItemKind.Error)
                 {
                     <div class="log-item" @key="key">

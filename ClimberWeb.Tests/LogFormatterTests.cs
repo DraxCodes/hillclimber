@@ -222,6 +222,69 @@ public class LogFormatterTests
     }
 
     [Fact]
+    public void ParsesReasoningEvent()
+    {
+        var line = Stamped("""
+            {"type":"reasoning","part":{"type":"reasoning","text":"first line\nsecond line"}}
+            """);
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Reasoning, entry.Kind);
+        Assert.Equal("first line\nsecond line", entry.Text);
+    }
+
+    [Fact]
+    public void EmptyReasoningKeepsItsKindSoTheGrouperCanSkipIt()
+    {
+        var line = Stamped("{\"type\":\"reasoning\",\"part\":{\"type\":\"reasoning\",\"text\":\"\"}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Reasoning, entry.Kind);
+        Assert.Equal(string.Empty, entry.Text);
+        Assert.Equal(line, entry.Raw);
+    }
+
+    [Fact]
+    public void ReasoningStripsBidiOverridesAndKeepsLineBreaks()
+    {
+        var line = Stamped("{\"type\":\"reasoning\",\"part\":{\"type\":\"reasoning\",\"text\":\"safe \u202Eevil\u202C\\nnext\"}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Reasoning, entry.Kind);
+        Assert.DoesNotContain('\u202E', entry.Text);
+        Assert.DoesNotContain('\u202C', entry.Text);
+        Assert.Equal("safe evil\nnext", entry.Text);
+    }
+
+    [Fact]
+    public void ParsesTheShippedErrorShapeWithoutAPart()
+    {
+        var line = Stamped("""
+            {"type":"error","timestamp":1,"sessionID":"ses_a","error":{"name":"APIError","data":{"message":"Rate limit exceeded; retrying in 5s","statusCode":429,"isRetryable":true}}}
+            """);
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Error, entry.Kind);
+        Assert.Equal("Rate limit exceeded; retrying in 5s", entry.Text);
+    }
+
+    [Fact]
+    public void UnknownOpencodeEventKeepsItsPayloadInsteadOfShowingJson()
+    {
+        var line = Stamped("{\"type\":\"session.updated\",\"part\":{\"id\":\"ses_a\",\"type\":\"session\"}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Unrecognized, entry.Kind);
+        Assert.Equal("session.updated", entry.Text);
+        Assert.Equal(line, entry.Raw);
+    }
+
+    [Fact]
     public void ParsesErrorEvent()
     {
         var line = Stamped("{\"type\":\"error\",\"part\":{\"type\":\"error\",\"error\":\"boom\"}}");
@@ -250,8 +313,6 @@ public class LogFormatterTests
     [InlineData("[12:34:56] {\"foo\":1}")]
     [InlineData("[12:34:56] {\"type\":\"text\"}")]
     [InlineData("[12:34:56] {\"type\":\"text\",\"part\":{}}")]
-    [InlineData("[12:34:56] {\"type\":\"mystery\",\"part\":{\"type\":\"mystery\"}}")]
-    [InlineData("[12:34:56] {\"type\":\"tool\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\"}}")]
     [InlineData("[12:34:56] completely plain")]
     [InlineData("")]
     public void FallsBackToPlainForAnythingNotAnOpencodeEvent(string line)

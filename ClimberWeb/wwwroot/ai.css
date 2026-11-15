@@ -26,6 +26,57 @@
     overflow-wrap: anywhere;
 }
 
+/* Reasoning --------------------------------------------------------------- */
+
+.ai-reasoning {
+    margin: 0.1rem 0 0.45rem;
+    padding-left: 0.55rem;
+    border-left: 2px solid var(--line);
+}
+
+.ai-reasoning-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    padding: 0.18rem 0.3rem;
+    border-radius: var(--radius-sm);
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    list-style: none;
+}
+
+.ai-reasoning-head::-webkit-details-marker {
+    display: none;
+}
+
+.ai-reasoning-head:hover {
+    background: var(--surface-2);
+    color: var(--ink-2);
+}
+
+.ai-reasoning-head:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
+}
+
+.ai-reasoning[open] .ai-chevron {
+    transform: rotate(90deg);
+}
+
+.ai-reasoning-body {
+    max-width: 72ch;
+    padding: 0.1rem 0.3rem 0.45rem 1.4rem;
+    color: var(--ink-2);
+    font-family: var(--font-sans);
+    font-size: 0.86rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 /* Trace group ------------------------------------------------------------- */
 
 .ai-trace-group {

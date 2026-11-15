@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -30,6 +31,18 @@ public enum LogKind
 
     /// <summary>An opencode <c>error</c> event.</summary>
     Error,
+
+    /// <summary>
+    /// An opencode <c>reasoning</c> event; <see cref="LogEntry.Text"/> is the thought.
+    /// An empty thought carries no displayable content and is skipped by the grouper.
+    /// </summary>
+    Reasoning,
+
+    /// <summary>
+    /// A JSON event whose <c>type</c> this parser does not know. The raw payload stays
+    /// available verbatim behind a disclosure instead of filling the feed.
+    /// </summary>
+    Unrecognized,
 }
 
 /// <summary>A log line prepared for display.</summary>
@@ -68,6 +81,7 @@ public sealed class LogFormatter
     private const int MaxCachedLines = 6000;
     private const int MaxSummaryLength = 100;
     private const int MaxPromptLength = 500;
+    private const int MaxReasoningLength = 4000;
 
     private static readonly Regex StampRegex = new(@"^\[(\d{2}:\d{2}:\d{2})\]\s?", RegexOptions.Compiled);
 
@@ -133,20 +147,45 @@ public sealed class LogFormatter
             if (root.ValueKind != JsonValueKind.Object
                 || !root.TryGetProperty("type", out var typeElement)
                 || typeElement.ValueKind != JsonValueKind.String
-                || !root.TryGetProperty("part", out var part)
-                || part.ValueKind != JsonValueKind.Object)
+                || typeElement.GetString() is not { Length: > 0 } type)
             {
                 return plain;
             }
 
-            return typeElement.GetString() switch
+            // A real opencode error has no `part`; it carries `error.name` and
+            // `error.data.message` at the root. Handle it before the part guard so the
+            // error does not degrade to a raw JSON line.
+            if (string.Equals(type, "error", StringComparison.Ordinal))
+            {
+                var errorPart = root.TryGetProperty("part", out var candidate) && candidate.ValueKind == JsonValueKind.Object
+                    ? candidate
+                    : default;
+                return plain with { Kind = LogKind.Error, Text = SummarizeError(root, errorPart) };
+            }
+
+            if (!root.TryGetProperty("part", out var part) || part.ValueKind != JsonValueKind.Object)
+            {
+                return plain;
+            }
+
+            return type switch
             {
                 "text" => TextEntry(plain, part),
+                "reasoning" => plain with
+                {
+                    Kind = LogKind.Reasoning,
+                    Text = Truncate(Clean(GetString(part, "text") ?? string.Empty), MaxReasoningLength),
+                },
                 "tool_use" => ToolEntry(plain, part),
                 "step_start" => plain with { Kind = LogKind.StepStart, Text = "step start" },
                 "step_finish" => plain with { Kind = LogKind.StepFinish, Text = SummarizeFinish(part) },
-                "error" => plain with { Kind = LogKind.Error, Text = SummarizeError(root, part) },
-                _ => plain,
+                // Known to be an opencode event, but not one this renderer understands. The
+                // type is model-adjacent data, so bound it before it becomes a title.
+                _ => plain with
+                {
+                    Kind = LogKind.Unrecognized,
+                    Text = Truncate(Clean(type), MaxSummaryLength),
+                },
             };
         }
     }
@@ -274,13 +313,32 @@ public sealed class LogFormatter
 
     private static string SummarizeError(JsonElement root, JsonElement part)
     {
+        // Shipped shape: `error.data.message`; fixtures use `part.error` or `part.message`.
         var message = GetString(part, "error") ?? GetString(part, "message");
 
         if (string.IsNullOrWhiteSpace(message)
             && root.TryGetProperty("error", out var error)
             && error.ValueKind != JsonValueKind.Null)
         {
-            message = error.ValueKind == JsonValueKind.String ? error.GetString() : error.GetRawText();
+            if (error.ValueKind == JsonValueKind.String)
+            {
+                message = error.GetString();
+            }
+            else if (error.ValueKind == JsonValueKind.Object)
+            {
+                var detail = error.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object
+                    ? data
+                    : error;
+                message = GetString(detail, "message")
+                    ?? GetString(error, "message")
+                    ?? GetString(detail, "name")
+                    ?? GetString(error, "name")
+                    ?? error.GetRawText();
+            }
+            else
+            {
+                message = error.GetRawText();
+            }
         }
 
         return string.IsNullOrWhiteSpace(message) ? "error" : Flatten(message);
@@ -355,7 +413,39 @@ public sealed class LogFormatter
     }
 
     private static string Flatten(string value) =>
-        value.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ').Trim();
+        Clean(value).Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ').Trim();
+
+    /// <summary>
+    /// Removes Unicode format and non-whitespace control characters from model-written
+    /// text. Razor escapes the result; this stops bidi overrides ("Trojan Source") and
+    /// zero-width characters from spoofing the reading order of a transcript.
+    /// </summary>
+    private static string Clean(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        StringBuilder? builder = null;
+        for (var index = 0; index < value.Length; index++)
+        {
+            var ch = value[index];
+            var remove = char.GetUnicodeCategory(ch) == UnicodeCategory.Format
+                || (char.IsControl(ch) && ch is not '\n' and not '\r' and not '\t');
+
+            if (remove && builder is null)
+            {
+                builder = new StringBuilder(value.Length).Append(value, 0, index);
+            }
+            else if (!remove)
+            {
+                builder?.Append(ch);
+            }
+        }
+
+        return builder?.ToString() ?? value;
+    }
 
     private static string Truncate(string value, int maxLength) =>
         value.Length <= maxLength ? value : string.Concat(value.AsSpan(0, maxLength), "…");

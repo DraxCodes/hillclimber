@@ -1,0 +1,14 @@
+﻿<details class="ai-reasoning">
+    <summary class="ai-reasoning-head">
+        <AiIcon Name="subagent" CssClass="ai-reasoning-icon" />
+        <span class="ai-reasoning-label">Thought</span>
+        <AiIcon Name="chevron" CssClass="ai-chevron" />
+    </summary>
+    <div class="ai-reasoning-body">@Text</div>
+</details>
+
+@code {
+    /// <summary>The model's reasoning, with its line breaks preserved.</summary>
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+}

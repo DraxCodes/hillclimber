@@ -10,6 +10,7 @@ public class LogGrouperTests
     private static LogEntry Text(string text, int index) => Entry(LogKind.Text, text, index);
     private static LogEntry Tool(string name, int index) => Entry(LogKind.Tool, name, index);
     private static LogEntry Subagent(string agent, int index) => Entry(LogKind.Subagent, agent, index);
+    private static LogEntry Reasoning(string text, int index) => Entry(LogKind.Reasoning, text, index);
 
     [Fact]
     public void EmptyInputProducesNoItems()
@@ -98,6 +99,44 @@ public class LogGrouperTests
             new[] { OutputItemKind.TraceGroup, OutputItemKind.Plain, OutputItemKind.TraceGroup },
             items.Select(item => item.Kind));
         Assert.Same(plain, items[1].Entries[0]);
+    }
+
+    [Fact]
+    public void ConsecutiveReasoningMergesAndBreaksSurroundingGroups()
+    {
+        var items = LogGrouper.Group([
+            Tool("shell", 1),
+            Reasoning("first", 2),
+            Reasoning("second", 3),
+            Tool("read", 4),
+        ]);
+
+        Assert.Equal(
+            new[] { OutputItemKind.TraceGroup, OutputItemKind.Reasoning, OutputItemKind.TraceGroup },
+            items.Select(item => item.Kind));
+        Assert.Equal(new[] { "first", "second" }, items[1].Entries.Select(entry => entry.Text));
+    }
+
+    [Fact]
+    public void EmptyReasoningIsSkippedWithoutSplittingActivity()
+    {
+        var items = LogGrouper.Group([Tool("shell", 1), Reasoning("  ", 2), Tool("read", 3)]);
+
+        var item = Assert.Single(items);
+        Assert.Equal(OutputItemKind.TraceGroup, item.Kind);
+        Assert.Equal(new[] { "shell", "read" }, item.Entries.Select(entry => entry.Text));
+    }
+
+    [Fact]
+    public void UnrecognizedEventBecomesItsOwnQuietRow()
+    {
+        var unknown = Entry(LogKind.Unrecognized, "session.updated", 2);
+        var items = LogGrouper.Group([Tool("shell", 1), unknown, Tool("read", 3)]);
+
+        Assert.Equal(
+            new[] { OutputItemKind.TraceGroup, OutputItemKind.Unrecognized, OutputItemKind.TraceGroup },
+            items.Select(item => item.Kind));
+        Assert.Same(unknown, items[1].Entries[0]);
     }
 
     [Fact]
