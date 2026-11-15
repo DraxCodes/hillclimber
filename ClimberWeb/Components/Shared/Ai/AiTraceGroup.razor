@@ -1,0 +1,16 @@
+<section class="ai-trace-group" aria-label="Activity">
+    @if (!string.IsNullOrEmpty(Summary))
+    {
+        <div class="ai-trace-group-head">@Summary</div>
+    }
+    @ChildContent
+</section>
+
+@code {
+    /// <summary>A short count or label, for example "4 steps".</summary>
+    [Parameter]
+    public string? Summary { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

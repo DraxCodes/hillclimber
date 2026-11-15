@@ -32,6 +32,19 @@ public enum LogKind
     Error,
 }
 
+/// <summary>The completion state of a tool call, read from opencode's <c>part.state.status</c>.</summary>
+public enum ToolStatus
+{
+    /// <summary>Completed successfully, or no status was reported.</summary>
+    None,
+
+    /// <summary>Still running; the UI shows a running step.</summary>
+    Running,
+
+    /// <summary>Failed; the UI shows an error step with its output opened.</summary>
+    Failed,
+}
+
 /// <summary>A log line prepared for display.</summary>
 /// <param name="Raw">The original line exactly as it lives in <c>ClimberState.Logs</c>.</param>
 /// <param name="Timestamp">The <c>HH:mm:ss</c> stamp, or empty when the line carries none.</param>
@@ -41,14 +54,16 @@ public enum LogKind
 /// <see cref="LogKind.Tool"/>, and the marker/summary for the step and error kinds.
 /// </param>
 /// <param name="ToolInput">One-line summary of the tool input; may be empty.</param>
-/// <param name="ToolOutput">Tool output; may be null.</param>
+/// <param name="ToolOutput">Tool output, or the error text when a tool failed; may be null.</param>
+/// <param name="Status">The tool's completion state; <see cref="ToolStatus.None"/> for non-tools.</param>
 public sealed record LogEntry(
     string Raw,
     string Timestamp,
     LogKind Kind,
     string Text,
     string? ToolInput = null,
-    string? ToolOutput = null);
+    string? ToolOutput = null,
+    ToolStatus Status = ToolStatus.None);
 
 /// <summary>
 /// Turns the run's log feed into display-ready <see cref="LogEntry"/> rows. Lines the
@@ -168,10 +183,15 @@ public sealed class LogFormatter
         var hasState = part.TryGetProperty("state", out var state) && state.ValueKind == JsonValueKind.Object;
         var input = hasState && state.TryGetProperty("input", out var rawInput) ? rawInput : default;
         var output = hasState ? GetString(state, "output") : null;
+        var error = hasState ? GetString(state, "error") : null;
+        var status = hasState ? ReadStatus(state) : ToolStatus.None;
+
+        // A failed call often carries only `state.error`; keep it as the expandable body.
+        var detail = string.IsNullOrEmpty(output) ? error : output;
 
         if (string.Equals(tool, "subagent", StringComparison.Ordinal))
         {
-            return SubagentEntry(plain, input, output);
+            return SubagentEntry(plain, input, detail, status);
         }
 
         return plain with
@@ -179,15 +199,24 @@ public sealed class LogFormatter
             Kind = LogKind.Tool,
             Text = tool,
             ToolInput = SummarizeInput(input),
-            ToolOutput = output,
+            ToolOutput = detail,
+            Status = status,
         };
     }
+
+    /// <summary>Maps opencode's tool <c>state.status</c> onto the display status.</summary>
+    private static ToolStatus ReadStatus(JsonElement state) => GetString(state, "status") switch
+    {
+        "running" or "pending" or "in_progress" => ToolStatus.Running,
+        "error" or "failed" => ToolStatus.Failed,
+        _ => ToolStatus.None,
+    };
 
     /// <summary>
     /// A <c>subagent</c> call: the agent name, its (flattened) prompt, and its result with
     /// opencode's <c>&lt;subagent …&gt;…&lt;/subagent&gt;</c> wrapper removed.
     /// </summary>
-    private static LogEntry SubagentEntry(LogEntry plain, JsonElement input, string? output)
+    private static LogEntry SubagentEntry(LogEntry plain, JsonElement input, string? output, ToolStatus status)
     {
         var isObject = input.ValueKind == JsonValueKind.Object;
         var agent = isObject ? GetString(input, "agent") : null;
@@ -200,6 +229,7 @@ public sealed class LogFormatter
             Text = string.IsNullOrEmpty(agent) ? "subagent" : agent,
             ToolInput = string.IsNullOrEmpty(prompt) ? null : Truncate(Flatten(prompt), MaxPromptLength),
             ToolOutput = string.IsNullOrEmpty(result) ? null : result,
+            Status = status,
         };
     }
 

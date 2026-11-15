@@ -109,7 +109,7 @@ if (surplusState !== 'connected') {
   );
 }
 
-const logText = async () => (await page.locator('.log-line').allInnerTexts()).join('\n');
+const logText = async () => (await page.locator('.log-item').allInnerTexts()).join('\n');
 const approvalOffered = async () => (await page.locator('.approval-row').count()) > 0;
 
 // Only the echoed command lines matter: prompt text and model prose can mention any provider.
@@ -207,7 +207,7 @@ await page.waitForTimeout(150);
 check('prompt clears as soon as the run starts', (await page.inputValue('#prompt')).trim() === '', `status ${await status()}`);
 await settle();
 check('run starts and settles', ['running', 'completed', 'stopped', 'failed'].includes(await status()), await status());
-check('run live output panel fills', (await page.locator('.log-line').count()) > 0);
+check('run live output panel fills', (await page.locator('.log-item').count()) > 0);
 const primaryTab = (await page.locator('.outtab').first().innerText()).toLowerCase();
 check('output labels the running agent', primaryTab.includes('orchestrator') || primaryTab.includes('main'), primaryTab);
 await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});
@@ -244,7 +244,7 @@ await setField('#prompt', 'Implement the unimplemented methods in Calculator.cs 
 await start();
 await settle();
 check('climb starts and settles', ['running', 'completed', 'stopped', 'failed'].includes(await status()), await status());
-check('climb live output panel fills', (await page.locator('.log-line').count()) > 0);
+check('climb live output panel fills', (await page.locator('.log-item').count()) > 0);
 check('goal clears once the climb takes it', (await page.inputValue('#prompt')).trim() === '', await page.inputValue('#prompt'));
 await shot(page, 'hillclimb.png');
 await page.locator('.btn-row .btn', { hasText: 'stop' }).first().click().catch(() => {});

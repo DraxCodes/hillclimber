@@ -316,10 +316,11 @@
     flex: 1;
 }
 
-/* Live log — column-reverse keeps the newest line pinned at the bottom */
+/* Live log — column-reverse keeps the newest row pinned at the bottom */
 .log {
     display: flex;
     flex-direction: column-reverse;
+    gap: 0.2rem;
     overflow-y: auto;
     height: 46dvh;
     min-height: 220px;
@@ -333,6 +334,11 @@
     -webkit-overflow-scrolling: touch;
 }
 
+.log-item {
+    min-width: 0;
+}
+
+/* Raw lines keep their original colouring; structured rows live in ai.css. */
 .log-line {
     color: var(--ink-2);
     white-space: pre-wrap;
@@ -344,43 +350,6 @@
 .log-line.warn { color: var(--orange); }
 .log-line.err { color: var(--red); }
 .log-line.dim { color: var(--ink-3); }
-
-/* opencode --format json events, parsed into readable fields */
-.log-time {
-    color: var(--ink-3);
-    margin-right: 0.45rem;
-}
-
-.log-tool-name {
-    color: var(--ink);
-    font-weight: 600;
-    margin-right: 0.5rem;
-}
-
-.log-tool-input {
-    color: var(--ink-2);
-    word-break: break-all;
-}
-
-.log-tool-out {
-    margin: 0.2rem 0 0.4rem;
-    padding: 0.4rem 0.55rem;
-    border-left: 2px solid var(--line-2);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--ink-2);
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-.log-event.log-step-start,
-.log-event.log-step-finish {
-    color: var(--ink-3);
-}
-
-.log-event.log-error {
-    color: var(--red);
-}
 
 /* Output tabs: the main stream plus one tab per subagent used */
 .outtabs {
@@ -409,20 +378,6 @@
 .outtab.active {
     color: var(--ink);
     border-bottom-color: var(--accent);
-}
-
-.log-subagent-name {
-    color: var(--accent-text);
-    font-weight: 600;
-    margin-right: 0.4rem;
-}
-
-.log-subagent-prompt {
-    margin: 0.2rem 0 0.3rem;
-    padding-left: 0.6rem;
-    border-left: 2px solid var(--line-2);
-    white-space: pre-wrap;
-    word-break: break-word;
 }
 
 .log::-webkit-scrollbar {

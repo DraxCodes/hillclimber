@@ -58,6 +58,70 @@ public class LogFormatterTests
         Assert.Equal("total 4\ndir A\n", entry.ToolOutput);
     }
 
+    [Theory]
+    [InlineData("\"completed\"", ToolStatus.None)]
+    [InlineData("\"running\"", ToolStatus.Running)]
+    [InlineData("\"pending\"", ToolStatus.Running)]
+    [InlineData("\"in_progress\"", ToolStatus.Running)]
+    [InlineData("\"error\"", ToolStatus.Failed)]
+    [InlineData("\"failed\"", ToolStatus.Failed)]
+    [InlineData("\"mystery\"", ToolStatus.None)]
+    public void MapsToolStateStatus(string stateStatus, ToolStatus expected)
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":"
+            + stateStatus
+            + ",\"input\":{\"command\":\"echo hi\"}}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Tool, entry.Kind);
+        Assert.Equal(expected, entry.Status);
+    }
+
+    [Fact]
+    public void MissingToolStatusReadsAsNone()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"input\":{\"command\":\"echo hi\"}}}}");
+
+        Assert.Equal(ToolStatus.None, LogFormatter.Parse(line).Status);
+    }
+
+    [Fact]
+    public void FailedToolUsesErrorTextWhenOutputIsMissing()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":\"error\",\"input\":{\"command\":\"dotnet build\"},\"error\":\"error CS1002\"}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(ToolStatus.Failed, entry.Status);
+        Assert.Equal("error CS1002", entry.ToolOutput);
+    }
+
+    [Fact]
+    public void ToolOutputWinsOverErrorText()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":\"error\",\"output\":\"out\",\"error\":\"err\"}}}");
+
+        Assert.Equal("out", LogFormatter.Parse(line).ToolOutput);
+    }
+
+    [Fact]
+    public void FailedSubagentCarriesStatusAndErrorText()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"subagent\",\"state\":{\"status\":\"error\",\"input\":{\"agent\":\"plan-architect\",\"prompt\":\"Plan.\"},\"error\":\"boom\"}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Subagent, entry.Kind);
+        Assert.Equal(ToolStatus.Failed, entry.Status);
+        Assert.Equal("boom", entry.ToolOutput);
+    }
+
     [Fact]
     public void ParsesSubagentCall_WithAgentPromptAndUnwrappedResult()
     {

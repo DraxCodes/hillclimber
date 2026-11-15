@@ -281,7 +281,7 @@ else
         <div class="panel-head">
             <span class="idx">[03]</span>
             <span class="panel-title">output</span>
-            <span class="panel-meta">@ActiveLogs.Count lines</span>
+            <span class="panel-meta">@ActiveLogs.Count events</span>
         </div>
         <div class="outtabs" role="tablist" aria-label="Output stream">
             <button class="outtab @(_outputTab == PrimaryTab ? "active" : string.Empty)" type="button"
@@ -293,56 +293,49 @@ else
             }
         </div>
         <div class="log" id="log-feed">
-            @foreach (var entry in VisibleEntries)
+            @foreach (var item in VisibleItems)
             {
-                var css = LineClass(entry.Raw);
-                if (entry.Kind == LogKind.Plain)
+                var key = item.Entries[0].Raw;
+                if (item.Kind == OutputItemKind.Message)
                 {
-                    <div class="log-line @css">@entry.Raw</div>
-                }
-                else if (entry.Kind == LogKind.Subagent && _outputTab == PrimaryTab)
-                {
-                    <div class="log-line @css log-event log-subagent-ref">
-                        <span class="log-time">@entry.Timestamp</span>
-                        <span class="log-subagent-name">◆ @entry.Text</span>
-                        <span class="dim">— see its tab</span>
+                    <div class="log-item" @key="key">
+                        <AiMessage Text="@MessageText(item)" />
                     </div>
                 }
-                else if (entry.Kind == LogKind.Subagent)
+                else if (item.Kind == OutputItemKind.TraceGroup)
                 {
-                    <div class="log-line @css log-event log-subagent">
-                        <span class="log-time">@entry.Timestamp</span>
-                        <span class="log-subagent-name">◆ @entry.Text</span>
-                        @if (!string.IsNullOrEmpty(entry.ToolInput))
-                        {
-                            <pre class="log-subagent-prompt dim">@entry.ToolInput</pre>
-                        }
-                        @if (!string.IsNullOrEmpty(entry.ToolOutput))
-                        {
-                            <pre class="log-tool-out">@entry.ToolOutput</pre>
-                        }
+                    <div class="log-item" @key="key">
+                        <AiTraceGroup Summary="@StepSummary(item.Entries.Count)">
+                            @foreach (var entry in item.Entries)
+                            {
+                                var view = ToolPresentation.For(entry, _outputTab == PrimaryTab);
+                                <AiTraceLine @key="entry.Raw"
+                                             Icon="@view.Icon"
+                                             Title="@view.Title"
+                                             Description="@view.Description"
+                                             Status="@view.Status"
+                                             Detail="@view.Detail" />
+                            }
+                        </AiTraceGroup>
+                    </div>
+                }
+                else if (item.Kind == OutputItemKind.Error)
+                {
+                    <div class="log-item" @key="key">
+                        <AiMarker Text="@item.Entries[0].Text" Tone="MarkerTone.Error" />
+                    </div>
+                }
+                else if (item.Kind == OutputItemKind.Marker)
+                {
+                    <div class="log-item" @key="key">
+                        <AiMarker Text="@MarkerText(item.Entries[0])" />
                     </div>
                 }
                 else
                 {
-                    <div class="log-line @css log-event @KindClass(entry.Kind)">
-                        <span class="log-time">@entry.Timestamp</span>
-                        @if (entry.Kind == LogKind.Tool)
-                        {
-                            <span class="log-tool-name">⚙ @entry.Text</span>
-                            @if (!string.IsNullOrEmpty(entry.ToolInput))
-                            {
-                                <span class="log-tool-input">@entry.ToolInput</span>
-                            }
-                            @if (!string.IsNullOrEmpty(entry.ToolOutput))
-                            {
-                                <pre class="log-tool-out">@entry.ToolOutput</pre>
-                            }
-                        }
-                        else
-                        {
-                            <span class="log-text">@entry.Text</span>
-                        }
+                    var plain = item.Entries[0];
+                    <div class="log-item" @key="key">
+                        <div class="log-line @LineClass(plain.Raw)">@plain.Raw</div>
                     </div>
                 }
             }
@@ -611,27 +604,31 @@ else
         .Distinct(StringComparer.Ordinal)
         .ToArray();
 
-    /// <summary>The entries for the selected tab: everything for the primary tab, one agent's calls otherwise.</summary>
+    /// <summary>The entries for the selected tab, oldest first: everything for the primary tab, one agent's calls otherwise.</summary>
     private IReadOnlyList<LogEntry> VisibleEntries => _outputTab == PrimaryTab
         ? _entries
         : _entries
             .Where(entry => entry.Kind == LogKind.Subagent && string.Equals(entry.Text, _outputTab, StringComparison.Ordinal))
             .ToArray();
 
+    /// <summary>
+    /// The transcript rows for the selected tab, newest group first. The container is
+    /// <c>column-reverse</c>, so the newest group renders at the bottom while rows inside a
+    /// group keep their chronological order.
+    /// </summary>
+    private IReadOnlyList<OutputItem> VisibleItems => LogGrouper.Group(VisibleEntries).Reverse().ToArray();
+
     private void SelectOutputTab(string tab) => _outputTab = tab;
 
-    private void RebuildEntries() => _entries = ActiveLogs.Reverse().Select(_logFormatter.Format).ToArray();
+    private void RebuildEntries() => _entries = ActiveLogs.Select(_logFormatter.Format).ToArray();
 
-    /// <summary>CSS hook for a structured row; mirrors the kind names styled in Home.razor.css.</summary>
-    private static string KindClass(LogKind kind) => kind switch
-    {
-        LogKind.Text => "log-text",
-        LogKind.Tool => "log-tool",
-        LogKind.StepStart => "log-step-start",
-        LogKind.StepFinish => "log-step-finish",
-        LogKind.Error => "log-error",
-        _ => string.Empty,
-    };
+    private static string MessageText(OutputItem item) =>
+        string.Join("\n\n", item.Entries.Select(entry => entry.Text));
+
+    private static string StepSummary(int count) => count == 1 ? "1 step" : $"{count} steps";
+
+    private static string MarkerText(LogEntry entry) =>
+        string.IsNullOrEmpty(entry.Timestamp) ? entry.Text : $"{entry.Timestamp} · {entry.Text}";
 
     private static string LineClass(string line)
     {
