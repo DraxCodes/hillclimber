@@ -281,6 +281,17 @@ else
         <div class="panel-head">
             <span class="idx">[03]</span>
             <span class="panel-title">output</span>
+            @if (Activity is { Working: true } activity)
+            {
+                <span class="log-working" role="status" aria-live="polite" aria-label="Working: @activity.Label">
+                    <span class="log-working-dot" aria-hidden="true"></span>
+                    <span class="log-working-what" aria-hidden="true">@activity.Label</span>
+                    @if (ActiveElapsed is { Length: > 0 } elapsed)
+                    {
+                        <span class="log-working-elapsed" aria-hidden="true">@elapsed</span>
+                    }
+                </span>
+            }
             <button class="log-latest" id="log-latest" type="button" data-latest hidden aria-label="Jump to latest output">
                 latest <span aria-hidden="true">↓</span>
             </button>
@@ -290,12 +301,32 @@ else
                     role="tab" aria-selected="@(_outputTab == PrimaryTab)" @onclick="() => SelectOutputTab(PrimaryTab)">@PrimaryTabLabel</button>
             @foreach (var name in SubAgentNames)
             {
-                <button class="outtab @(_outputTab == name ? "active" : string.Empty)" type="button" data-outtab="@name"
-                        role="tab" aria-selected="@(_outputTab == name)" @onclick="() => SelectOutputTab(name)">@SubLabel(name)</button>
+                var working = TabWorking(name);
+                <button class="outtab @(_outputTab == name ? "active" : string.Empty) @(working ? "working" : string.Empty)"
+                        type="button" data-outtab="@name" data-working="@(working ? "true" : null)"
+                        role="tab" aria-selected="@(_outputTab == name)"
+                        aria-label="@(working ? $"{SubLabel(name)} (working)" : null)"
+                        @onclick="() => SelectOutputTab(name)">
+                    @if (working)
+                    {
+                        <span class="outtab-dot" aria-hidden="true"></span>
+                    }
+                    <span class="outtab-label">@SubLabel(name)</span>
+                </button>
             }
         </div>
         <div class="log @(_outputTab == PrimaryTab ? string.Empty : "solo")" id="log-feed" data-active-tab="@_outputTab">
-            @foreach (var item in VisibleItems)
+            @{
+                var items = VisibleItems;
+
+                // "Newest" is a claim about the transcript, not the DOM order: the feed is
+                // rendered newest first, and the turn nearest that edge is the one a reader
+                // arrives at. Only that turn opens by default and, while the run is live, it
+                // is the one that shimmers.
+                var newestTurn = items.FirstOrDefault(item => item.Kind == OutputItemKind.Turn);
+                var activeItem = items.Count > 0 ? items[0] : null;
+            }
+            @foreach (var item in items)
             {
                 var key = item.Entries[0].Raw;
                 if (item.Kind == OutputItemKind.Message)
@@ -306,14 +337,27 @@ else
                 }
                 else if (item.Kind == OutputItemKind.Turn)
                 {
-                    var turn = TurnPresentation.For(item.Entries, item.Footer, item.Open, live: ActiveRunning);
+                    var newest = ReferenceEquals(item, newestTurn);
+                    var active = newest && ReferenceEquals(item, activeItem);
+                    var turn = TurnPresentation.For(
+                        item.Entries,
+                        item.Footer,
+                        item.Open,
+                        live: ActiveLive,
+                        newest: newest,
+                        active: active);
+
+                    // A reader's own click wins over the default. The key is the turn's
+                    // first raw event, which is stable while the run grows.
+                    var isOpen = _turnOpen.TryGetValue(key, out var chosen) ? chosen : turn.Open;
                     @if (_outputTab == PrimaryTab)
                     {
                         <div class="log-item" @key="key">
-                            <AiTurn Summary="@turn.Summary" Status="@turn.Status" Open="@turn.Open" Footer="@turn.Footer">
+                            <AiTurn Summary="@turn.Summary" Status="@turn.Status" Open="@isOpen" Footer="@turn.Footer"
+                                    OnToggle="open => SetTurnOpen(key, open)">
                                 @foreach (var entry in item.Entries)
                                 {
-                                    @Row(entry)
+                                    @Row(entry, newest)
                                 }
                             </AiTurn>
                         </div>
@@ -326,7 +370,7 @@ else
                         <div class="log-item" @key="key">
                             @foreach (var entry in item.Entries)
                             {
-                                @Row(entry)
+                                @Row(entry, openReasoning: false)
                             }
                         </div>
                     }
@@ -444,6 +488,9 @@ else
     private IReadOnlyList<LogEntry> _entries = Array.Empty<LogEntry>();
     private string _outputTab = PrimaryTab;
 
+    /// <summary>A reader's explicit open/closed choice per turn, keyed by its first raw event.</summary>
+    private readonly Dictionary<string, bool> _turnOpen = new(StringComparer.Ordinal);
+
     /// <summary>The tab whose rows the DOM currently holds; script restores state only when this lags.</summary>
     private string? _renderedTab;
     private int _maxIterations = 5;
@@ -471,6 +518,18 @@ else
     private bool ActiveRunning => _method == RunMethod.Run
         ? _run.Status is RunStatus.Running or RunStatus.AwaitingApproval
         : _climb.Status is RunStatus.Running or RunStatus.AwaitingApproval;
+
+    /// <summary>
+    /// True only while the method on screen is streaming. Awaiting approval is paused, so
+    /// a turn left "running" settles instead of shimmering beside a waiting status card.
+    /// </summary>
+    private bool ActiveLive => ActiveStatus == RunStatus.Running;
+
+    /// <summary>The panel's live activity phrase, or null while the run is at rest.</summary>
+    private ActivityView? Activity => ActiveLive ? OutputActivity.For(_entries, live: true) : null;
+
+    /// <summary>True while a delegate's tab is the work the orchestrator is waiting on.</summary>
+    private bool TabWorking(string agentId) => OutputActivity.TabWorking(agentId, _entries, ActiveLive);
 
     /// <summary>True while either method is active; the two share the machine, so only one may go at a time.</summary>
     private bool AnyRunning =>
@@ -588,21 +647,19 @@ else
                 : $"{AgentCatalog.WorkflowName} — delegates to {string.Join(" / ", Delegates.Select(role => role.Name))} as needed"
             : $"{AgentCatalog.WorkflowName} — gated loop";
 
-    private string ElapsedLabel
-    {
-        get
-        {
-            if (_run.StartedAt is not { } start)
-            {
-                return "—";
-            }
+    private string ElapsedLabel =>
+        _run.StartedAt is { } start ? Duration((_run.FinishedAt ?? DateTimeOffset.Now) - start) : "—";
 
-            var span = (_run.FinishedAt ?? DateTimeOffset.Now) - start;
-            return span.TotalMinutes >= 1
-                ? $"{(int)span.TotalMinutes}m {span.Seconds:00}s"
-                : $"{span.TotalSeconds:0.0}s";
-        }
-    }
+    /// <summary>When the method on screen started, for the output header's live clock.</summary>
+    private DateTimeOffset? ActiveStartedAt => _method == RunMethod.Run ? _run.StartedAt : _climb.StartedAt;
+
+    /// <summary>The header clock while the panel is working; empty when nothing is live.</summary>
+    private string ActiveElapsed => ActiveStartedAt is { } start ? Duration(DateTimeOffset.Now - start) : string.Empty;
+
+    private static string Duration(TimeSpan span) =>
+        span.TotalMinutes >= 1
+            ? $"{(int)span.TotalMinutes}m {span.Seconds:00}s"
+            : $"{span.TotalSeconds:0.0}s";
 
     private string StatusText => ActiveStatus.Label();
 
@@ -646,9 +703,12 @@ else
     /// the stream simply ends without a status, so a leftover "running" is history, not live.
     /// </summary>
     private IReadOnlyList<LogEntry> DisplayEntries =>
-        TurnPresentation.Settled(VisibleEntries, ActiveRunning);
+        TurnPresentation.Settled(VisibleEntries, ActiveLive);
 
     private void SelectOutputTab(string tab) => _outputTab = tab;
+
+    /// <summary>Remembers a disclosure the reader opened or closed, so a later render keeps it.</summary>
+    private void SetTurnOpen(string key, bool open) => _turnOpen[key] = open;
 
     /// <summary>
     /// Puts the reader back where they were on the tab that is now showing. Returns false
@@ -674,10 +734,15 @@ else
         string.Join("\n\n", item.Entries.Select(entry => entry.Text));
 
     /// <summary>One activity row inside a turn: reasoning prose, a terminal card, or a trace row.</summary>
-    private RenderFragment Row(LogEntry entry) => @<text>
+    /// <param name="entry">The row to render.</param>
+    /// <param name="openReasoning">
+    /// True inside the newest turn: its thoughts are part of the work a reader arrived for.
+    /// Older turns keep reasoning folded, and a subagent tab has no turn to belong to.
+    /// </param>
+    private RenderFragment Row(LogEntry entry, bool openReasoning) => @<text>
         @if (entry.Kind == LogKind.Reasoning)
         {
-            <AiReasoning @key="entry.Raw" Text="@entry.Text" />
+            <AiReasoning @key="entry.Raw" Text="@entry.Text" Open="@openReasoning" />
         }
         else if (entry.Kind == LogKind.Unrecognized)
         {
@@ -1092,6 +1157,10 @@ else
         // StartOnFallback re-enters Start and re-reads the box.
         var failure = _prompt.Launch(prompt, () =>
         {
+            // A reader's turn choices belong to the transcript they were made in; the next
+            // run starts with the defaults rather than inheriting keys that cannot recur.
+            _turnOpen.Clear();
+
             if (_method == RunMethod.Hillclimb)
             {
                 _ = Climber.StartAsync(new ClimberOptions(

@@ -365,6 +365,59 @@
     min-height: 0;
 }
 
+/* Output activity: the panel header is below the status card, so a reader watching the
+   transcript needs the working signal here, not only at the top of the page. The dot is
+   the only motion; the phrase and clock say what is happening without flashing. */
+.log-working {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    color: var(--accent-text);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.01em;
+}
+
+.log-working-dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: log-pulse 1.4s ease-out infinite;
+}
+
+@keyframes log-pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+    70% { box-shadow: 0 0 0 6px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.log-working-what {
+    min-width: 0;
+    max-width: 30ch;
+    overflow: hidden;
+    color: var(--ink-2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.log-working-elapsed {
+    flex: none;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+    /* The clock is the first thing to go: the phrase says what is happening, and the
+       panel only has room for one of them beside the title. */
+    .log-working-elapsed {
+        display: none;
+    }
+}
+
 /* Jump to latest: lives in the output panel header so it never covers the row it points
    at, and is shown only while the reader is scrolled back. `[hidden]` needs its own rule
    because the `display` above would beat the user agent's. */
@@ -415,6 +468,9 @@
 }
 
 .outtab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     font-family: var(--font-mono);
     font-size: 0.74rem;
     color: var(--ink-3);
@@ -432,6 +488,32 @@
 .outtab.active {
     color: var(--ink);
     border-bottom-color: var(--accent);
+}
+
+/* The tab strip is a separate control group from the buttons; give it the same ring they
+   use, so a keyboard reader sees one focus language across the page. */
+.outtab:focus-visible {
+    outline: none;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus);
+}
+
+/* A delegate's tab is live too: the dot matches the panel's activity signal, so a reader
+   can see that work is happening on a tab they are not looking at. */
+.outtab-dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: log-pulse 1.4s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .log-working-dot,
+    .outtab-dot {
+        animation: none;
+    }
 }
 
 .log::-webkit-scrollbar {

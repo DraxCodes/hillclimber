@@ -237,7 +237,7 @@ public class ToolPresentationTests
             Subagent("plan-architect", "Produce a plan.", status: StepStatus.Running),
             primaryTab: true);
 
-        Assert.Equal("Running: plan-architect — see its tab", view.Title);
+        Assert.Equal("Running: plan-architect — working on its tab", view.Title);
         Assert.Equal(StepStatus.Running, view.Status);
     }
 

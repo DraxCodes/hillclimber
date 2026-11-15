@@ -23,6 +23,9 @@ public sealed record ClimberState
     /// <summary>Human-readable detail about the current status.</summary>
     public string? Message { get; init; }
 
+    /// <summary>When the current climb started, or null before the first climb.</summary>
+    public DateTimeOffset? StartedAt { get; init; }
+
     /// <summary>Live log feed, oldest first.</summary>
     public IReadOnlyList<string> Logs { get; init; } = Array.Empty<string>();
 
@@ -186,6 +189,7 @@ public sealed class HillClimberService : IHillClimberService
             _state = new ClimberState
             {
                 Status = RunStatus.Running,
+                StartedAt = DateTimeOffset.Now,
                 MaxIterations = maxIterations,
                 CurrentIteration = 0,
                 BestScore = 0,

@@ -20,12 +20,12 @@ data it needs is named, but it has not been built.
 | [Chain of Thought](https://ui.shadcn.com/docs/ai-elements/base/chain-of-thought) | `AiTurn` + `TurnPresentation` | now | one step's reasoning, tool rows and `step_finish` footer |
 | [Tool](https://ui.shadcn.com/docs/ai-elements/base/tool) | `AiTraceLine` + `AiCodeBlock` | now | tool name, input summary, output, status |
 | [Terminal](https://ui.shadcn.com/docs/ai-elements/base/terminal) | `AiTerminalCard` + `AiCodeBlock` | now | `shell`/`bash` title, full command, exit code and output; copy via `data-copy` |
-| [Message](https://ui.shadcn.com/docs/ai-elements/base/message) | `AiMessage` | now | consecutive `text` events |
+| [Message](https://ui.shadcn.com/docs/ai-elements/base/message) | `AiMessage` + `AiMarkdown` | now | consecutive `text` events, parsed as markdown |
 | [Chat](https://ui.shadcn.com/docs/ai-elements/base/chat) | `.log` panel + `LogGrouper` | now | the whole feed |
 | [Subagent](https://ui.shadcn.com/docs/ai-elements/base/subagent) | `AiTraceLine` (subagent variant) | now | agent, prompt, result |
 | [Code Block](https://ui.shadcn.com/docs/components/base/code-block) | `AiCodeBlock` | now | tool output |
 | [Marker](https://ui.shadcn.com/docs/components/base/marker) | `AiMarker` | now | a footer with no activity, `error` |
-| [Reasoning](https://ui.shadcn.com/docs/ai-elements/base/reasoning) | `AiReasoning` | now | `reasoning` events, collapsed unless opened |
+| [Reasoning](https://ui.shadcn.com/docs/ai-elements/base/reasoning) | `AiReasoning` | now | `reasoning` events, opened in the newest turn and collapsed in older ones |
 | [Plan](https://ui.shadcn.com/docs/ai-elements/base/plan) | — | later | plan events; not parsed |
 | [Task](https://ui.shadcn.com/docs/ai-elements/base/task) | — | later | task/todo events; not parsed |
 | [Queue](https://ui.shadcn.com/docs/ai-elements/base/queue) | — | later | the agent's todo list; not parsed |
@@ -77,6 +77,53 @@ without a turn wrapper, because the tab has no step boundaries of its own; that 
 top down and sizes to its rows (`.log.solo` drops the fixed viewport height), so a one-row
 tab is one row tall rather than a mostly blank panel. On a narrow panel a trace title wraps
 instead of ending in an ellipsis, and a solo row's prompt takes its own full width.
+
+## Markdown
+
+`AiMessage` and `AiReasoning` render through `AiMarkdown`, fed by the pure
+`MarkdownParser`. The supported subset is paragraphs, ATX headings (`#`–`######`),
+bullet and numbered lists (flat, with indented continuations), fenced code (backtick or
+tilde, with the info string), block quotes (parsed recursively), horizontal rules, inline
+code, strong, emphasis and links.
+
+It never produces HTML: blocks and inline runs are records, Razor encodes every string,
+and there is no `MarkupString`/`Html.Raw` in the transcript path. A link target is
+scheme-checked before it becomes a link — http(s), mailto, a root path, a fragment or a
+colon-free relative path; anything else keeps its words but not its target. An
+unterminated fence consumes the rest of the message as code, so a streaming answer never
+flashes raw backticks. Terminal output stays verbatim `AiCodeBlock`; markdown never
+touches tool output.
+
+## Live activity
+
+`OutputActivity` derives both signals from the log, purely and cheaply enough to call on
+every render:
+
+- The output header shows a pulsing dot and a phrase while the active method is
+  streaming: `thinking` for reasoning, `writing` for prose, the running command or tool
+  description, `delegating` while a subagent row is in flight, and `working` between
+  events. The phrase drops the row's own `Running: ` prefix so it fits the header, and the
+  elapsed clock sits beside it on wide screens.
+- A subagent tab carries a dot while that delegate's row is the newest event, and its
+  `aria-label` says `(working)`. On the primary tab the delegate row reads
+  `Running: <agent> — working on its tab` while it works, `Failed: <agent> — see its tab`
+  when it failed, and `… — see its tab` otherwise.
+
+Only the dot, the active turn summary and genuinely running rows animate. Under
+`prefers-reduced-motion` the animation stops and the accent colour plus the words remain.
+
+## Default expansion
+
+The newest turn and every failed turn start open; older turns start collapsed. Inside an
+open turn, reasoning starts open in the newest turn and stays folded in older ones, a
+terminal card opens while running or when a failure is short enough to read, and trace
+rows keep their own disclosure. A reader's click on a turn summary is remembered by turn
+key (`_turnOpen`), so a later render never reopens what they closed; the per-tab
+scroll/disclosure restore still applies when they switch tabs.
+
+The active turn shimmers while the run is live even after its `step_finish` footer
+arrives: opencode closes a step at every exchange, so "open" alone would hide the shimmer
+for most of a run. A stopped run settles its rows; only a genuinely running row shimmers.
 
 ## Adding the next element
 

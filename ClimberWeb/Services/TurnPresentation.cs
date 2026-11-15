@@ -3,8 +3,8 @@ namespace ClimberWeb.Services;
 /// <summary>The display primitives an <c>AiTurn</c> needs, independent of log parsing.</summary>
 /// <param name="Summary">The one-line label, for example "Worked in 3 steps · 1 failed".</param>
 /// <param name="Status">The turn's display state.</param>
-/// <param name="Open">Whether the turn starts expanded: while streaming, or when a call failed.</param>
-/// <param name="Footer">The human cost/token line from <c>step_finish</c>, or null while open.</param>
+/// <param name="Open">Whether the turn starts expanded: the newest turn, a streaming one, or a failure.</param>
+/// <param name="Footer">The human cost/token line from <c>step_finish</c>, or null when the step never closed.</param>
 public sealed record TurnView(string Summary, StepStatus Status, bool Open, string? Footer);
 
 /// <summary>
@@ -32,13 +32,21 @@ public static class TurnPresentation
     /// <summary>Builds the turn view for <paramref name="entries"/> and its optional footer.</summary>
     /// <param name="entries">The turn's reasoning and tool rows, in chronological order.</param>
     /// <param name="footer">The <c>step_finish</c> that closed the turn, or null.</param>
-    /// <param name="open">True only for the feed's last turn, which never got a footer.</param>
+    /// <param name="open">True for the feed's last turn, which never got a footer.</param>
     /// <param name="live">True while the run itself is still streaming.</param>
+    /// <param name="newest">True for the newest turn in the feed; it keeps its body expanded.</param>
+    /// <param name="active">
+    /// True when the newest row of the feed is this turn. A live run's active turn shimmers
+    /// even after a per-step <c>step_finish</c> closed it, because the run is still working
+    /// on the same place in the transcript.
+    /// </param>
     public static TurnView For(
         IReadOnlyList<LogEntry> entries,
         LogEntry? footer,
         bool open = false,
-        bool live = false)
+        bool live = false,
+        bool newest = false,
+        bool active = false)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
@@ -67,7 +75,10 @@ public static class TurnPresentation
 
         // "Still working" is a claim about the run, not about the events: an unterminated
         // turn whose run has stopped was cut off, and must stop shimmering and settle.
-        var streaming = open && live;
+        // While the run is live, the turn the reader is at is the work in progress even
+        // when a step_finish already gave it a footer — opencode closes a step after every
+        // exchange, so "open" alone would hide the shimmer for most of a run.
+        var streaming = live && (open || active);
         var interrupted = open && !live;
 
         var verb = streaming ? "Working in" : interrupted ? "Stopped after" : "Worked in";
@@ -85,7 +96,7 @@ public static class TurnPresentation
         return new TurnView(
             summary,
             failed > 0 ? StepStatus.Failed : streaming ? StepStatus.Running : StepStatus.None,
-            Open: streaming || failed > 0,
+            Open: streaming || newest || failed > 0,
             Footer: footer?.Text);
     }
 }

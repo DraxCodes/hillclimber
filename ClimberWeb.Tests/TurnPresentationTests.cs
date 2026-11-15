@@ -54,6 +54,66 @@ public class TurnPresentationTests
     }
 
     [Fact]
+    public void AStoppedNewestTurnOpensButDoesNotShimmer()
+    {
+        var view = TurnPresentation.For([Tool(), Tool()], footer: null, open: true, live: false, newest: true);
+
+        Assert.Equal("Stopped after 2 steps", view.Summary);
+        Assert.Equal(StepStatus.None, view.Status);
+        Assert.True(view.Open);
+    }
+
+    [Fact]
+    public void TheNewestTurnStaysOpenAfterItsFooterArrives()
+    {
+        var view = TurnPresentation.For([Tool(), Tool()], Footer(), newest: true);
+
+        Assert.Equal("Worked in 2 steps", view.Summary);
+        Assert.Equal(StepStatus.None, view.Status);
+        Assert.True(view.Open);
+    }
+
+    [Fact]
+    public void ALiveNewestTurnShimmersEvenAfterItsFooterArrives()
+    {
+        var view = TurnPresentation.For(
+            [Tool(), Tool()],
+            Footer(),
+            live: true,
+            newest: true,
+            active: true);
+
+        Assert.Equal("Working in 2 steps", view.Summary);
+        Assert.Equal(StepStatus.Running, view.Status);
+        Assert.True(view.Open);
+    }
+
+    [Fact]
+    public void ALiveTurnBehindNewerProseOpensWithoutClaimingToWork()
+    {
+        var view = TurnPresentation.For(
+            [Tool(), Tool()],
+            Footer(),
+            live: true,
+            newest: true,
+            active: false);
+
+        Assert.Equal("Worked in 2 steps", view.Summary);
+        Assert.Equal(StepStatus.None, view.Status);
+        Assert.True(view.Open);
+    }
+
+    [Fact]
+    public void AnOlderTurnKeepsTheAllCollapsedDefault()
+    {
+        var view = TurnPresentation.For([Tool()], Footer(), live: true);
+
+        Assert.Equal("Worked in 1 step", view.Summary);
+        Assert.Equal(StepStatus.None, view.Status);
+        Assert.False(view.Open);
+    }
+
+    [Fact]
     public void AnOpenThinkingTurnWhoseRunStoppedSettles()
     {
         var view = TurnPresentation.For([Reasoning()], footer: null, open: true, live: false);

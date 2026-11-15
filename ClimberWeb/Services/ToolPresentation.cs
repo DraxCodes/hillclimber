@@ -79,7 +79,10 @@ public static class ToolPresentation
         // narrow row can clip the tail without hiding it.
         if (primaryTab)
         {
-            var title = $"{StatePrefix(status)}{agent ?? "subagent"} — see its tab";
+            // A running delegate reads as work happening on its tab, not just a pointer:
+            // the tab carries the same pulsing dot, so the row and the tab agree.
+            var suffix = status == StepStatus.Running ? " — working on its tab" : " — see its tab";
+            var title = $"{StatePrefix(status)}{agent ?? "subagent"}{suffix}";
             return new TraceView("subagent", title, null, status, null);
         }
 

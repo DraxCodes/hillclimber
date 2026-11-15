@@ -1,5 +1,5 @@
 <details class="ai-turn @StatusClass" open="@Open">
-    <summary class="ai-turn-head">
+    <summary class="ai-turn-head" @onclick="Toggle">
         <span class="ai-turn-summary">@Summary</span>
         <AiIcon Name="chevron" CssClass="ai-chevron" />
     </summary>
@@ -32,6 +32,16 @@
     /// <summary>The turn's reasoning and trace rows, in chronological order.</summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Raised when the reader clicks the summary, with the state they asked for. The page
+    /// records it so the default expansion of the newest turn never overrides a choice the
+    /// reader made themselves.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnToggle { get; set; }
+
+    private Task Toggle() => OnToggle.InvokeAsync(!Open);
 
     private string StatusClass => Status switch
     {
