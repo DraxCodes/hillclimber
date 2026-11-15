@@ -86,38 +86,40 @@ else
                             disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Hillclimb)">hillclimb</button>
                 </div>
 
-                <div class="spendline order-4 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1" aria-label="Provider connections and spend">
-                    @foreach (var provider in Providers.Providers)
-                    {
-                        <span class="conn hidden min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex"
-                              data-provider="@provider.Id"
-                              aria-label="@($"{provider.DisplayName}: {ProviderLabel(provider)}")"
-                              title="@($"{provider.DisplayName}: {ProviderLabel(provider)}")">
-                            <span class="@ToneDot(provider)" aria-hidden="true"></span>
-                            <span class="hidden truncate sm:inline">@provider.DisplayName.ToLowerInvariant()</span>
-                            <span class="hidden text-muted-foreground/80 md:inline">@ProviderLabel(provider)</span>
+                <div class="order-4 flex min-w-0 basis-full flex-wrap items-center justify-center gap-x-5 gap-y-1.5 lg:pl-60">
+                    <div class="spendline flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1" aria-label="Provider connections and spend">
+                        @foreach (var provider in Providers.Providers)
+                        {
+                            <span class="conn hidden min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex"
+                                  data-provider="@provider.Id"
+                                  aria-label="@($"{provider.DisplayName}: {ProviderLabel(provider)}")"
+                                  title="@($"{provider.DisplayName}: {ProviderLabel(provider)}")">
+                                <span class="@ToneDot(provider)" aria-hidden="true"></span>
+                                <span class="hidden truncate sm:inline">@provider.DisplayName.ToLowerInvariant()</span>
+                                <span class="hidden text-muted-foreground/80 md:inline">@ProviderLabel(provider)</span>
+                            </span>
+                        }
+                        <span class="spend-item text-xs text-muted-foreground">
+                            spent <b class="font-semibold text-foreground">@ActiveSpendText</b>
+                            <span class="hidden text-muted-foreground/80 sm:inline">@ActiveSpendNoun</span>
                         </span>
-                    }
-                    <span class="spend-item text-xs text-muted-foreground">
-                        spent <b class="font-semibold text-foreground">@ActiveSpendText</b>
-                        <span class="hidden text-muted-foreground/80 sm:inline">@ActiveSpendNoun</span>
-                    </span>
-                </div>
+                    </div>
 
-                <div class="providerbar order-5 flex min-w-0 flex-wrap items-center gap-1" aria-label="provider">
-                    <span class="label font-mono text-[0.62rem] uppercase tracking-[0.12em] text-muted-foreground">platform</span>
-                    @foreach (var provider in Providers.Providers)
-                    {
-                        <button class="method @(SelectedProviderId == provider.Id ? "active" : string.Empty) focus-ring inline-flex h-7 items-center rounded-md border px-2 font-mono text-[0.68rem] transition-colors disabled:opacity-50"
-                                type="button"
-                                disabled="@AnyRunning"
-                                aria-pressed="@(SelectedProviderId == provider.Id)"
-                                title="@ProviderNote"
-                                @onclick="() => SelectProvider(provider.Id)">
-                            <span class="@UiClass.Join(ToneDot(provider), "mr-1.5 sm:hidden")" aria-hidden="true"></span>
-                            @provider.DisplayName.ToLowerInvariant()
-                        </button>
-                    }
+                    <div class="providerbar flex min-w-0 flex-wrap items-center gap-1" aria-label="provider">
+                        <span class="label font-mono text-[0.62rem] uppercase tracking-[0.12em] text-muted-foreground">platform</span>
+                        @foreach (var provider in Providers.Providers)
+                        {
+                            <button class="method @(SelectedProviderId == provider.Id ? "active" : string.Empty) focus-ring inline-flex h-7 items-center rounded-md border px-2 font-mono text-[0.68rem] transition-colors disabled:opacity-50"
+                                    type="button"
+                                    disabled="@AnyRunning"
+                                    aria-pressed="@(SelectedProviderId == provider.Id)"
+                                    title="@ProviderNote"
+                                    @onclick="() => SelectProvider(provider.Id)">
+                                <span class="@UiClass.Join(ToneDot(provider), "mr-1.5 sm:hidden")" aria-hidden="true"></span>
+                                @provider.DisplayName.ToLowerInvariant()
+                            </button>
+                        }
+                    </div>
                 </div>
 
                 @if (_method == RunMethod.Run)
@@ -168,7 +170,6 @@ else
                         </div>
                     </dl>
                 }
-                <div class="order-3 hidden basis-full sm:block" aria-hidden="true"></div>
             </div>
         </div>
     </SectionContent>
