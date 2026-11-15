@@ -15,29 +15,37 @@ latency, size) with a `plan-architect` agent and a read-only
 The gate is the 1–10 rubric in `docs/agents/hillclimb-rubric.md`. Read it before
 the first score; quote it, don't paraphrase it.
 
-- **Below 8:** name the specific flaws holding it back, fix those flaws, iterate.
+- **Below 8:** name the specific subjective flaws holding it back (for example
+  clunky transitions, visual clutter, unclear hierarchy), fix those flaws, and
+  iterate.
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
-- **Tests, build and free harnesses are a floor**, not the iterate/stop signal. A
-  red floor cannot reach 8.
+- **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
+  iterations, then stop and report the ceiling if the score does not move.
+- **Floor:** a passing build, `dotnet test` and the free assertion harnesses. A
+  red floor cannot score 8 and cannot ship.
+
+The score is the only iterate/stop signal. A green floor does not earn a ship; a
+number moving does not earn a ship. `scripts/ui/polish.mjs` is supporting evidence,
+not a threshold: it exits 0 whatever its UPS, so only a harness error or a detected
+run fails it.
 
 ## Roles
 
 - `plan-architect` (subagent): declares the target score, the evidence plan, the
   ordered flaws to fix, the floor and the stop conditions. It does not edit code.
-- `quality-gatekeeper` (subagent): read-only scorer. Captures evidence, assigns the
-  1–10 score, names why not the next level, and checks the floor. It does not edit
-  code and does not negotiate the score.
-- `task-orchestrator` (primary): runs the loop, makes the changes, applies the gate
-  and commits. It cannot raise a score.
+- `quality-gatekeeper` (subagent): read-only scorer. Reviews the captured evidence,
+  assigns the 1–10 score, names why not the next level, and checks the floor. It
+  does not edit code and does not negotiate the score.
+- `task-orchestrator` (primary): runs the loop, seeds and captures the evidence,
+  makes the changes, applies the gate and commits. It cannot raise a score.
 
 ## Workflow
 
 0. **Sharpen (optional).** If "better" is genuinely unclear, load the `grilling`
    skill and interview the user until the target and the flaws are settled. Skip it
    when the task already names what is wrong — grilling costs real tokens.
-1. **Frame.** Name the artifact and the target score. The default is 8; a 10
-   requires `Target score: 10` in the task or spec. If the target is missing, ask
-   once rather than assuming.
+1. **Frame.** Name the artifact and the target score. The default is 8; only
+   `Target score: 10` in the task or spec raises it. Record the target; do not ask.
 2. **Plan.** Launch `plan-architect`. Capture the target, evidence plan, ordered
    flaws, floor and stop conditions. Do not proceed without a baseline score.
 3. **Baseline.** Seed temporary sample data, capture the evidence, and have
@@ -49,21 +57,21 @@ the first score; quote it, don't paraphrase it.
    3. Launch `quality-gatekeeper` to score the change and check the floor.
    4. On a higher score and a green floor, stage and commit exactly this change as
       one atomic commit.
-   5. On a lower score or a red floor, revert the change and record why.
-   6. On an unchanged score, revert unless the change is required to reach the
-      next flaw, and record that reason.
-5. **Stop.** Stop at the target score, when the score stops moving, when the budget
-   is exhausted, or after two no-movement iterations. Report the baseline score,
-   the final score with its named remaining flaws, the floor results, and the kept
-   commits. Remove the seed.
+   5. On an unchanged or lower score, or a red floor, revert the change and record
+      why.
+5. **Stop.** Stop at the target score, after two consecutive iterations without a
+   higher score, when a 10 was demanded and the ceiling is reached, or when the
+   budget is exhausted. Report the baseline score, the final score with its named
+   remaining flaws, the floor results, and the kept commits. Remove the seed.
 
 ## The floor
 
 Before any score counts, run the project's free checks: `dotnet test`, the build
-warnings, and the free harnesses (`scripts/ui/polish.mjs`, `theme-nav`,
-`security`, `providers`). The paid `scripts/ui/surfaces.mjs` runs only with
-explicit approval, Surplus only, and stopped immediately. Label anything not run
-as **not run**; never imply it passed.
+warnings, and the free assertion harnesses (`theme-nav`, `security`, `providers`).
+`scripts/ui/polish.mjs` runs as supporting evidence: its UPS is reported, and only
+a harness error or a detected run fails it. The paid `scripts/ui/surfaces.mjs` runs
+only with explicit approval, Surplus only, and stopped immediately. Label anything
+not run as **not run**; never imply it passed.
 
 ## Rules
 

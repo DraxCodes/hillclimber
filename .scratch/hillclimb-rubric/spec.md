@@ -27,8 +27,10 @@ finish, with a gate that is explicit about when to keep polishing and when to sh
    375 in both themes, and a short first-run/keyboard read-through. Every named
    flaw or strength says what is visible and where.
 4. **Tests/build stay a hard floor.** `dotnet test`, build warnings and the free
-   harnesses must pass before any score counts; a red floor cannot reach 8. They no
-   longer decide whether to iterate.
+   assertion harnesses must pass before any score counts; a red floor cannot reach
+   8. `polish.mjs` is supporting evidence, not a threshold: it exits 0 whatever its
+   UPS, so only its harness error or a detected run fails it. They no longer decide
+   whether to iterate.
 5. **Demanding a 10.** Explicit only: `Target score: 10` in the task prompt or
    spec. Otherwise 8 is the ship threshold. At 8–9 with a 10 demanded, the
    gatekeeper names what a 10 requires, the loop gets at most two attempts, then
@@ -60,8 +62,11 @@ adjectives are not evidence.
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
   iterations, then stop and report the ceiling if the score does not move.
-- **Floor:** a passing build, `dotnet test` and the free harnesses. A red floor
-  cannot score 8 and cannot ship.
+- **Floor:** a passing build, `dotnet test` and the free assertion harnesses. A
+  red floor cannot score 8 and cannot ship.
+
+The score is the only iterate/stop signal. Two consecutive iterations without a
+higher score stop the loop; a demanded 10 that stalls reports its ceiling.
 
 ## Anti-inflation rules
 
@@ -105,3 +110,23 @@ skills and does not own these files, so it needs no edit.
 3. Skill, command, agents and `AGENTS.md` agree with the rubric and contain no
    leftover "measurable metric is the decision" wording.
 4. `dotnet test` is green; anything not run is labelled as not run.
+
+## Evidence
+
+- **Tests:** `dotnet test --nologo` → **311 passed, 0 failed, 0 skipped**
+  (402 ms), both projects built. This change is documentation and agent prompts;
+  no test was added or changed.
+- **Not run:** the free browser harnesses (`polish.mjs`, `theme-nav`, `security`,
+  `providers`) were **not run** — they need a running server and this change
+  touches no UI. The paid `surfaces.mjs` was **not run** and was not needed.
+- **Review:** `/code-review 1206434` ran both axes. It found drift between copies
+  of the gate, a one-vs-two no-movement contradiction, an unrepresentable ceiling
+  verdict, ambiguous evidence ownership, and an uplift on `polish.mjs`. The gate is
+  now quoted verbatim in the rubric, `AGENTS.md`, the skill and the command; the
+  gatekeeper gained a `STOP` verdict; evidence capture belongs to the orchestrator;
+  `polish.mjs` is supporting evidence, not a threshold. The exact 5/8/10 anchors
+  were confirmed already verbatim, so they were left untouched.
+
+## Fixed point for review
+
+Session start HEAD is `1206434`. `/code-review 1206434`.

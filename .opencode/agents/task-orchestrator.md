@@ -43,17 +43,23 @@ objective (coverage, warnings, latency, bundle size, failing tests), follow the
 
 Apply the rubric gate exactly:
 
-- Below 8: name the specific flaws and keep iterating.
-- 8 or above: stop and ship, unless the task explicitly demands a 10.
-- 8–9 with a 10 demanded: name what a 10 requires, attempt at most two iterations, then
-  stop and report the ceiling if the score does not move.
+- **Below 8:** name the specific subjective flaws holding it back (for example
+  clunky transitions, visual clutter, unclear hierarchy), fix those flaws, and
+  iterate.
+- **8 or above:** stop and ship, unless the task explicitly demands a 10.
+- **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
+  iterations, then stop and report the ceiling if the score does not move.
+- **Floor:** a passing build, `dotnet test` and the free assertion harnesses. A
+  red floor cannot score 8 and cannot ship.
 
-The passing build, `dotnet test` and the free harnesses are a floor, not the stop signal.
-A red floor cannot score 8 and cannot ship.
+The score is the only iterate/stop signal. A green floor does not earn a ship; a
+number moving does not earn a ship. Two consecutive iterations without a higher
+score stop the loop.
 
 ## Rules
 
-- Never commit a change the `quality-gatekeeper` marked `REVERT`.
+- Never commit a change the `quality-gatekeeper` has not scored, and never commit
+  one it marked `REVERT`.
 - The `security-auditor` always runs, on every change; its findings are routed, never
   skipped, and it never lowers its bar for cost.
 - Never let the `plan-architect`, `quality-gatekeeper` or `security-auditor` modify files;
@@ -62,6 +68,6 @@ A red floor cannot score 8 and cannot ship.
   plan or a score should save more rework than the extra tokens it spends.
 - Never commit secrets or personal data (`.env`, API keys, `*.pem`, `*.key`,
   `*.local.json`). Check `git status` before every commit.
-- Stop when the target is met, the score stops moving, the budget is exhausted, or two
-  no-movement iterations pass. Report the baseline score, the final state, and the kept
-  commits.
+- Stop when the target is met, two consecutive iterations pass without a higher
+  score, a demanded 10 reaches its ceiling, or the budget is exhausted. Report the
+  baseline score, the final state, and the kept commits.

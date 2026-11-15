@@ -11,9 +11,19 @@ measurable objective (coverage, warnings, build/test time, bundle size, response
 time), ask whether to run the hillclimb workflow before implementing it directly.
 It is opt-in, so don't assume; a one-line question is enough.
 
-The gate is the 1–10 rubric in `docs/agents/hillclimb-rubric.md`: below 8, name the
-specific flaws and iterate; 8 or above, ship unless the task explicitly demands a
-10. Tests and build are a floor, not the iterate/stop signal.
+The gate is the 1–10 rubric in `docs/agents/hillclimb-rubric.md`:
+
+- **Below 8:** name the specific subjective flaws holding it back (for example
+  clunky transitions, visual clutter, unclear hierarchy), fix those flaws, and
+  iterate.
+- **8 or above:** stop and ship, unless the task explicitly demands a 10.
+- **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
+  iterations, then stop and report the ceiling if the score does not move.
+- **Floor:** a passing build, `dotnet test` and the free assertion harnesses. A
+  red floor cannot score 8 and cannot ship.
+
+The score is the only iterate/stop signal. A green floor does not earn a ship; a
+number moving does not earn a ship.
 
 ## Working preferences
 
@@ -36,12 +46,11 @@ and handoffs inherit them without re-asking:
    Playwright harness under `scripts/ui`, which drives real `opencode` runs) may be
    skipped, but say plainly that they were **not run** rather than implying they
    passed.
-4. **Gate hillclimb on perceived quality, not statistics.** Use the 1–10 rubric in
-   `docs/agents/hillclimb-rubric.md` as written: score from seeded screenshots and
-   a first-run/keyboard read-through; below 8 means name the specific flaws and
-   iterate, 8 or above means ship unless the task says `Target score: 10`. Keep
-   tests, build and the free harnesses as a floor — a green number never
-   substitutes for the rubric.
+4. **Gate hillclimb on perceived quality, not statistics.** Score with the 1–10
+   rubric in `docs/agents/hillclimb-rubric.md`, from seeded screenshots and a
+   first-run/keyboard read-through. The gate above applies as written: a green
+   number never substitutes for the rubric, and tests/build are a floor.
+   Token-spending harnesses stay optional per preference 3.
 
 ## Session hygiene
 

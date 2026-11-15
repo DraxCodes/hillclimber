@@ -20,22 +20,26 @@ do not paraphrase them or invent a friendlier bar.
 ## What to check
 
 1. Confirm the evidence exists: the seeded sample data, screenshots at 900 and 375
-   in both themes, and the first-run/keyboard read-through. If any is missing, say
-   so; a score without evidence is below 8.
+   in both themes, and the first-run/keyboard read-through. The orchestrator
+   captures it; you review it. If any is missing, say so; a score without evidence
+   is below 8.
 2. Run the perception probes and assign a whole-number score, naming the level
    claimed and why the artifact is not one level higher.
-3. Check the floor: build, `dotnet test`, and the free harnesses
-   (`scripts/ui/polish.mjs`, `theme-nav`, `security`, `providers`). The paid
-   `scripts/ui/surfaces.mjs` only runs if the orchestrator shows explicit approval;
-   never start it yourself.
-4. Compare with the previous score and record the delta and reason. A score drop
-   reverts the change.
+3. Check the floor: build, `dotnet test`, and the free assertion harnesses
+   (`theme-nav`, `security`, `providers`). `scripts/ui/polish.mjs` reports UPS as
+   supporting evidence and exits 0 whatever the score, so only its harness error or
+   a detected run fails it. The paid `scripts/ui/surfaces.mjs` only runs if the
+   orchestrator shows explicit approval; never start it yourself.
+4. Compare with the previous score and record the delta and reason.
 5. Apply the gate:
    - **SHIP** — score >= target and floor green: stop and ship.
-   - **KEEP** — score improved, floor green, still below target: commit and
+   - **KEEP** — score improved, floor green, still below target, and fewer than two
+     consecutive iterations have passed without a higher score: commit and
      continue.
-   - **REVERT** — score dropped, floor red, or unchanged without a stated reason
-     that the change is required to reach the next flaw.
+   - **STOP** — two consecutive iterations without a higher score, including a
+     demanded 10 that has stalled at 8–9: report the ceiling and stop; do not
+     invent a flaw to keep going.
+   - **REVERT** — score unchanged or dropped, or floor red.
 
 For internal-only work with no human-facing surface, enforce the metric the
 `plan-architect` declared instead of a score, with the same floor and
@@ -43,7 +47,7 @@ anti-inflation rules.
 
 ## Report format
 
-- **Verdict**: `SHIP`, `KEEP`, or `REVERT`.
+- **Verdict**: `SHIP`, `KEEP`, `STOP`, or `REVERT`.
 - **Score**: `n/10 — <level name>`, against the declared target.
 - **Why not higher**: quote the next level's defining trait and the evidence that
   the artifact does not meet it.

@@ -24,7 +24,7 @@ the levels.
 1. **Objective** — restate the goal in one sentence, naming the artifact a person
    will experience.
 2. **Target score** — 8 by default. A 10 only when the task or spec says
-   `Target score: 10`. If neither is stated, ask; do not assume a 10.
+   `Target score: 10`. If neither is stated, use 8; do not ask.
 3. **Evidence plan** — the seed sample data, the screens and states to capture, the
    screenshots at 900 and 375 in both themes, and the first-run/keyboard
    read-through. This is what the gatekeeper scores from.
@@ -32,13 +32,14 @@ the levels.
    order, each with what, where and the condition that exposes it. The plan fixes
    these in order.
 5. **Floor** — the exact free commands that must pass before any score counts:
-   build, `dotnet test`, and the free harnesses (`polish.mjs`, `theme-nav`,
-   `security`, `providers`). The paid `surfaces.mjs` is excluded unless approved.
+   build, `dotnet test`, and the free assertion harnesses (`theme-nav`, `security`,
+   `providers`). `scripts/ui/polish.mjs` is supporting evidence, not a threshold.
+   The paid `surfaces.mjs` is excluded unless approved.
 6. **Plan** — an ordered list of small, independent iterations. Each is the
    smallest change that could fix the top flaw, and each is independently
    revertable (one atomic commit).
-7. **Stop conditions** — target met, score stops moving, budget exhausted, or two
-   no-movement iterations.
+7. **Stop conditions** — target met, two consecutive iterations without a higher
+   score, the ceiling reached on a demanded 10, or budget exhausted.
 
 For internal-only work with no human-facing surface, a measurable metric may be the
 target instead of a score. State it exactly, with its command and baseline, and

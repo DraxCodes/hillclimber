@@ -61,8 +61,8 @@ Observable traits:
 - Exactly one named, low-exposure imperfection remains: a rare state, an advanced
   control, or a single microinconsistency a first-time user would not meet while
   doing the primary task.
-- If the reviewer cannot name the one edge, the artifact is a 10; if the edge sits
-  on the main path, it is a 7 or lower.
+- If the reviewer cannot name the one edge, score 10 and state that no flaw was
+  found across the probes; if the edge sits on the main path, it is a 7 or lower.
 
 ### 8 — Clean & Clear
 
@@ -158,11 +158,16 @@ Observable traits:
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
   iterations, then stop and report the ceiling if the score does not move.
-- **Floor:** a passing build, `dotnet test` and the free harnesses. A red floor
-  cannot score 8 and cannot ship.
+- **Floor:** a passing build, `dotnet test` and the free assertion harnesses. A
+  red floor cannot score 8 and cannot ship.
 
 The score is the only iterate/stop signal. A green floor does not earn a ship; a
-number moving does not earn a ship. Only the rubric does.
+number moving does not earn a ship. Only the rubric does. Two consecutive
+iterations without a higher score stop the loop.
+
+`scripts/ui/polish.mjs` is supporting evidence, not a threshold: it reports a UI
+Polish Score and exits 0 whatever the score, so only a harness error or a detected
+run fails it. Do not turn its UPS into a gate until backlog issue 05 adds one.
 
 ## Evidence a score must cite
 
@@ -191,7 +196,7 @@ Flaws holding it at 7:
   2. <what> — <where> — <condition>
 Why not 8: <the level-8 trait that is missing>
 Why not 6: <the level-6 trait that is absent>
-Floor: dotnet test <result>; build <result>; polish <result or not run>
+Floor: dotnet test <result>; build <result>; polish <UPS and exit, or not run>
 ```
 
 ## Anti-inflation rules
@@ -201,8 +206,8 @@ Floor: dotnet test <result>; build <result>; polish <result or not run>
 - A below-8 score must name at least one concrete flaw with its location and the
   condition that exposes it.
 - Scores are whole numbers; no 7.5.
-- Record the score per iteration with its delta and the reason. No movement stops
-  the loop; a drop reverts the change.
+- Record the score per iteration with its delta and the reason. Two consecutive
+  iterations without a higher score stop the loop; a drop reverts the change.
 - `quality-gatekeeper` sets the score and `task-orchestrator` applies it. The
   orchestrator cannot raise a score; a disagreement is settled by re-reading the
   evidence, not by averaging.
@@ -224,5 +229,5 @@ The same levels apply when the artifact is not a screen; only the evidence chang
 ## Target score
 
 The default target is **8**. A 10 is demanded only when the task prompt or spec
-says `Target score: 10` in as many words. Record the target before the first
-score; it does not move during a run.
+says `Target score: 10` in as many words. When no target is stated, use 8; do not
+ask. Record the target before the first score; it does not move during a run.
