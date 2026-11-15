@@ -202,6 +202,71 @@
             // Remember the most recently opened transcript disclosure so Escape has a target
             // even when focus sits on the page body. Other page dialogs keep their own keys.
             var lastOpened = null;
+
+            // A toggle fires after the browser has already grown the row, so the summary's
+            // position before the change is captured on the click (or Escape) that causes it.
+            var anchorPending = null;
+
+            function captureAnchor(summary) {
+                var details = summary && summary.parentElement;
+                if (!details || details.tagName !== "DETAILS") return;
+                anchorPending = { details: details, top: summary.getBoundingClientRect().top };
+            }
+
+            // Keep the clicked summary under the reader's eye: shift the feed by however far
+            // the summary moved, or align a block taller than the panel to the near edge.
+            // The arithmetic mirrors StepScrollMath.Target; the unit tests own the clamps.
+            function anchorDisclosure(details, beforeTop) {
+                var feed = document.getElementById("log-feed");
+                if (!feed || !feed.contains(details)) return;
+                var summary = details.querySelector(":scope > summary");
+                if (!summary) return;
+
+                var feedRect = feed.getBoundingClientRect();
+                var afterTop = summary.getBoundingClientRect().top;
+                var body = details.querySelector(":scope > div");
+                var bodyRect = details.open && body ? body.getBoundingClientRect() : null;
+                var bodyHeight = bodyRect ? bodyRect.height : 0;
+                var tall = details.open && bodyHeight > feedRect.height - 60;
+                var delta = tall ? afterTop - feedRect.top : afterTop - beforeTop;
+
+                if (details.open && !tall && bodyHeight > 0 && bodyRect.bottom > 0) {
+                    var bodyBottomAfter = bodyRect.bottom - delta;
+                    if (bodyBottomAfter > feedRect.bottom + 2) {
+                        delta += bodyBottomAfter - feedRect.bottom;
+                    }
+                    var bodyTopAfter = bodyRect.top - delta;
+                    if (bodyTopAfter < feedRect.top - 2) {
+                        delta -= feedRect.top - bodyTopAfter;
+                    }
+                }
+
+                var summaryAfter = afterTop - delta;
+                if (summaryAfter < feedRect.top - 2) {
+                    delta -= feedRect.top - summaryAfter;
+                } else if (summaryAfter > feedRect.bottom + 2) {
+                    delta += summaryAfter - feedRect.bottom;
+                }
+
+                if (Math.abs(delta) < 2) return;
+
+                var max = Math.max(0, feed.scrollHeight - feed.clientHeight);
+                var target = feed.scrollTop + delta;
+                target = isSolo(feed)
+                    ? Math.max(0, Math.min(max, target))
+                    : Math.min(0, Math.max(-max, target));
+                if (Math.abs(target - feed.scrollTop) < 0.5) return;
+
+                var reduce = window.matchMedia
+                    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                feed.scrollTo({ top: target, behavior: reduce ? "auto" : "smooth" });
+            }
+
+            document.addEventListener("click", function (e) {
+                var summary = e.target && e.target.closest ? e.target.closest("#log-feed summary") : null;
+                if (summary) captureAnchor(summary);
+            }, true);
+
             document.addEventListener("toggle", function (e) {
                 var details = e.target;
                 if (!details || details.tagName !== "DETAILS") return;
@@ -210,6 +275,11 @@
                     lastOpened = details;
                 } else if (lastOpened === details) {
                     lastOpened = null;
+                }
+                if (anchorPending && anchorPending.details === details) {
+                    var beforeTop = anchorPending.top;
+                    anchorPending = null;
+                    anchorDisclosure(details, beforeTop);
                 }
                 syncLatest();
             }, true);
@@ -312,6 +382,8 @@
                 var details = active && active.closest ? active.closest("#log-feed details[open]") : null;
                 if (!details && lastOpened && lastOpened.open) details = lastOpened;
                 if (!details) return;
+                var closingSummary = details.querySelector(":scope > summary");
+                if (closingSummary) captureAnchor(closingSummary);
                 details.removeAttribute("open");
                 var summary = details.querySelector("summary");
                 if (summary) summary.focus();

@@ -331,6 +331,9 @@
     font-size: 0.76rem;
     line-height: 1.55;
     overscroll-behavior: contain;
+    /* The disclosure anchor owns the offset adjustment; browser scroll anchoring would
+       apply its own shift first and make the two disagree. */
+    overflow-anchor: none;
     -webkit-overflow-scrolling: touch;
 }
 
