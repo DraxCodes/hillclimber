@@ -1,9 +1,8 @@
 # Spec: Scroll the output panel to the step a reader expands
 
-Status: open, reported by the user on 2026-11-15, immediately after the
+Status: approach settled with the user on 2026-11-15, reported immediately after the
 [output-panel-readability](../output-panel-readability/spec.md) hillclimb shipped at 8/10.
-Nothing here is designed or implemented yet; the approach has to be settled with the user
-first (AGENTS.md preference 1).
+Implementation not started; the decisions below are locked (AGENTS.md preference 1).
 
 ## The report (user's words)
 
@@ -71,6 +70,27 @@ first (AGENTS.md preference 1).
    reading should pin the window against that (likely yes: once they have expanded and been
    re-anchored, they are no longer at the live edge, and the existing "latest" button already
    tracks that). Verify what happens today before choosing.
+
+## Decisions (settled 2026-11-15, with the user)
+
+1. **What moves.** Pin the clicked summary and reveal the body below it. Measure the
+   summary's `getBoundingClientRect()` around the toggle and shift `scrollTop` by the delta.
+2. **Scope.** Every `<details>` inside `#log-feed`: turns, reasoning blocks, terminal cards
+   and trace rows. One capture-phase listener covers all of them, and nesting still shifts
+   once per toggle.
+3. **Tall blocks and motion.** A block taller than the panel aligns its summary to the near
+   edge and lets the body scroll. `behavior: "smooth"` unless
+   `prefers-reduced-motion: reduce`, then one jump; deltas under a few pixels are skipped.
+   No `focus()` call, so the focus ring stays on the summary and Enter/Escape keep working.
+4. **Close and the live edge.** On close, shift by the collapsed height so the summary stays
+   where it was and no blank space is left. Do not pin the window against new streaming
+   events: once re-anchored the reader is off the live edge, and the existing `latest` button
+   already says so. The per-tab restore must not be re-anchored while it is putting a saved
+   offset back.
+
+The arithmetic (direction-aware shift, clamping, tall-block alignment, no-op threshold) lives
+in a pure service with unit tests; `App.razor` keeps only DOM wiring, beside the existing
+toggle listener and tab-state functions.
 
 ## Evidence plan
 
