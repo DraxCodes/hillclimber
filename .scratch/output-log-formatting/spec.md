@@ -104,8 +104,8 @@ the full command; status/exit; and the output. Non-shell tools keep the trace-ro
   keyboard probe), which keeps the button before the disclosure in tab order. Moving it
   outside the summary would either put it after the output body or need a non-disclosure
   header layout, so the deviation is kept and recorded here.
-- Existing `AiTraceLine`, `AiTraceGroup`, `AiMessage`, `AiMarker`, `AiCodeBlock` are
-  reused; `AiTraceGroup` retires if the turn fully replaces it.
+- Existing `AiTraceLine`, `AiMessage`, `AiMarker`, `AiCodeBlock` are reused; `AiTraceGroup`
+  retired once the turn replaced it.
 
 All components take primitives, never `LogEntry`.
 
@@ -237,6 +237,26 @@ than polishing:
 - 344 tests pass, 0 failed. `theme-nav` 0 failures, `security` 0 failures, `providers`
   15 checks 0 failures, `polish.mjs` 560 checks 0 defects / UPS 100. `surfaces.mjs`
   (paid) not run. 0 console errors, 0 horizontal overflow in the feed at 375 and 900.
+
+## Review follow-ups (`40bfae3...HEAD`)
+
+The two-axis review found three defects worth fixing before shipping; the rest (the
+`ai-status-*` switch repeated across three components, the `TurnPresentation` verb
+ternary, the `pending`/`message` buffer names, `TraceView`'s nullable pair, the
+`ReadCommand`/`ReadExitCode` key loops, the shared signaling-only glyph, and the `.solo`
+rule reaching from `ai.css` into a page class) are recorded as smells for a later pass.
+
+1. `Settle` moved out of `Home.razor` into `TurnPresentation.Settled(entries, live)` /
+   `Settle(entry)` with tests, per `docs/ai-elements.md` (pure transforms live in a tested
+   service, not the page).
+2. Prose arriving during a turn now closes that turn and renders in place, then the work
+   after it opens the next turn — chronological, and still never folded. A `step_finish`
+   that lands after prose renders as the quiet cost marker.
+3. An unknown event inside a turn folds in as its quiet row instead of splitting the turn;
+   between turns it still stands alone. The turn body routes it through
+   `ToolPresentation.ForEvent`, so it never reads "Ran session.updated".
+
+Floor after the follow-ups: 348 tests pass, 0 failed.
 
 ## Fixed point for review
 
