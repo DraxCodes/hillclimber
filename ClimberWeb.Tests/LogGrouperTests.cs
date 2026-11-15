@@ -79,15 +79,28 @@ public class LogGrouperTests
     }
 
     [Fact]
-    public void ProseBeforeAStepFinishLeavesTheFooterAsAQuietMarker()
+    public void ProseBeforeAStepFinishKeepsTheFooterOnItsTurn()
     {
         var finish = Finish(3);
         var items = LogGrouper.Group([Tool("shell", 1), Text("done", 2), finish]);
 
         Assert.Equal(
-            new[] { OutputItemKind.Turn, OutputItemKind.Message, OutputItemKind.Marker },
+            new[] { OutputItemKind.Turn, OutputItemKind.Message },
             items.Select(item => item.Kind));
-        Assert.Same(finish, items[2].Entries[0]);
+        Assert.Same(finish, items[0].Footer);
+        Assert.Equal("done", items[1].Entries.Single().Text);
+    }
+
+    [Fact]
+    public void AFooterWithNothingButProseBeforeItIsStillAMarker()
+    {
+        var finish = Finish(2);
+        var items = LogGrouper.Group([Text("answer", 1), finish]);
+
+        Assert.Equal(
+            new[] { OutputItemKind.Message, OutputItemKind.Marker },
+            items.Select(item => item.Kind));
+        Assert.Same(finish, items[1].Entries[0]);
     }
 
     [Fact]

@@ -711,8 +711,12 @@ else
         }
     </text>;
 
+    // A step's cost line reads the same whether it hangs under a turn or stands alone, so
+    // a footer marker keeps the turn footer's text; other markers keep their timestamp.
     private static string MarkerText(LogEntry entry) =>
-        string.IsNullOrEmpty(entry.Timestamp) ? entry.Text : $"{entry.Timestamp} · {entry.Text}";
+        entry.Kind == LogKind.StepFinish || string.IsNullOrEmpty(entry.Timestamp)
+            ? entry.Text
+            : $"{entry.Timestamp} · {entry.Text}";
 
     private static string LineClass(string line)
     {

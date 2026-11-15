@@ -77,13 +77,37 @@ public static class LogGrouper
             {
                 items.Add(new OutputItem(OutputItemKind.Turn, turn.ToArray(), footer, open));
             }
-            else if (footer is not null)
+            else if (footer is not null && !AttachToLastTurn(footer))
             {
                 // A step that produced only prose still has a cost worth one quiet line.
                 items.Add(new OutputItem(OutputItemKind.Marker, new[] { footer }));
             }
 
             turn.Clear();
+        }
+
+        // Prose closes a turn before its step finishes, so the footer can arrive with no open
+        // turn. It still belongs to that work: look back past the prose it answered and give
+        // the footer to that turn, rather than to a line of its own.
+        bool AttachToLastTurn(LogEntry footer)
+        {
+            for (var index = items.Count - 1; index >= 0; index--)
+            {
+                if (items[index].Kind == OutputItemKind.Message)
+                {
+                    continue;
+                }
+
+                if (items[index] is { Kind: OutputItemKind.Turn, Footer: null } last)
+                {
+                    items[index] = last with { Footer = footer };
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
         }
 
         foreach (var entry in entries)
