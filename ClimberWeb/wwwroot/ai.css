@@ -77,23 +77,72 @@
     overflow-wrap: anywhere;
 }
 
-/* Trace group ------------------------------------------------------------- */
+/* Turn -------------------------------------------------------------------- */
 
-.ai-trace-group {
+.ai-turn {
+    margin: 0.25rem 0 0.6rem;
+}
+
+.ai-turn-head {
     display: flex;
-    flex-direction: column;
-    gap: 0.05rem;
-    margin: 0.2rem 0 0.5rem;
-    padding-left: 0.7rem;
+    align-items: baseline;
+    gap: 0.45rem;
+    padding: 0.22rem 0.4rem;
+    border-radius: var(--radius-sm);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    list-style: none;
+}
+
+.ai-turn-head::-webkit-details-marker {
+    display: none;
+}
+
+.ai-turn-head:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+}
+
+.ai-turn-head:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
+}
+
+.ai-turn-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-turn.ai-status-error .ai-turn-summary {
+    color: var(--red);
+}
+
+.ai-turn.ai-status-running .ai-turn-summary {
+    color: var(--accent-text);
+    animation: ai-shimmer 1.4s ease-in-out infinite;
+}
+
+.ai-turn[open] .ai-chevron {
+    transform: rotate(90deg);
+}
+
+.ai-turn-body {
+    margin-left: 0.35rem;
+    padding: 0.15rem 0 0.2rem 0.65rem;
     border-left: 2px solid var(--line);
 }
 
-.ai-trace-group-head {
-    padding: 0.1rem 0 0.15rem 0.3rem;
+.ai-turn-foot {
+    padding: 0.25rem 0.3rem 0.15rem;
     color: var(--ink-3);
     font-family: var(--font-mono);
-    font-size: 0.68rem;
-    letter-spacing: 0.03em;
+    font-size: 0.66rem;
+    letter-spacing: 0.02em;
 }
 
 /* Trace line -------------------------------------------------------------- */
@@ -148,6 +197,46 @@ summary.ai-trace-row:focus-visible {
     white-space: nowrap;
 }
 
+/* On a subagent's own tab the prompt is the content, so it runs to full width instead of
+   trailing off in an ellipsis, and the short title keeps its full word. */
+.log.solo .ai-trace-title {
+    flex: none;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.log.solo .ai-trace-desc {
+    max-width: none;
+    overflow: visible;
+    white-space: normal;
+}
+
+/* A path is the fact a trace row carries, so on a narrow panel it wraps instead of
+   ending in an ellipsis; wide rows stay on one line so the column scans. A solo row's
+   description is the prompt, so it takes its own full width rather than being squeezed
+   into the sliver the title leaves. */
+@media (max-width: 560px) {
+    .ai-trace-title {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .ai-trace-desc {
+        max-width: none;
+        white-space: normal;
+    }
+
+    .log.solo .ai-trace-row {
+        flex-wrap: wrap;
+    }
+
+    .log.solo .ai-trace-desc {
+        flex: 1 1 100%;
+        order: 1;
+    }
+}
+
 .ai-chevron {
     margin-left: auto;
     color: var(--ink-3);
@@ -158,11 +247,23 @@ summary.ai-trace-row:focus-visible {
     transform: rotate(90deg);
 }
 
-.ai-status-error .ai-trace-title {
+/* Closed disclosures are not laid out at all. Chromium otherwise keeps their boxes
+   measurable while making them unfocusable, which both costs layout for output nobody is
+   reading and makes automated checks see rows they can never reach. */
+.ai-turn:not([open]) > .ai-turn-body,
+.ai-reasoning:not([open]) > .ai-reasoning-body,
+.ai-terminal:not([open]) > .ai-terminal-body,
+.ai-trace-line:not([open]) > .ai-trace-detail {
+    display: none;
+}
+
+/* Status belongs to the row it describes: a failed turn must not repaint the rows inside
+   it, so both rules name the trace line rather than any descendant. */
+.ai-trace-line.ai-status-error .ai-trace-title {
     color: var(--red);
 }
 
-.ai-status-running .ai-trace-title {
+.ai-trace-line.ai-status-running .ai-trace-title {
     color: var(--accent-text);
     animation: ai-shimmer 1.4s ease-in-out infinite;
 }
@@ -174,6 +275,174 @@ summary.ai-trace-row:focus-visible {
 
 .ai-trace-detail {
     padding: 0.1rem 0.3rem 0.45rem 1.45rem;
+}
+
+/* Terminal card ----------------------------------------------------------- */
+
+.ai-terminal {
+    margin: 0.18rem 0 0.5rem;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+.ai-terminal.ai-status-error {
+    border-left: 2px solid var(--red);
+}
+
+.ai-terminal-panel {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    cursor: pointer;
+}
+
+.ai-terminal-panel::-webkit-details-marker {
+    display: none;
+}
+
+.ai-terminal-panel:hover {
+    background: color-mix(in srgb, var(--bg) 35%, var(--surface-2));
+}
+
+.ai-terminal-panel:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--focus);
+}
+
+.ai-terminal-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.3rem 0.5rem 0.05rem;
+}
+
+.ai-terminal-icon {
+    color: var(--ink-3);
+}
+
+.ai-terminal-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-terminal-exit {
+    flex: none;
+    padding: 0 0.3rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    line-height: 1.45;
+}
+
+.ai-terminal-exit-bad {
+    border-color: color-mix(in srgb, var(--red) 35%, transparent);
+    color: var(--red);
+}
+
+.ai-terminal .ai-chevron {
+    margin-left: 0;
+}
+
+.ai-terminal[open] .ai-chevron {
+    transform: rotate(90deg);
+}
+
+.ai-terminal-cmd {
+    display: flex;
+    gap: 0.4rem;
+    max-height: 5.4rem;
+    padding: 0 0.5rem 0.35rem;
+    overflow-y: auto;
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: 0.73rem;
+    line-height: 1.5;
+}
+
+.ai-terminal-prompt {
+    flex: none;
+    color: var(--ink-3);
+    user-select: none;
+}
+
+.ai-terminal-cmd code {
+    min-width: 0;
+    color: var(--ink);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.ai-copy {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    /* 24px is the WCAG 2.2 minimum target size, and the harness threshold. */
+    min-width: 24px;
+    min-height: 24px;
+    margin: -0.15rem 0;
+    padding: 0 0.25rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    line-height: 1.5;
+    cursor: pointer;
+}
+
+.ai-copy:hover {
+    background: var(--bg);
+    color: var(--ink);
+}
+
+.ai-copy:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--focus);
+}
+
+.ai-copy.is-copied {
+    color: var(--accent-text);
+}
+
+.ai-copy.is-failed {
+    color: var(--red);
+}
+
+.ai-terminal-body {
+    padding: 0 0.4rem 0.4rem;
+}
+
+.ai-terminal-body .ai-code {
+    max-height: 14rem;
+    background: var(--bg);
+}
+
+.ai-terminal.ai-status-running .ai-terminal-title {
+    color: var(--accent-text);
+    animation: ai-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Narrow screens: a clipped title hides the one fact that identifies the call, so
+   let it wrap to two lines instead of truncating. */
+@media (max-width: 480px) {
+    .ai-terminal-title {
+        max-height: 2.8em;
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
 }
 
 /* Code block -------------------------------------------------------------- */

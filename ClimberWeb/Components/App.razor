@@ -146,6 +146,182 @@
             };
         })();
     </script>
+    <script>
+        // Transcript affordances: copy a command from a terminal card, and close the
+        // disclosure the reader is in with Escape. Delegated so Blazor re-renders and
+        // enhanced navigation do not unbind either behaviour.
+        window.climberLog = (function () {
+            function legacyCopy(text) {
+                var area = document.createElement("textarea");
+                area.value = text;
+                area.setAttribute("readonly", "");
+                area.style.position = "fixed";
+                area.style.opacity = "0";
+                document.body.appendChild(area);
+                area.select();
+                var copied = false;
+                try { copied = document.execCommand("copy"); } catch (e) { }
+                document.body.removeChild(area);
+                return copied ? Promise.resolve() : Promise.reject(new Error("copy failed"));
+            }
+
+            // navigator.clipboard needs a secure context and may still reject (permission,
+            // unfocused document), so fall back to the selection path instead of failing.
+            function copyText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(text).catch(function () {
+                        return legacyCopy(text);
+                    });
+                }
+
+                return legacyCopy(text);
+            }
+
+            document.addEventListener("click", function (e) {
+                var button = e.target && e.target.closest ? e.target.closest("[data-copy]") : null;
+                if (!button) return;
+                e.preventDefault();
+                var label = button.textContent;
+
+                function flash(text, cls) {
+                    button.textContent = text;
+                    button.classList.add(cls);
+                    setTimeout(function () {
+                        button.textContent = label;
+                        button.classList.remove(cls);
+                    }, 1200);
+                }
+
+                copyText(button.getAttribute("data-copy") || "").then(function () {
+                    flash("copied", "is-copied");
+                }).catch(function () {
+                    flash("failed", "is-failed");
+                });
+            });
+
+            // Remember the most recently opened transcript disclosure so Escape has a target
+            // even when focus sits on the page body. Other page dialogs keep their own keys.
+            var lastOpened = null;
+            document.addEventListener("toggle", function (e) {
+                var details = e.target;
+                if (!details || details.tagName !== "DETAILS") return;
+                if (!details.closest || !details.closest("#log-feed")) return;
+                if (details.open) {
+                    lastOpened = details;
+                } else if (lastOpened === details) {
+                    lastOpened = null;
+                }
+                syncLatest();
+            }, true);
+
+            // The combined stream is column-reverse, so its live edge is scrollTop 0 and
+            // engines disagree on the sign when scrolled back; compare the distance
+            // instead. A solo tab reads top down, so its live edge is the bottom.
+            function isSolo(feed) {
+                return feed.classList.contains("solo");
+            }
+
+            function atLiveEdge(feed) {
+                if (isSolo(feed)) {
+                    return feed.scrollHeight - feed.scrollTop - feed.clientHeight <= 32;
+                }
+
+                return Math.abs(feed.scrollTop) <= 32;
+            }
+
+            function syncLatest() {
+                var feed = document.getElementById("log-feed");
+                var button = document.getElementById("log-latest");
+                if (!feed || !button) return;
+                if (atLiveEdge(feed)) {
+                    button.setAttribute("hidden", "");
+                } else {
+                    button.removeAttribute("hidden");
+                }
+            }
+
+            // Scroll does not bubble, so listen in the capture phase. Looking the feed up on
+            // each event keeps this working across Blazor re-renders and tab switches.
+            document.addEventListener("scroll", function (e) {
+                if (e.target && e.target.id === "log-feed") syncLatest();
+            }, true);
+
+            document.addEventListener("click", function (e) {
+                var button = e.target && e.target.closest ? e.target.closest("[data-latest]") : null;
+                if (!button) return;
+                var feed = document.getElementById("log-feed");
+                if (!feed) return;
+                feed.scrollTop = isSolo(feed) ? feed.scrollHeight : 0;
+                syncLatest();
+            });
+
+            // Switching tabs swaps the whole row set, which would otherwise drop where the
+            // reader was scrolled and every disclosure they had opened. Keep both per tab
+            // here, then let the page put them back once Blazor has patched the DOM.
+            var tabState = Object.create(null);
+
+            // Oldest first. Rows are rendered newest first and new work is always added at
+            // the chronological end, so this order is stable while a run grows.
+            function transcriptDetails(feed) {
+                return Array.prototype.slice.call(feed.querySelectorAll("details")).reverse();
+            }
+
+            function saveTabState() {
+                var feed = document.getElementById("log-feed");
+                if (!feed) return;
+                var tab = feed.getAttribute("data-active-tab");
+                if (!tab) return;
+                tabState[tab] = {
+                    scroll: feed.scrollTop,
+                    open: transcriptDetails(feed).map(function (details) {
+                        return details.open ? 1 : 0;
+                    })
+                };
+            }
+
+            function restoreTabState(tab) {
+                var feed = document.getElementById("log-feed");
+                if (!feed) return;
+                var state = tabState[tab];
+                if (state) {
+                    var details = transcriptDetails(feed);
+                    for (var i = 0; i < details.length && i < state.open.length; i++) {
+                        if (state.open[i]) {
+                            details[i].setAttribute("open", "");
+                        } else {
+                            details[i].removeAttribute("open");
+                        }
+                    }
+
+                    feed.scrollTop = state.scroll;
+                }
+
+                syncLatest();
+            }
+
+            // Capture phase: read the tab being left before Blazor's own handler swaps the
+            // feed to the new one.
+            document.addEventListener("click", function (e) {
+                var tab = e.target && e.target.closest ? e.target.closest("[data-outtab]") : null;
+                if (tab) saveTabState();
+            }, true);
+
+            document.addEventListener("keydown", function (e) {
+                if (e.key !== "Escape") return;
+                var active = document.activeElement;
+                var details = active && active.closest ? active.closest("#log-feed details[open]") : null;
+                if (!details && lastOpened && lastOpened.open) details = lastOpened;
+                if (!details) return;
+                details.removeAttribute("open");
+                var summary = details.querySelector("summary");
+                if (summary) summary.focus();
+            });
+
+            return {
+                restoreTab: restoreTabState
+            };
+        })();
+    </script>
 </body>
 
 </html>

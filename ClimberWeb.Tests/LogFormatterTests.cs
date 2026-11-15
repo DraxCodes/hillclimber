@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ClimberWeb.Services;
 
 namespace ClimberWeb.Tests;
@@ -56,6 +57,78 @@ public class LogFormatterTests
         Assert.Equal("shell", entry.Text);
         Assert.Contains("command=Get-ChildItem -Force", entry.ToolInput);
         Assert.Equal("total 4\ndir A\n", entry.ToolOutput);
+    }
+
+    [Fact]
+    public void ReadsTheHumanTitleCommandAndExitCodeFromAShellCall()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":\"dotnet test\"},\"output\":\"ok\",\"title\":\"Run the test suite\",\"metadata\":{\"exit\":0}}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal("Run the test suite", entry.ToolTitle);
+        Assert.Equal("dotnet test", entry.Command);
+        Assert.Equal(0, entry.ExitCode);
+        Assert.Equal(StepStatus.None, entry.Status);
+    }
+
+    [Fact]
+    public void ToolTitleEqualToTheToolNameIsDropped()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":\"echo hi\"},\"output\":\"hi\",\"title\":\"shell\"}}}");
+
+        Assert.Null(LogFormatter.Parse(line).ToolTitle);
+    }
+
+    [Fact]
+    public void InputDescriptionBecomesTheTitleWhenStateHasNone()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":\"dotnet test\",\"description\":\"Run the tests\"},\"output\":\"ok\"}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal("Run the tests", entry.ToolTitle);
+        Assert.Equal("command=dotnet test", entry.ToolInput);
+    }
+
+    [Fact]
+    public void ShellCommandKeepsItsFullTextWhenTheInputSummaryCannot()
+    {
+        var command = "dotnet test --filter \"Category=Unit · Slow\"\n  --nologo";
+        var payload = "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":"
+            + JsonSerializer.Serialize(command)
+            + "},\"output\":\"ok\"}}}";
+
+        var entry = LogFormatter.Parse(Stamped(payload));
+
+        Assert.Equal(command, entry.Command);
+        Assert.DoesNotContain("\n", entry.ToolInput);
+    }
+
+    [Fact]
+    public void NonZeroExitCodeMarksTheCallFailed()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"shell\",\"state\":{\"status\":\"completed\",\"input\":{\"command\":\"dotnet build\"},\"output\":\"error CS1002\",\"metadata\":{\"exit\":1}}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(StepStatus.Failed, entry.Status);
+        Assert.Equal(1, entry.ExitCode);
+    }
+
+    [Fact]
+    public void NonShellToolHasNoCommand()
+    {
+        var line = Stamped(
+            "{\"type\":\"tool_use\",\"part\":{\"type\":\"tool\",\"tool\":\"read\",\"state\":{\"status\":\"completed\",\"input\":{\"filePath\":\"src/Foo.cs\"},\"output\":\"contents\",\"metadata\":{\"exit\":1}}}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Null(entry.Command);
     }
 
     [Theory]
@@ -181,7 +254,8 @@ public class LogFormatterTests
         Assert.Contains("stop", finish.Text);
         Assert.Contains("221", finish.Text);
         Assert.Contains("116", finish.Text);
-        Assert.Contains("reasoning 17", finish.Text);
+        Assert.Contains("17 reasoning", finish.Text);
+        Assert.DoesNotContain("step finish", finish.Text);
         Assert.Contains("cache 7296 read", finish.Text);
     }
 

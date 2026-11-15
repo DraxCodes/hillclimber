@@ -8,8 +8,11 @@ public class ToolPresentationTests
         string name,
         string? input = null,
         string? output = null,
-        StepStatus status = StepStatus.None) =>
-        new("raw", "12:00:00", LogKind.Tool, name, input, output, status);
+        StepStatus status = StepStatus.None,
+        string? title = null,
+        string? command = null,
+        int? exitCode = null) =>
+        new("raw", "12:00:00", LogKind.Tool, name, input, output, status, title, command, exitCode);
 
     private static LogEntry Subagent(
         string agent,
@@ -147,6 +150,19 @@ public class ToolPresentationTests
         Assert.Null(view.Description);
     }
 
+    [Theory]
+    [InlineData("session.updated", "session updated")]
+    [InlineData("mcp_tools-changed", "mcp tools changed")]
+    public void UnknownEventReadsAsLowercaseProse(string type, string title)
+    {
+        var view = ToolPresentation.ForEvent(Tool(type));
+
+        Assert.Equal("gear", view.Icon);
+        Assert.Equal(title, view.Title);
+        Assert.Null(view.Description);
+        Assert.Equal("raw", view.Detail);
+    }
+
     [Fact]
     public void KnownToolWithoutItsKeyFallsBackToTheToolName()
     {
@@ -233,5 +249,85 @@ public class ToolPresentationTests
 
         Assert.True(view.Title.Length <= 80, $"title was {view.Title.Length} characters");
         Assert.EndsWith("…", view.Title);
+    }
+
+    [Fact]
+    public void HumanTitleWinsOverTheGrammarTitle()
+    {
+        var view = ToolPresentation.For(
+            Tool("shell", "command=dotnet test", "269 passed", title: "Run the test suite", command: "dotnet test"),
+            primaryTab: true);
+
+        Assert.Equal("Run the test suite", view.Title);
+        Assert.Equal("dotnet test", view.Command);
+        Assert.Equal("269 passed", view.Detail);
+    }
+
+    [Fact]
+    public void HumanTitleThatRepeatsThePathKeepsTheGrammarVerb()
+    {
+        var view = ToolPresentation.For(
+            Tool("read", "filePath=src/Foo.cs", "contents", title: "src/Foo.cs"),
+            primaryTab: true);
+
+        Assert.Equal("Read src/Foo.cs", view.Title);
+    }
+
+    [Fact]
+    public void HumanTitleEqualToTheCommandKeepsTheGrammarTitle()
+    {
+        var view = ToolPresentation.For(
+            Tool("shell", "command=dotnet test", "ok", title: "dotnet test", command: "dotnet test"),
+            primaryTab: true);
+
+        Assert.Equal("Ran dotnet test", view.Title);
+    }
+
+    [Fact]
+    public void FailedHumanTitleKeepsTheStatePrefix()
+    {
+        var view = ToolPresentation.For(
+            Tool(
+                "shell",
+                "command=dotnet build",
+                "error CS1002",
+                StepStatus.Failed,
+                title: "Build the solution",
+                command: "dotnet build",
+                exitCode: 1),
+            primaryTab: true);
+
+        Assert.Equal("Failed: Build the solution", view.Title);
+        Assert.Equal(1, view.ExitCode);
+        Assert.Equal(StepStatus.Failed, view.Status);
+    }
+
+    [Fact]
+    public void ShellWithACommandExposesTheTerminalFields()
+    {
+        var view = ToolPresentation.For(
+            Tool("shell", "command=dotnet test", "269 passed", command: "dotnet test", exitCode: 0),
+            primaryTab: true);
+
+        Assert.Equal("terminal", view.Icon);
+        Assert.Equal("dotnet test", view.Command);
+        Assert.Equal(0, view.ExitCode);
+    }
+
+    [Fact]
+    public void ShellWithoutACommandKeepsTheTraceRow()
+    {
+        var view = ToolPresentation.For(Tool("shell", "command=dotnet test"), primaryTab: true);
+
+        Assert.Null(view.Command);
+        Assert.Null(view.ExitCode);
+    }
+
+    [Fact]
+    public void NonShellToolNeverExposesATerminalCommand()
+    {
+        var view = ToolPresentation.For(Tool("read", "filePath=src/Foo.cs"), primaryTab: true);
+
+        Assert.Null(view.Command);
     }
 }

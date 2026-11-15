@@ -6,12 +6,16 @@ namespace ClimberWeb.Services;
 /// <param name="Description">Optional secondary text, for example a leftover input key.</param>
 /// <param name="Status">The step's display state.</param>
 /// <param name="Detail">Expandable output, or null for a row with nothing to expand.</param>
+/// <param name="Command">The full shell command, or null when the call is not a shell command.</param>
+/// <param name="ExitCode">The command's exit code when opencode recorded one; may be null.</param>
 public sealed record TraceView(
     string Icon,
     string Title,
     string? Description,
     StepStatus Status,
-    string? Detail);
+    string? Detail,
+    string? Command = null,
+    int? ExitCode = null);
 
 /// <summary>
 /// Turns a tool or subagent <see cref="LogEntry"/> into the primitives the reusable
@@ -34,9 +38,35 @@ public static class ToolPresentation
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        return entry.Kind == LogKind.Subagent
-            ? SubagentView(entry, primaryTab)
-            : ToolView(entry);
+        if (entry.Kind == LogKind.Subagent)
+        {
+            return SubagentView(entry, primaryTab);
+        }
+
+        var view = ToolView(entry);
+
+        // A shell call with a known command renders as a terminal card: the row keeps
+        // opencode's description, and the card adds the command and its exit code.
+        return string.IsNullOrWhiteSpace(entry.Command)
+            ? view
+            : view with { Command = entry.Command, ExitCode = entry.ExitCode };
+    }
+
+    /// <summary>
+    /// Builds the quiet row for an event this renderer does not understand. The type becomes
+    /// lowercase prose ("session.updated" reads "session updated"), so the row never announces
+    /// the renderer's own gap; the raw payload stays behind the disclosure.
+    /// </summary>
+    public static TraceView ForEvent(LogEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return new TraceView("gear", Humanize(entry.Text), null, StepStatus.None, entry.Raw);
+    }
+
+    private static string Humanize(string type)
+    {
+        var words = type.Split(['.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
+        return words.Length == 0 ? "event" : string.Join(' ', words);
     }
 
     private static TraceView SubagentView(LogEntry entry, bool primaryTab)
@@ -80,12 +110,22 @@ public static class ToolPresentation
         var (subject, remainder) = SplitInput(entry.ToolInput, keys);
         var status = entry.Status;
 
-        var title = status switch
+        var grammarTitle = status switch
         {
             StepStatus.Running => subject is null ? $"Running {entry.Text}" : $"{progressive} {subject}",
             StepStatus.Failed => subject is null ? $"Failed to run {entry.Text}" : $"Failed to {action} {subject}",
             _ => subject is null ? $"Ran {entry.Text}" : $"{verb} {subject}",
         };
+
+        // opencode's own description ("Build the web project") reads better than a verb
+        // guess. When it merely repeats the input the grammar already spells out — a
+        // file path, a pattern, the command itself — the grammar keeps the verb.
+        var humanTitle = entry.ToolTitle;
+        var title = !string.IsNullOrWhiteSpace(humanTitle)
+            && !string.Equals(humanTitle, entry.Command, StringComparison.Ordinal)
+            && (subject is null || !humanTitle.Contains(subject, StringComparison.Ordinal))
+                ? $"{StatePrefix(status)}{humanTitle}"
+                : grammarTitle;
 
         var description = subject is null
             ? (string.IsNullOrWhiteSpace(entry.ToolInput) ? null : entry.ToolInput)

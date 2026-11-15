@@ -56,6 +56,9 @@ public enum LogKind
 /// <param name="ToolInput">One-line summary of the tool input; may be empty.</param>
 /// <param name="ToolOutput">Tool output, or the error text when a tool failed; may be null.</param>
 /// <param name="Status">The step's completion state; <see cref="StepStatus.None"/> for non-steps.</param>
+/// <param name="ToolTitle">opencode's human description of the call (<c>state.title</c>); may be null.</param>
+/// <param name="Command">The full shell command when the tool is a shell; may be null.</param>
+/// <param name="ExitCode">The command's exit code (<c>state.metadata.exit</c>); may be null.</param>
 public sealed record LogEntry(
     string Raw,
     string Timestamp,
@@ -63,7 +66,10 @@ public sealed record LogEntry(
     string Text,
     string? ToolInput = null,
     string? ToolOutput = null,
-    StepStatus Status = StepStatus.None);
+    StepStatus Status = StepStatus.None,
+    string? ToolTitle = null,
+    string? Command = null,
+    int? ExitCode = null);
 
 /// <summary>
 /// Turns the run's log feed into display-ready <see cref="LogEntry"/> rows. Lines the
@@ -82,6 +88,8 @@ public sealed class LogFormatter
     private const int MaxSummaryLength = 100;
     private const int MaxPromptLength = 500;
     private const int MaxReasoningLength = 4000;
+    private const int MaxCommandLength = 16000;
+    private const int MaxTitleLength = 200;
 
     private static readonly Regex StampRegex = new(@"^\[(\d{2}:\d{2}:\d{2})\]\s?", RegexOptions.Compiled);
 
@@ -211,15 +219,33 @@ public sealed class LogFormatter
         var output = hasState ? GetString(state, "output") : null;
         var error = hasState ? GetText(state, "error") : null;
         var status = hasState ? ReadStatus(state) : StepStatus.None;
+        var stateTitle = hasState ? GetString(state, "title") : null;
+        var inputTitle = hasState ? GetString(input, "description") : null;
+        var exitCode = hasState ? ReadExitCode(state) : null;
+
+        // opencode puts the human description in `state.title`; older fixtures only
+        // carry the model's `input.description`. Either beats the tool's own name.
+        var title = string.IsNullOrWhiteSpace(stateTitle) || string.Equals(stateTitle, tool, StringComparison.Ordinal)
+            ? inputTitle
+            : stateTitle;
+
+        // A command that exited non-zero failed, even when the tool reports "completed".
+        if (exitCode is not null and not 0)
+        {
+            status = StepStatus.Failed;
+        }
 
         // A failed call often carries only `state.error`; keep it as the expandable body.
+        // Tool output is model-influenced, so strip bidi/control characters here too.
         var detail = string.IsNullOrEmpty(output) ? error : output;
+        detail = string.IsNullOrEmpty(detail) ? detail : Clean(detail);
 
         if (string.Equals(tool, "subagent", StringComparison.Ordinal))
         {
             return SubagentEntry(plain, input, detail, status);
         }
 
+        var isShell = tool is "shell" or "bash";
         return plain with
         {
             Kind = LogKind.Tool,
@@ -227,7 +253,53 @@ public sealed class LogFormatter
             ToolInput = SummarizeInput(input),
             ToolOutput = detail,
             Status = status,
+            ToolTitle = title is null || string.Equals(title, tool, StringComparison.Ordinal)
+                ? null
+                : Truncate(Clean(title), MaxTitleLength),
+            Command = isShell ? ReadCommand(input) : null,
+            ExitCode = exitCode,
         };
+    }
+
+    /// <summary>Reads <c>state.metadata.exit</c> (or <c>exitCode</c>/<c>code</c>) as an exit code.</summary>
+    private static int? ReadExitCode(JsonElement state)
+    {
+        if (!state.TryGetProperty("metadata", out var metadata) || metadata.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        foreach (var name in new[] { "exit", "exitCode", "code" })
+        {
+            if (metadata.TryGetProperty(name, out var value)
+                && value.ValueKind == JsonValueKind.Number
+                && value.TryGetInt32(out var code))
+            {
+                return code;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The full command from a shell tool's input, or null when it has none.</summary>
+    private static string? ReadCommand(JsonElement input)
+    {
+        if (input.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        foreach (var name in new[] { "command", "cmd" })
+        {
+            var value = GetString(input, name);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return Truncate(Clean(value), MaxCommandLength);
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Maps opencode's tool <c>state.status</c> onto the display status.</summary>
@@ -291,21 +363,24 @@ public sealed class LogFormatter
         var reason = GetString(part, "reason") ?? "stop";
         var usage = OpenCodeEvents.ReadUsage(part);
 
+        // Human words, not the event's wire names: this line is read, not parsed.
         var summary = new StringBuilder()
-            .Append("step finish · ").Append(reason)
+            .Append(string.Equals(reason, "tool-calls", StringComparison.Ordinal) ? "tool calls" : reason)
             .Append(" · $").Append(usage.Cost.ToString("0.######"))
-            .Append(" · in ").Append(usage.Input);
+            .Append(" · ").Append(usage.Input).Append(" in / ").Append(usage.Output).Append(" out");
 
         if (usage.CacheRead > 0 || usage.CacheWrite > 0)
         {
-            summary.Append(" (cache ").Append(usage.CacheRead).Append(" read / ").Append(usage.CacheWrite).Append(" write)");
+            summary.Append(" · cache ").Append(usage.CacheRead).Append(" read");
+            if (usage.CacheWrite > 0)
+            {
+                summary.Append(" / ").Append(usage.CacheWrite).Append(" write");
+            }
         }
-
-        summary.Append(" / out ").Append(usage.Output);
 
         if (usage.Reasoning > 0)
         {
-            summary.Append(" · reasoning ").Append(usage.Reasoning);
+            summary.Append(" · ").Append(usage.Reasoning).Append(" reasoning");
         }
 
         return summary.ToString();
@@ -354,6 +429,13 @@ public sealed class LogFormatter
         var parts = new List<string>();
         foreach (var property in input.EnumerateObject())
         {
+            // The model's own description is promoted to the row title when opencode
+            // did not supply one; repeating it as `description=…` is noise on every row.
+            if (string.Equals(property.Name, "description", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             if (parts.Count >= 3)
             {
                 break;

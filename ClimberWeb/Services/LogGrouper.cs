@@ -6,16 +6,13 @@ public enum OutputItemKind
     /// <summary>One or more consecutive <see cref="LogKind.Text"/> entries.</summary>
     Message,
 
-    /// <summary>One or more consecutive <see cref="LogKind.Tool"/> / <see cref="LogKind.Subagent"/> entries.</summary>
-    TraceGroup,
-
-    /// <summary>One or more consecutive <see cref="LogKind.Reasoning"/> entries.</summary>
-    Reasoning,
+    /// <summary>One step's reasoning and tool calls, folded behind a summary.</summary>
+    Turn,
 
     /// <summary>A JSON event this renderer does not recognise; raw payload behind a disclosure.</summary>
     Unrecognized,
 
-    /// <summary>A step boundary or summary line.</summary>
+    /// <summary>A footer with no activity before it, rendered as one quiet line.</summary>
     Marker,
 
     /// <summary>An opencode <c>error</c> event.</summary>
@@ -25,16 +22,24 @@ public enum OutputItemKind
     Plain,
 }
 
-/// <summary>One transcript row: a message, a group of traces, or a single marker/plain line.</summary>
+/// <summary>One transcript row: a message, a turn of activity, or a single marker/plain line.</summary>
 /// <param name="Kind">How the row should be rendered.</param>
 /// <param name="Entries">The entries in chronological order; one for a single-row kind.</param>
-public sealed record OutputItem(OutputItemKind Kind, IReadOnlyList<LogEntry> Entries);
+/// <param name="Footer">The <c>step_finish</c> that closed a turn, or null when it never arrived.</param>
+/// <param name="Open">True only for the feed's last turn, which was still streaming.</param>
+public sealed record OutputItem(
+    OutputItemKind Kind,
+    IReadOnlyList<LogEntry> Entries,
+    LogEntry? Footer = null,
+    bool Open = false);
 
 /// <summary>
-/// Folds a run's display-ready log entries into the rows the transcript renders: contiguous
-/// prose becomes one message, contiguous tool calls become one trace group, and everything
-/// else keeps its own row. Pure and order-preserving, so it is cheap to test and to call on
-/// every render.
+/// Folds a run's display-ready log entries into transcript rows. A <c>step_start</c> opens a
+/// turn, its reasoning and tool calls join it, and <c>step_finish</c> closes it with a footer.
+/// Prose belongs to the reader, not the fold: text that arrives during a turn renders just
+/// after it, and text outside a turn renders on its own. Errors and plain lines end the
+/// current turn and render as their own rows. Pure and order-preserving, so it is cheap to
+/// test and to call on every render.
 /// </summary>
 public static class LogGrouper
 {
@@ -49,30 +54,43 @@ public static class LogGrouper
         }
 
         var items = new List<OutputItem>();
-        var pending = new List<LogEntry>();
-        OutputItemKind? pendingKind = null;
+        var turn = new List<LogEntry>();
 
-        void Flush()
+        // Text is the answer, so it is never folded. Text that arrives while a turn is open
+        // is buffered and rendered directly after that turn; text outside a turn is its own row.
+        var pending = new List<LogEntry>();
+        var message = new List<LogEntry>();
+
+        void FlushMessage()
         {
-            if (pending.Count == 0)
+            if (message.Count == 0)
             {
                 return;
             }
 
-            items.Add(new OutputItem(pendingKind!.Value, pending.ToArray()));
-            pending.Clear();
-            pendingKind = null;
+            items.Add(new OutputItem(OutputItemKind.Message, message.ToArray()));
+            message.Clear();
         }
 
-        void Append(OutputItemKind kind, LogEntry entry)
+        void FlushTurn(LogEntry? footer = null, bool open = false)
         {
-            if (pendingKind != kind)
+            if (turn.Count > 0)
             {
-                Flush();
-                pendingKind = kind;
+                items.Add(new OutputItem(OutputItemKind.Turn, turn.ToArray(), footer, open));
+            }
+            else if (footer is not null)
+            {
+                // A step that produced only prose still has a cost worth one quiet line.
+                items.Add(new OutputItem(OutputItemKind.Marker, new[] { footer }));
             }
 
-            pending.Add(entry);
+            turn.Clear();
+
+            if (pending.Count > 0)
+            {
+                items.Add(new OutputItem(OutputItemKind.Message, pending.ToArray()));
+                pending.Clear();
+            }
         }
 
         foreach (var entry in entries)
@@ -80,54 +98,69 @@ public static class LogGrouper
             switch (entry.Kind)
             {
                 case LogKind.Text:
-                    Append(OutputItemKind.Message, entry);
-                    break;
-
-                case LogKind.Tool:
-                case LogKind.Subagent:
-                    Append(OutputItemKind.TraceGroup, entry);
-                    break;
-
-                // A thought belongs with the activity it explains; consecutive thoughts
-                // merge like prose. An empty thought carries nothing to show.
-                case LogKind.Reasoning:
-                    if (!string.IsNullOrWhiteSpace(entry.Text))
+                    if (turn.Count > 0)
                     {
-                        Append(OutputItemKind.Reasoning, entry);
+                        pending.Add(entry);
+                    }
+                    else
+                    {
+                        message.Add(entry);
                     }
 
                     break;
 
-                // A recognised event the renderer does not understand: one quiet row,
-                // with its payload available on demand.
-                case LogKind.Unrecognized:
-                    Flush();
-                    items.Add(new OutputItem(OutputItemKind.Unrecognized, new[] { entry }));
+                // A thought belongs with the activity it explains. An empty thought
+                // carries nothing to show and must not open a turn of its own.
+                case LogKind.Reasoning:
+                    if (!string.IsNullOrWhiteSpace(entry.Text))
+                    {
+                        FlushMessage();
+                        turn.Add(entry);
+                    }
+
                     break;
 
-                // A step start marks a new turn but carries nothing worth showing.
+                case LogKind.Tool:
+                case LogKind.Subagent:
+                    FlushMessage();
+                    turn.Add(entry);
+                    break;
+
+                // A step start opens a turn but carries nothing worth showing.
                 case LogKind.StepStart:
-                    Flush();
+                    FlushMessage();
+                    FlushTurn();
                     break;
 
                 case LogKind.StepFinish:
-                    Flush();
-                    items.Add(new OutputItem(OutputItemKind.Marker, new[] { entry }));
+                    FlushMessage();
+                    FlushTurn(entry);
+                    break;
+
+                case LogKind.Unrecognized:
+                    FlushMessage();
+                    FlushTurn();
+                    items.Add(new OutputItem(OutputItemKind.Unrecognized, new[] { entry }));
                     break;
 
                 case LogKind.Error:
-                    Flush();
+                    FlushMessage();
+                    FlushTurn();
                     items.Add(new OutputItem(OutputItemKind.Error, new[] { entry }));
                     break;
 
                 default:
-                    Flush();
+                    FlushMessage();
+                    FlushTurn();
                     items.Add(new OutputItem(OutputItemKind.Plain, new[] { entry }));
                     break;
             }
         }
 
-        Flush();
+        FlushMessage();
+
+        // Whatever is still open when the feed ends is the run's live turn.
+        FlushTurn(open: turn.Count > 0);
         return items;
     }
 }

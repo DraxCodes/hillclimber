@@ -1,0 +1,68 @@
+<details class="ai-terminal @StatusClass" open="@Open">
+    <summary class="ai-terminal-panel">
+        <span class="ai-terminal-head">
+            <AiIcon Name="terminal" CssClass="ai-terminal-icon" />
+            <span class="ai-terminal-title">@Title</span>
+            @if (ExitLabel is not null)
+            {
+                <span class="ai-terminal-exit @ExitClass">@ExitLabel</span>
+            }
+            <button class="ai-copy" type="button" data-copy="@Command" aria-label="Copy command" aria-live="polite">copy</button>
+            @if (Detail is not null)
+            {
+                <AiIcon Name="chevron" CssClass="ai-chevron" />
+            }
+        </span>
+        <span class="ai-terminal-cmd">
+            <span class="ai-terminal-prompt" aria-hidden="true">$</span>
+            <code>@Command</code>
+        </span>
+    </summary>
+    @if (Detail is not null)
+    {
+        <div class="ai-terminal-body">
+            <AiCodeBlock Text="@Detail" />
+        </div>
+    }
+</details>
+
+@code {
+    /// <summary>A human label for the call, for example "Ran dotnet test".</summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>The full command, shown verbatim on its own line.</summary>
+    [Parameter, EditorRequired]
+    public string Command { get; set; } = string.Empty;
+
+    /// <summary>The command's exit code when opencode recorded one; may be null.</summary>
+    [Parameter]
+    public int? ExitCode { get; set; }
+
+    /// <summary>The step's display state; a failure or running command opens its output.</summary>
+    [Parameter]
+    public StepStatus Status { get; set; }
+
+    /// <summary>Command output. Null renders a card with no disclosure.</summary>
+    [Parameter]
+    public string? Detail { get; set; }
+
+    private bool Open => Detail is not null
+        && (Status == StepStatus.Running
+            || (Status == StepStatus.Failed && LineCount(Detail) <= 6));
+
+    // The title already carries running / failed in words; the chip adds the one fact
+    // the title cannot: what the command actually returned.
+    private string? ExitLabel => ExitCode is int code ? $"exit {code}" : null;
+
+    private static int LineCount(string text) => text.Count(ch => ch == '\n') + 1;
+
+    private string ExitClass => ExitCode is int code && code != 0 ? "ai-terminal-exit-bad" : string.Empty;
+
+    private string StatusClass => Status switch
+    {
+        StepStatus.Running => "ai-status-running",
+        StepStatus.Failed => "ai-status-error",
+        _ => string.Empty,
+    };
+}

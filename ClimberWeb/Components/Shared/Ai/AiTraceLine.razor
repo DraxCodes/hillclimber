@@ -5,7 +5,7 @@
     <details class="ai-trace-line @StatusClass" open="@(Status == StepStatus.Failed)">
         <summary class="ai-trace-row">
             <AiIcon Name="@Icon" />
-            <span class="ai-trace-title">@Title</span>
+            <span class="ai-trace-title" title="@Title">@Title</span>
             @if (!string.IsNullOrEmpty(Description))
             {
                 <span class="ai-trace-desc">@Description</span>
@@ -22,7 +22,7 @@ else
     <div class="ai-trace-line @StatusClass">
         <span class="ai-trace-row">
             <AiIcon Name="@Icon" />
-            <span class="ai-trace-title">@Title</span>
+            <span class="ai-trace-title" title="@Title">@Title</span>
             @if (!string.IsNullOrEmpty(Description))
             {
                 <span class="ai-trace-desc">@Description</span>

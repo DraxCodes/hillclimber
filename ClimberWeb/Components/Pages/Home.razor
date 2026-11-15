@@ -281,18 +281,20 @@ else
         <div class="panel-head">
             <span class="idx">[03]</span>
             <span class="panel-title">output</span>
-            <span class="panel-meta">@ActiveLogs.Count events</span>
+            <button class="log-latest" id="log-latest" type="button" data-latest hidden aria-label="Jump to latest output">
+                latest <span aria-hidden="true">↓</span>
+            </button>
         </div>
         <div class="outtabs" role="tablist" aria-label="Output stream">
-            <button class="outtab @(_outputTab == PrimaryTab ? "active" : string.Empty)" type="button"
+            <button class="outtab @(_outputTab == PrimaryTab ? "active" : string.Empty)" type="button" data-outtab="@PrimaryTab"
                     role="tab" aria-selected="@(_outputTab == PrimaryTab)" @onclick="() => SelectOutputTab(PrimaryTab)">@PrimaryTabLabel</button>
             @foreach (var name in SubAgentNames)
             {
-                <button class="outtab @(_outputTab == name ? "active" : string.Empty)" type="button"
+                <button class="outtab @(_outputTab == name ? "active" : string.Empty)" type="button" data-outtab="@name"
                         role="tab" aria-selected="@(_outputTab == name)" @onclick="() => SelectOutputTab(name)">@SubLabel(name)</button>
             }
         </div>
-        <div class="log" id="log-feed">
+        <div class="log @(_outputTab == PrimaryTab ? string.Empty : "solo")" id="log-feed" data-active-tab="@_outputTab">
             @foreach (var item in VisibleItems)
             {
                 var key = item.Entries[0].Raw;
@@ -302,34 +304,38 @@ else
                         <AiMessage Text="@MessageText(item)" />
                     </div>
                 }
-                else if (item.Kind == OutputItemKind.TraceGroup)
+                else if (item.Kind == OutputItemKind.Turn)
                 {
-                    <div class="log-item" @key="key">
-                        <AiTraceGroup Summary="@StepSummary(item.Entries.Count)">
+                    var turn = TurnPresentation.For(item.Entries, item.Footer, item.Open, live: ActiveRunning);
+                    @if (_outputTab == PrimaryTab)
+                    {
+                        <div class="log-item" @key="key">
+                            <AiTurn Summary="@turn.Summary" Status="@turn.Status" Open="@turn.Open" Footer="@turn.Footer">
+                                @foreach (var entry in item.Entries)
+                                {
+                                    @Row(entry)
+                                }
+                            </AiTurn>
+                        </div>
+                    }
+                    else
+                    {
+                        // A subagent tab carries one agent's own work. It has no step
+                        // boundaries of its own, so a turn summary would claim an open step
+                        // that already finished; the rows stand on their own.
+                        <div class="log-item" @key="key">
                             @foreach (var entry in item.Entries)
                             {
-                                var view = ToolPresentation.For(entry, _outputTab == PrimaryTab);
-                                <AiTraceLine @key="entry.Raw"
-                                             Icon="@view.Icon"
-                                             Title="@view.Title"
-                                             Description="@view.Description"
-                                             Status="@view.Status"
-                                             Detail="@view.Detail" />
+                                @Row(entry)
                             }
-                        </AiTraceGroup>
-                    </div>
-                }
-                else if (item.Kind == OutputItemKind.Reasoning)
-                {
-                    <div class="log-item" @key="key">
-                        <AiReasoning Text="@MessageText(item)" />
-                    </div>
+                        </div>
+                    }
                 }
                 else if (item.Kind == OutputItemKind.Unrecognized)
                 {
-                    var unknown = item.Entries[0];
+                    var unknown = ToolPresentation.ForEvent(item.Entries[0]);
                     <div class="log-item" @key="key">
-                        <AiTraceLine Icon="gear" Title="@($"Unrecognised event · {unknown.Text}")" Detail="@unknown.Raw" />
+                        <AiTraceLine Icon="@unknown.Icon" Title="@unknown.Title" Detail="@unknown.Detail" />
                     </div>
                 }
                 else if (item.Kind == OutputItemKind.Error)
@@ -347,7 +353,7 @@ else
                 else
                 {
                     var plain = item.Entries[0];
-                    <div class="log-item" @key="key">
+                    <div class="log-item log-raw" @key="key">
                         <div class="log-line @LineClass(plain.Raw)">@plain.Raw</div>
                     </div>
                 }
@@ -437,6 +443,9 @@ else
     private AgentSelection _agents = new(Array.Empty<WorkflowRole>(), null);
     private IReadOnlyList<LogEntry> _entries = Array.Empty<LogEntry>();
     private string _outputTab = PrimaryTab;
+
+    /// <summary>The tab whose rows the DOM currently holds; script restores state only when this lags.</summary>
+    private string? _renderedTab;
     private int _maxIterations = 5;
     private string _pinInput = string.Empty;
     private string? _pinError;
@@ -472,7 +481,8 @@ else
 
     private string? ActiveMessage => _method == RunMethod.Run ? _run.Message : _climb.Message;
 
-    private IReadOnlyList<string> ActiveLogs => _method == RunMethod.Run ? _run.Logs : _climb.Logs;
+    private IReadOnlyList<string> ActiveLogs =>
+        _method == RunMethod.Run ? _run.Logs : _climb.Logs;
 
     private decimal ActiveReportedSpendUsd => _method == RunMethod.Run ? _run.Metrics.SpendUsd : _climb.SpendUsd;
 
@@ -629,16 +639,73 @@ else
     /// <c>column-reverse</c>, so the newest group renders at the bottom while rows inside a
     /// group keep their chronological order.
     /// </summary>
-    private IReadOnlyList<OutputItem> VisibleItems => LogGrouper.Group(VisibleEntries).Reverse().ToArray();
+    private IReadOnlyList<OutputItem> VisibleItems => LogGrouper.Group(DisplayEntries).Reverse().ToArray();
+
+    /// <summary>
+    /// Rows as recorded, except that no step can still be running once its run has stopped:
+    /// the stream simply ends without a status, so a leftover "running" is history, not live.
+    /// </summary>
+    private IReadOnlyList<LogEntry> DisplayEntries =>
+        ActiveRunning ? VisibleEntries : VisibleEntries.Select(Settle).ToArray();
+
+    private static LogEntry Settle(LogEntry entry) =>
+        entry.Status == StepStatus.Running ? entry with { Status = StepStatus.None } : entry;
 
     private void SelectOutputTab(string tab) => _outputTab = tab;
+
+    /// <summary>
+    /// Puts the reader back where they were on the tab that is now showing. Returns false
+    /// when script is not reachable yet (prerendering, or a lost circuit) so the next
+    /// render tries again.
+    /// </summary>
+    private async Task<bool> RestoreTabAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("climberLog.restoreTab", _outputTab);
+            return true;
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or JSException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
 
     private void RebuildEntries() => _entries = ActiveLogs.Select(_logFormatter.Format).ToArray();
 
     private static string MessageText(OutputItem item) =>
         string.Join("\n\n", item.Entries.Select(entry => entry.Text));
 
-    private static string StepSummary(int count) => count == 1 ? "1 step" : $"{count} steps";
+    /// <summary>One activity row inside a turn: reasoning prose, a terminal card, or a trace row.</summary>
+    private RenderFragment Row(LogEntry entry) => @<text>
+        @if (entry.Kind == LogKind.Reasoning)
+        {
+            <AiReasoning @key="entry.Raw" Text="@entry.Text" />
+        }
+        else
+        {
+            var rowView = ToolPresentation.For(entry, _outputTab == PrimaryTab);
+            var rowCommand = rowView.Command;
+            @if (rowCommand is not null)
+            {
+                <AiTerminalCard @key="entry.Raw"
+                                Title="@rowView.Title"
+                                Command="@rowCommand"
+                                ExitCode="@rowView.ExitCode"
+                                Status="@rowView.Status"
+                                Detail="@rowView.Detail" />
+            }
+            else
+            {
+                <AiTraceLine @key="entry.Raw"
+                             Icon="@rowView.Icon"
+                             Title="@rowView.Title"
+                             Description="@rowView.Description"
+                             Status="@rowView.Status"
+                             Detail="@rowView.Detail" />
+            }
+        }
+    </text>;
 
     private static string MarkerText(LogEntry entry) =>
         string.IsNullOrEmpty(entry.Timestamp) ? entry.Text : $"{entry.Timestamp} · {entry.Text}";
@@ -820,6 +887,14 @@ else
             {
                 // Circuit gone, or the box left the page (the session re-locked mid-run).
             }
+        }
+
+        // A tab switch replaces the feed's rows, so its scroll position and open
+        // disclosures live in script rather than in the DOM. Put them back only after
+        // Blazor has patched the new tab in.
+        if (_renderedTab != _outputTab && await RestoreTabAsync())
+        {
+            _renderedTab = _outputTab;
         }
 
         if (!firstRender)

@@ -345,6 +345,60 @@
     word-break: break-word;
 }
 
+/* A fallback line is verbatim by design, but it is still transcript: give it the quiet
+   container the structured rows have, so it does not read as stray debug output. */
+.log-raw .log-line {
+    padding: 0.25rem 0.5rem;
+    border-left: 2px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    font-size: 0.72rem;
+}
+
+/* A subagent tab carries one agent's own row. The feed is a chat scroller pinned to the
+   bottom, which would leave that row stranded under a blank panel; a solo feed reads top
+   down and sizes to its rows, so a short list does not open onto mostly empty space.
+   (The prompt's full-width rule lives in ai.css, since that text is rendered by
+   AiTraceLine rather than by this page.) */
+.log.solo {
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+}
+
+/* Jump to latest: lives in the output panel header so it never covers the row it points
+   at, and is shown only while the reader is scrolled back. `[hidden]` needs its own rule
+   because the `display` above would beat the user agent's. */
+.log-latest {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+    min-height: 24px;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+}
+
+.log-latest[hidden] {
+    display: none;
+}
+
+.log-latest:hover {
+    border-color: var(--accent);
+    color: var(--accent-text);
+}
+
+.log-latest:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus);
+}
+
 .log-line.cmd { color: var(--ink); }
 .log-line.ok { color: var(--green); }
 .log-line.warn { color: var(--orange); }
