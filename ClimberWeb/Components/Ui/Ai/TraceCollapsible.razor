@@ -14,7 +14,7 @@
     <button type="button"
             data-slot="trace-collapsible-trigger"
             aria-expanded="@(Open ? "true" : "false")"
-            class="group/trace-collapsible-trigger flex min-h-6 w-fit max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-lg text-left text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 has-[[data-status=error]]:text-destructive"
+            class="group/trace-collapsible-trigger flex min-h-6 w-fit max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-lg text-left text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring has-[[data-status=error]]:text-destructive"
             @onclick="Toggle">
         @Trigger
         <span data-slot="trace-icon"
