@@ -359,6 +359,30 @@ public class LogFormatterTests
     }
 
     [Fact]
+    public void UnknownEventPayloadDropsTheLogTimestamp()
+    {
+        var line = Stamped("{\"type\":\"session.updated\",\"part\":{\"id\":\"ses_a\"}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.NotNull(entry.ToolOutput);
+        Assert.DoesNotContain("[12:34:56]", entry.ToolOutput);
+        Assert.Contains("\"type\":\"session.updated\"", entry.ToolOutput);
+    }
+
+    [Fact]
+    public void SessionDiffCarriesTheFilesItNames()
+    {
+        var line = Stamped("{\"type\":\"session.diff\",\"part\":{\"files\":[\"a.cs\",\"b.cs\"]}}");
+
+        var entry = LogFormatter.Parse(line);
+
+        Assert.Equal(LogKind.Unrecognized, entry.Kind);
+        Assert.Equal("session.diff", entry.Text);
+        Assert.Equal("a.cs\nb.cs", entry.ToolInput);
+    }
+
+    [Fact]
     public void ParsesErrorEvent()
     {
         var line = Stamped("{\"type\":\"error\",\"part\":{\"type\":\"error\",\"error\":\"boom\"}}");

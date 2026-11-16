@@ -60,7 +60,22 @@ public static class ToolPresentation
     public static TraceView ForEvent(LogEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        return new TraceView("gear", Humanize(entry.Text), null, StepStatus.None, entry.Raw);
+
+        // A session diff is a known shape even when its event type is not: say what
+        // changed and list the files, never the event's stamped log line.
+        if (string.Equals(entry.Text, "session.diff", StringComparison.Ordinal)
+            && entry.ToolInput is { Length: > 0 } files)
+        {
+            var count = files.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+            return new TraceView(
+                "pencil",
+                count == 1 ? "Changed 1 file" : $"Changed {count} files",
+                null,
+                StepStatus.None,
+                files);
+        }
+
+        return new TraceView("gear", Humanize(entry.Text), null, StepStatus.None, entry.ToolOutput ?? entry.Raw);
     }
 
     private static string Humanize(string type)
@@ -105,7 +120,7 @@ public static class ToolPresentation
             "shell" or "bash" => ("terminal", "Ran", "run", "Running", ShellKeys),
             "read" => ("file", "Read", "read", "Reading", PathKeys),
             "edit" or "write" or "patch" => ("pencil", "Edited", "edit", "Editing", PathKeys),
-            "glob" or "grep" or "list" => ("search", "Searched", "search", "Searching", SearchKeys),
+            "glob" or "grep" or "list" or "websearch" => ("search", "Searched", "search", "Searching", SearchKeys),
             "webfetch" => ("globe", "Fetched", "fetch", "Fetching", UrlKeys),
             _ => ("gear", "Ran", "run", "Running", Array.Empty<string>()),
         };

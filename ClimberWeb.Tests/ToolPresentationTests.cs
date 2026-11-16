@@ -173,6 +173,37 @@ public class ToolPresentationTests
     }
 
     [Fact]
+    public void WebsearchReadsAsASearch()
+    {
+        var view = ToolPresentation.For(Tool("websearch", "query=shadcn message scroller"), primaryTab: true);
+
+        Assert.Equal("search", view.Icon);
+        Assert.Equal("Searched shadcn message scroller", view.Title);
+        Assert.Null(view.Description);
+    }
+
+    [Fact]
+    public void SessionDiffNamesTheFilesItChanged()
+    {
+        var entry = new LogEntry("raw", "12:00:00", LogKind.Unrecognized, "session.diff",
+            ToolInput: "a.cs\nb.cs");
+
+        var view = ToolPresentation.ForEvent(entry);
+
+        Assert.Equal("pencil", view.Icon);
+        Assert.Equal("Changed 2 files", view.Title);
+        Assert.Equal("a.cs\nb.cs", view.Detail);
+    }
+
+    [Fact]
+    public void SessionDiffWithOneFileReadsSingular()
+    {
+        var entry = new LogEntry("raw", "12:00:00", LogKind.Unrecognized, "session.diff", ToolInput: "a.cs");
+
+        Assert.Equal("Changed 1 file", ToolPresentation.ForEvent(entry).Title);
+    }
+
+    [Fact]
     public void ToolWithoutOutputHasNoDetail()
     {
         var view = ToolPresentation.For(Tool("shell", "command=dotnet test"), primaryTab: true);

@@ -90,6 +90,7 @@ public sealed class LogFormatter
     private const int MaxReasoningLength = 4000;
     private const int MaxCommandLength = 16000;
     private const int MaxTitleLength = 200;
+    private const int MaxPayloadLength = 2000;
 
     private static readonly Regex StampRegex = new(@"^\[(\d{2}:\d{2}:\d{2})\]\s?", RegexOptions.Compiled);
 
@@ -187,12 +188,22 @@ public sealed class LogFormatter
                 "tool_use" => ToolEntry(plain, part),
                 "step_start" => plain with { Kind = LogKind.StepStart, Text = "step start" },
                 "step_finish" => plain with { Kind = LogKind.StepFinish, Text = SummarizeFinish(part) },
+                // A session diff is a known shape even though its type is not: the files it
+                // touched are the reader's fact, and the stamped log line is not.
+                "session.diff" => plain with
+                {
+                    Kind = LogKind.Unrecognized,
+                    Text = "session.diff",
+                    ToolInput = SummarizeFiles(part),
+                },
                 // Known to be an opencode event, but not one this renderer understands. The
-                // type is model-adjacent data, so bound it before it becomes a title.
+                // type is model-adjacent data, so bound it before it becomes a title. The
+                // payload keeps its JSON but loses the log timestamp, which is machinery.
                 _ => plain with
                 {
                     Kind = LogKind.Unrecognized,
                     Text = Truncate(Clean(type), MaxSummaryLength),
+                    ToolOutput = Truncate(Clean(payload), MaxPayloadLength),
                 },
             };
         }
@@ -384,6 +395,29 @@ public sealed class LogFormatter
         }
 
         return summary.ToString();
+    }
+
+    /// <summary>
+    /// The files a <c>session.diff</c> event names, one per line, or null when it names none.
+    /// Newline-separated because the row lists them; the caller counts the lines.
+    /// </summary>
+    private static string? SummarizeFiles(JsonElement part)
+    {
+        if (!part.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var names = new List<string>();
+        foreach (var file in files.EnumerateArray())
+        {
+            if (file.ValueKind == JsonValueKind.String && file.GetString() is { Length: > 0 } name)
+            {
+                names.Add(name);
+            }
+        }
+
+        return names.Count == 0 ? null : string.Join('\n', names);
     }
 
     private static string SummarizeError(JsonElement root, JsonElement part)
