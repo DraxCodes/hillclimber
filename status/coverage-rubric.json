@@ -1,0 +1,168 @@
+{
+  "thresholds": {
+    "line": 0.8,
+    "branch": 0.6,
+    "edgeBranchTarget": 0.75
+  },
+  "weights": {
+    "hotPaths": 40,
+    "edgeCases": 30,
+    "ui": 30
+  },
+  "hotPaths": [
+    {
+      "id": "run-lifecycle",
+      "label": "Run lifecycle",
+      "classes": [ "ClimberWeb.Services.RunService" ]
+    },
+    {
+      "id": "climb-loop",
+      "label": "Climb loop",
+      "classes": [ "ClimberWeb.Services.HillClimberService" ]
+    },
+    {
+      "id": "provider-registry",
+      "label": "Provider registry & fallback",
+      "classes": [ "ClimberWeb.Services.ProviderRegistry" ]
+    },
+    {
+      "id": "log-format",
+      "label": "Log formatting & grouping",
+      "classes": [ "ClimberWeb.Services.LogFormatter", "ClimberWeb.Services.LogGrouper" ]
+    },
+    {
+      "id": "output-presentation",
+      "label": "Output presentation",
+      "classes": [
+        "ClimberWeb.Services.ToolPresentation",
+        "ClimberWeb.Services.TurnPresentation",
+        "ClimberWeb.Services.TestResultParser"
+      ]
+    },
+    {
+      "id": "scroll-math",
+      "label": "Scroll math",
+      "classes": [ "ClimberWeb.Services.StepScrollMath" ]
+    },
+    {
+      "id": "status-report",
+      "label": "Status report & artifact parsing",
+      "classes": [
+        "ClimberWeb.Services.ProjectStatusService",
+        "ClimberWeb.Services.CoverageArtifact",
+        "ClimberWeb.Services.GitHistory"
+      ]
+    },
+    {
+      "id": "class-merge",
+      "label": "Class merge",
+      "classes": [
+        "ClimberWeb.Components.Ui.UiClass",
+        "ClimberWeb.Components.Ui.TailwindConflict"
+      ]
+    },
+    {
+      "id": "pin-gate",
+      "label": "PIN gate",
+      "classes": [ "ClimberWeb.Services.ClimberAuth" ]
+    },
+    {
+      "id": "binding-preflight",
+      "label": "Binding & preflight",
+      "classes": [ "ClimberWeb.Services.ClimberBinding", "ClimberWeb.Services.ClimbPreflight" ]
+    }
+  ],
+  "edgeCases": [
+    {
+      "id": "run-nonzero-exit",
+      "label": "Non-zero opencode exit fails the run",
+      "test": "ClimberWeb.Tests.RunServiceTests.Run_NonZeroExit_IsFailed_WithReason"
+    },
+    {
+      "id": "run-stop-mid-run",
+      "label": "Stopping during a run ends cleanly",
+      "test": "ClimberWeb.Tests.RunServiceTests.Stop_DuringRun_StopsCleanly"
+    },
+    {
+      "id": "run-fallback-approval",
+      "label": "Approved fallback retries on the fallback provider",
+      "test": "ClimberWeb.Tests.RunServiceTests.Run_ApproveFallback_RetriesWithTheOpenRouterModel"
+    },
+    {
+      "id": "run-exit-127",
+      "label": "Exit 127 never offers a fallback",
+      "test": "ClimberWeb.Tests.RunServiceTests.Run_Exit127_NeverOffersAFallback"
+    },
+    {
+      "id": "run-missing-opencode",
+      "label": "Missing opencode is a clear failure",
+      "test": "ClimberWeb.Tests.RunServiceTests.Run_MissingOpencode_IsFailed_WithNotFoundMessage"
+    },
+    {
+      "id": "climb-stop-mid-iteration",
+      "label": "Stopping mid-iteration ends the climb cleanly",
+      "test": "ClimberWeb.Tests.HillClimberServiceTests.StopDuringIteration_StopsCleanly"
+    },
+    {
+      "id": "artifact-corrupt",
+      "label": "Missing or corrupt coverage artifact is tolerated",
+      "test": "ClimberWeb.Tests.ProjectStatusTests.CoverageArtifact_UnusableInput_ReturnsNull"
+    },
+    {
+      "id": "git-failure",
+      "label": "Git failure degrades to a warning",
+      "test": "ClimberWeb.Tests.ProjectStatusTests.GetStatusAsync_GitFailure_DoesNotThrow"
+    },
+    {
+      "id": "pin-wrong",
+      "label": "A wrong PIN does not unlock",
+      "test": "ClimberWeb.Tests.ClimberAuthTests.WrongPin_DoesNotUnlock"
+    },
+    {
+      "id": "scroll-live-edge",
+      "label": "Reverse scroll clamps at the live edge",
+      "test": "ClimberWeb.Tests.StepScrollMathTests.ReverseScrollClampsAtTheLiveEdge"
+    }
+  ],
+  "uiSuites": [
+    {
+      "id": "theme-nav",
+      "label": "Theme survives navigation",
+      "script": "theme-nav.mjs",
+      "paid": false
+    },
+    {
+      "id": "security",
+      "label": "PIN gate on /status and /activity",
+      "script": "security.mjs",
+      "paid": false
+    },
+    {
+      "id": "providers",
+      "label": "Provider bar, approval and /activity cards",
+      "script": "providers.mjs",
+      "paid": false
+    },
+    {
+      "id": "polish",
+      "label": "Polish audit: 7 views × 4 viewports × 2 themes",
+      "script": "polish.mjs",
+      "paid": false
+    },
+    {
+      "id": "surfaces",
+      "label": "Every interactive surface",
+      "script": "surfaces.mjs",
+      "paid": true
+    }
+  ],
+  "bands": {
+    "strong": 85,
+    "solid": 70,
+    "thin": 55
+  },
+  "knownGaps": [
+    "First-run empty, loading and disconnected states have no free browser suite.",
+    "Seeded transcript states are covered only by unit-level playback fixtures or the paid seeded run."
+  ]
+}

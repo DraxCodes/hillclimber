@@ -6,8 +6,8 @@
 
 <br clear="left" />
 
-[![tests](https://img.shields.io/badge/tests-311%20passing-brightgreen)](#testing)
-[![coverage](https://img.shields.io/badge/coverage-63.11%25-yellowgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-500%20passing-brightgreen)](#testing)
+[![coverage](https://img.shields.io/badge/coverage-62.74%25-yellowgreen)](#testing)
 [![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://learn.microsoft.com/aspnet/core/blazor/)
 [![personal use](https://img.shields.io/badge/license-personal%20use-lightgrey)](#license)
@@ -201,18 +201,41 @@ docs/                  logo and README assets
 # Unit + integration tests (free)
 dotnet test --nologo
 
-# Regenerate the committed status/coverage.json artifact
+# Regenerate the committed status/coverage.json artifact: tests, totals,
+# per-hot-path coverage and TRX-verified edge cases
 powershell -File scripts/status.ps1
+
+# Merge free browser evidence into the artifact (server running). Kept separate
+# because dotnet test and a dev host contend for ClimberWeb/bin on Windows.
+powershell -File scripts/status-ui.ps1 -BaseUrl http://localhost:5179
 
 # Free browser checks (server running)
 cd scripts/ui
 node theme-nav.mjs      # theme survives navigation
 node security.mjs       # /status and /activity are PIN-gated
 node providers.mjs      # provider bar, approval copy, one /activity card per provider
+node polish.mjs         # 7 views x 4 viewports x 2 themes, 560 checks
 
 # Token-spending browser check (drives real OpenCode runs, Surplus only)
 npm run surfaces
 ```
+
+### Coverage rating
+
+`/status` shows a 0–100 coverage rating with its inputs and gaps, not just a number. The
+rating is a hybrid: `scripts/status.ps1` measures line/branch coverage per hot path and
+verifies named edge-case tests in the TRX log; `scripts/status-ui.ps1` records the free
+browser suites. The judgement lives in `status/coverage-rubric.json` — which classes are
+hot, the 80%/60% bar, the named edge scenarios, the suite list, the weights (hot paths 40,
+edge cases 30, UI integration 30) and the bands. `CoverageRater` combines the two and the
+page renders every input, so the score can be argued with.
+
+It is deliberately **not** line coverage: Razor components report 0% under `dotnet test`
+because no test renders them; the browser suites are what cover the UI. Raw line/branch
+totals are shown next to the rating with that caveat. A stale artifact is never hidden —
+the page compares a fingerprint of the measured sources with the working tree and marks
+the last-known rating unverified until it is regenerated. See
+[ADR 0001](docs/adr/0001-coverage-rating.md).
 
 ### Development transcript fixture
 
@@ -263,8 +286,10 @@ the first does not, and never approves a fallback. Exit codes: `0` all checks pa
 check failed, `2` refused to continue (configuration, connection, or a paid run that did
 not use Surplus).
 
-Current state: **311 tests passing, 0 failed, 0 skipped**, **63.11% line coverage**. The
-token-spending `surfaces.mjs` harness is **not run** as part of the default checks.
+Current state: **500 tests passing, 0 failed, 0 skipped**, **62.74% line / 53.75% branch
+coverage**, and a **96/100 coverage rating** on `/status` (9/10 hot paths at the rubric bar;
+Scroll math at 75% line is the open gap). The token-spending `surfaces.mjs` harness is
+**not run** as part of the default checks, so it never contributes to the UI dimension.
 
 ## License
 

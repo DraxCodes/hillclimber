@@ -377,6 +377,75 @@ public class ProjectStatusTests
         }
     }
 
+    [Fact]
+    public async Task GetStatusAsync_WithArtifactAndRubric_RatesAndVerifiesFreshness()
+    {
+        var root = Directory.CreateTempSubdirectory("climber-status").FullName;
+        try
+        {
+            var status = Directory.CreateDirectory(Path.Combine(root, "status")).FullName;
+            File.WriteAllText(
+                Path.Combine(status, "coverage-rubric.json"),
+                """
+                {
+                  "hotPaths": [ { "id": "alpha", "label": "Alpha", "classes": ["A"] } ],
+                  "edgeCases": [],
+                  "uiSuites": [],
+                  "weights": { "hotPaths": 40, "edgeCases": 30, "ui": 30 }
+                }
+                """);
+
+            var fingerprint = CoverageInputs.Capture(root);
+            Assert.NotNull(fingerprint);
+
+            File.WriteAllText(
+                Path.Combine(status, "coverage.json"),
+                $$"""
+                {
+                  "generated": "2026-11-16T08:00:00Z",
+                  "head": "abc1234",
+                  "fingerprint": { "version": 1, "inputs": "{{fingerprint}}" },
+                  "tests": { "passed": 10, "failed": 0, "skipped": 0 },
+                  "coverage": { "line": 0.9, "branch": 0.8 },
+                  "hotPaths": [ { "id": "alpha", "line": 0.9, "branch": 0.8, "lines": 10, "branches": 4 } ],
+                  "edgeCases": [],
+                  "ui": { "suites": [] }
+                }
+                """);
+
+            var service = new ProjectStatusService(
+                new FakeCommandRunner((request, _) =>
+                {
+                    var arguments = string.Join(' ', request.Arguments);
+                    if (arguments.Contains("rev-parse --short HEAD", StringComparison.Ordinal))
+                    {
+                        return new CommandResult(0, "abc1234\n", string.Empty);
+                    }
+
+                    if (arguments.Contains("--abbrev-ref", StringComparison.Ordinal))
+                    {
+                        return new CommandResult(0, "main\n", string.Empty);
+                    }
+
+                    return new CommandResult(0, string.Empty, string.Empty);
+                }),
+                Config(root),
+                root);
+
+            var report = await service.GetStatusAsync();
+
+            Assert.NotNull(report.Coverage);
+            Assert.NotNull(report.Rating);
+            Assert.NotNull(report.CoverageFreshness);
+            Assert.True(report.CoverageFreshness!.Verified);
+            Assert.Single(report.Coverage!.HotPaths);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static IConfiguration Config(string? repoRoot = null)
     {
         var values = new Dictionary<string, string?>();

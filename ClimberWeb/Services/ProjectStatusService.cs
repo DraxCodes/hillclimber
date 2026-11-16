@@ -45,6 +45,8 @@ public sealed class ProjectStatusService : IProjectStatusService
                 CadenceUnit.Day,
                 Array.Empty<CadenceBucket>(),
                 null,
+                null,
+                null,
                 Array.Empty<TrackedIssue>(),
                 new WorkflowCatalog("unknown", WorkflowCatalogReader.BaseWorkflow, Array.Empty<WorkflowRole>()),
                 warnings);
@@ -53,12 +55,41 @@ public sealed class ProjectStatusService : IProjectStatusService
         var sidecar = ChangelogSidecar.ReadFile(Path.Combine(root, ChangelogSidecar.RelativePath));
         var changes = await ReadChangelogAsync(root, sidecar, warnings, cancellationToken).ConfigureAwait(false);
         var (unit, buckets) = GitHistory.BuildCadence(changes);
-        var coverage = CoverageArtifact.ReadFile(Path.Combine(root, CoverageArtifact.RelativePath));
         var issues = IssueScanner.Scan(Path.Combine(root, ".scratch"));
         var workflow = WorkflowCatalogReader.Read(root);
         var repo = await ReadRepoAsync(root, warnings, cancellationToken).ConfigureAwait(false);
 
-        return new StatusReport(repo, changes, unit, buckets, coverage, issues, workflow, warnings);
+        var coverage = CoverageArtifact.ReadFile(Path.Combine(root, CoverageArtifact.RelativePath));
+        CoverageRating? rating = null;
+        CoverageStaleness? freshness = null;
+        if (coverage is not null)
+        {
+            var rubric = CoverageRubric.ReadFile(Path.Combine(root, CoverageRubric.RelativePath));
+            if (rubric is null)
+            {
+                warnings.Add("The coverage rating rubric is missing or unreadable; showing the raw measurement only.");
+            }
+
+            rating = CoverageRater.Evaluate(coverage, rubric);
+            freshness = CoverageRater.DescribeStaleness(
+                coverage.Fingerprint,
+                CoverageInputs.Capture(root),
+                coverage.Head,
+                repo?.Head,
+                changes);
+        }
+
+        return new StatusReport(
+            repo,
+            changes,
+            unit,
+            buckets,
+            coverage,
+            rating,
+            freshness,
+            issues,
+            workflow,
+            warnings);
     }
 
     /// <summary>

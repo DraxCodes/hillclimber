@@ -38,27 +38,45 @@ public sealed record ChangeEntry(
 /// <param name="Count">Commits in the bucket.</param>
 public sealed record CadenceBucket(DateTimeOffset Start, string Label, int Count);
 
-/// <summary>Coverage and test status read from the committed artifact.</summary>
+/// <summary>Coverage, test status and rating inputs read from the committed artifact.</summary>
 /// <param name="Generated">When the artifact was produced, if recorded.</param>
 /// <param name="Passed">Passing tests.</param>
 /// <param name="Failed">Failing tests.</param>
 /// <param name="Skipped">Skipped tests.</param>
 /// <param name="LineRate">Line coverage in the range 0..1, or null when unknown.</param>
+/// <param name="BranchRate">Branch coverage in the range 0..1, or null when unknown.</param>
+/// <param name="Head">Commit the measurement was taken at, when recorded.</param>
+/// <param name="Fingerprint">Identity of the inputs the measurement was taken from, when recorded.</param>
+/// <param name="HotPaths">Per-hot-path measurements, empty on schema-1 artifacts.</param>
+/// <param name="EdgeCases">Named edge-case outcomes, empty on schema-1 artifacts.</param>
+/// <param name="Ui">Browser-suite evidence, or null when the suites were not run.</param>
 public sealed record CoverageSummary(
     DateTimeOffset? Generated,
     int Passed,
     int Failed,
     int Skipped,
-    double? LineRate)
+    double? LineRate,
+    double? BranchRate,
+    string? Head,
+    CoverageFingerprint? Fingerprint,
+    IReadOnlyList<HotPathCoverage> HotPaths,
+    IReadOnlyList<EdgeCaseEvidence> EdgeCases,
+    UiEvidence? Ui)
 {
     /// <summary>Total tests that produced a result.</summary>
     public int Total => Passed + Failed + Skipped;
+
+    /// <summary>Tests that actually ran, which is the honest denominator for "passing".</summary>
+    public int Attempted => Passed + Failed;
 
     /// <summary>True when nothing failed.</summary>
     public bool Passing => Failed == 0;
 
     /// <summary>Line coverage as a whole number percentage, or null when unknown.</summary>
     public int? LinePercent => LineRate is { } rate ? (int)Math.Round(rate * 100) : null;
+
+    /// <summary>Branch coverage as a whole number percentage, or null when unknown.</summary>
+    public int? BranchPercent => BranchRate is { } rate ? (int)Math.Round(rate * 100) : null;
 }
 
 /// <summary>A tracked issue that has not been resolved yet.</summary>
@@ -97,6 +115,8 @@ public sealed record WorkflowCatalog(
 /// <param name="CadenceUnit">Bucket size used by the cadence graph.</param>
 /// <param name="Cadence">Cadence buckets, oldest first, contiguous.</param>
 /// <param name="Coverage">Coverage/test summary, or null when not measured yet.</param>
+/// <param name="Rating">Explainable coverage rating, or null when it cannot be produced.</param>
+/// <param name="CoverageFreshness">Whether the measurement still describes the working tree.</param>
 /// <param name="Issues">Tracked-but-unresolved issues.</param>
 /// <param name="Workflow">Models and workflow.</param>
 /// <param name="Warnings">Non-fatal problems to surface on the page.</param>
@@ -106,6 +126,8 @@ public sealed record StatusReport(
     CadenceUnit CadenceUnit,
     IReadOnlyList<CadenceBucket> Cadence,
     CoverageSummary? Coverage,
+    CoverageRating? Rating,
+    CoverageStaleness? CoverageFreshness,
     IReadOnlyList<TrackedIssue> Issues,
     WorkflowCatalog Workflow,
     IReadOnlyList<string> Warnings);

@@ -88,8 +88,10 @@ else
         {
             <div class="cov-row">
                 <div class="cov-stat">
-                    <span class="cov-num">@coverage.Passed<span class="dim">/@coverage.Total</span></span>
-                    <span class="cov-lbl">tests passing</span>
+                    <span class="cov-num">@coverage.Passed<span class="dim">/@coverage.Attempted</span></span>
+                    <span class="cov-lbl">
+                        tests passing@(coverage.Skipped > 0 ? $" · {coverage.Skipped} skipped" : string.Empty)
+                    </span>
                 </div>
                 <div class="cov-stat">
                     <span class="cov-num @(coverage.Passing ? "g" : "r")">@coverage.Failed</span>
@@ -100,11 +102,131 @@ else
                     <span class="cov-lbl">line coverage</span>
                 </div>
             </div>
-            @if (coverage.LinePercent is int linePercent)
+
+            @if (_report.CoverageFreshness is { } freshness)
             {
-                <div class="meter" role="img" aria-label="@($"{linePercent}% line coverage")">
-                    <span class="meter-fill" style="@($"width: {linePercent}%")"></span>
-                </div>
+                @if (freshness.Stale)
+                {
+                    <Alert Tone="warning" Icon="circle-alert" Class="mb-4">@freshness.Note</Alert>
+                }
+                else
+                {
+                    <p class="cov-fresh">
+                        <UiIcon Name="@(freshness.Verified ? "circle-check" : "circle-dot")" CssClass="size-3.5" />
+                        <span>@freshness.Note</span>
+                    </p>
+                }
+            }
+
+            @if (_report.Rating is { } rating)
+            {
+                <section class="rating" aria-labelledby="coverage-rating-label">
+                    <div class="rating-head">
+                        <div>
+                            <h3 id="coverage-rating-label" class="cov-lbl">coverage rating</h3>
+                            <p class="rating-score">
+                                @rating.Score<span class="rating-of">/100</span>
+                                <span class="rating-band">· @rating.Band</span>
+                            </p>
+                        </div>
+                        @if (_report.CoverageFreshness is not { Verified: true })
+                        {
+                            <Badge Variant="outline" Class="font-mono">unverified</Badge>
+                        }
+                    </div>
+                    <p class="rating-why">@rating.Summary</p>
+
+                    <div class="rating-dims">
+                        @foreach (var dimension in rating.Dimensions)
+                        {
+                            <div class="rating-dim">
+                                <div class="rating-dim-head">
+                                    <span class="rating-dim-name">@dimension.Label</span>
+                                    <span class="rating-dim-value mono">@dimension.Value</span>
+                                </div>
+                                <div class="rating-dim-meta">
+                                    <span class="mono">@dimension.Weight% weight</span>
+                                    <span class="rating-dim-evidence">@dimension.Evidence</span>
+                                </div>
+                                <div class="meter"
+                                     role="meter"
+                                     aria-label="@($"{dimension.Label}: {dimension.Percent}% of the bar")"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100"
+                                     aria-valuenow="@dimension.Percent">
+                                    <span class="meter-fill" style="@($"width: {dimension.Percent}%")"></span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <p class="rating-raw">
+                        raw assembly: @(coverage.LinePercent is int linePercent ? $"{linePercent}% line" : "line —")
+                        · @(coverage.BranchPercent is int branchPercent ? $"{branchPercent}% branch" : "branch —")
+                        <span class="dim">— these totals include Razor components, which dotnet coverage never executes; the browser suites are what cover them.</span>
+                    </p>
+
+                    <details class="rating-details">
+                        <summary>
+                            inputs &amp; gaps
+                            <span class="dim">(@rating.Dimensions.Sum(d => d.Items.Count) checks)</span>
+                        </summary>
+                        <div class="rating-groups">
+                            @if (rating.Gaps.Count > 0)
+                            {
+                                <div class="rating-group">
+                                    <h4 class="cov-lbl">gaps in this measurement</h4>
+                                    <ul class="rating-gaps">
+                                        @foreach (var gap in rating.Gaps)
+                                        {
+                                            <li>@gap</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+
+                            @if (rating.KnownGaps.Count > 0)
+                            {
+                                <div class="rating-group">
+                                    <h4 class="cov-lbl">known gaps</h4>
+                                    <ul class="rating-gaps">
+                                        @foreach (var gap in rating.KnownGaps)
+                                        {
+                                            <li>@gap</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+
+                            @foreach (var dimension in rating.Dimensions)
+                            {
+                                <div class="rating-group">
+                                    <h4 class="cov-lbl">@dimension.Label</h4>
+                                    <ul class="rating-list">
+                                        @foreach (var item in dimension.Items)
+                                        {
+                                            <li class="rating-item">
+                                                <span class="rating-mark @(item.Met ? "g" : "r")">@(item.Met ? "met" : "gap")</span>
+                                                <span class="rating-item-label">@item.Label</span>
+                                                <span class="rating-item-evidence mono dim">@item.Evidence</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                    </details>
+                </section>
+            }
+            else
+            {
+                <p class="cov-fresh">
+                    <UiIcon Name="circle-dot" CssClass="size-3.5" />
+                    <span>
+                        Rating unavailable — regenerate with <code class="mono">scripts/status.ps1</code>
+                        (per-hot-path data is missing) and check <code class="mono">status/coverage-rubric.json</code>.
+                    </span>
+                </p>
             }
         }
     </PagePanel>

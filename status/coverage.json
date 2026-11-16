@@ -1,11 +1,168 @@
 ﻿{
-    "generated":  "2026-11-15T03:23:57.3819219Z",
+    "schema":  2,
+    "generated":  "2026-11-16T18:15:25.2441339Z",
+    "head":  "bdbf4ab",
+    "fingerprint":  {
+                        "version":  1,
+                        "inputs":  "ffb97c4684d9238f3aa8867f1671adc01325e8c15daaa586c7e7fa146df90dc3"
+                    },
     "tests":  {
-                  "passed":  311,
+                  "passed":  500,
                   "failed":  0,
                   "skipped":  0
               },
     "coverage":  {
-                     "line":  0.6311
-                 }
+                     "line":  0.6274,
+                     "branch":  0.5375
+                 },
+    "hotPaths":  [
+                     {
+                         "id":  "run-lifecycle",
+                         "line":  0.984,
+                         "branch":  0.875,
+                         "lines":  188,
+                         "branches":  56
+                     },
+                     {
+                         "id":  "climb-loop",
+                         "line":  0.9836,
+                         "branch":  0.8625,
+                         "lines":  304,
+                         "branches":  80
+                     },
+                     {
+                         "id":  "provider-registry",
+                         "line":  0.9781,
+                         "branch":  0.9135,
+                         "lines":  183,
+                         "branches":  104
+                     },
+                     {
+                         "id":  "log-format",
+                         "line":  0.944,
+                         "branch":  0.8393,
+                         "lines":  411,
+                         "branches":  280
+                     },
+                     {
+                         "id":  "output-presentation",
+                         "line":  0.9877,
+                         "branch":  0.8833,
+                         "lines":  163,
+                         "branches":  180
+                     },
+                     {
+                         "id":  "scroll-math",
+                         "line":  0.75,
+                         "branch":  0.8462,
+                         "lines":  36,
+                         "branches":  26
+                     },
+                     {
+                         "id":  "status-report",
+                         "line":  0.9065,
+                         "branch":  0.8444,
+                         "lines":  385,
+                         "branches":  180
+                     },
+                     {
+                         "id":  "class-merge",
+                         "line":  0.9212,
+                         "branch":  0.6237,
+                         "lines":  482,
+                         "branches":  558
+                     },
+                     {
+                         "id":  "pin-gate",
+                         "line":  1,
+                         "branch":  0.9444,
+                         "lines":  56,
+                         "branches":  18
+                     },
+                     {
+                         "id":  "binding-preflight",
+                         "line":  0.9,
+                         "branch":  0.9167,
+                         "lines":  50,
+                         "branches":  36
+                     }
+                 ],
+    "edgeCases":  [
+                      {
+                          "id":  "run-nonzero-exit",
+                          "test":  "ClimberWeb.Tests.RunServiceTests.Run_NonZeroExit_IsFailed_WithReason",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "run-stop-mid-run",
+                          "test":  "ClimberWeb.Tests.RunServiceTests.Stop_DuringRun_StopsCleanly",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "run-fallback-approval",
+                          "test":  "ClimberWeb.Tests.RunServiceTests.Run_ApproveFallback_RetriesWithTheOpenRouterModel",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "run-exit-127",
+                          "test":  "ClimberWeb.Tests.RunServiceTests.Run_Exit127_NeverOffersAFallback",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "run-missing-opencode",
+                          "test":  "ClimberWeb.Tests.RunServiceTests.Run_MissingOpencode_IsFailed_WithNotFoundMessage",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "climb-stop-mid-iteration",
+                          "test":  "ClimberWeb.Tests.HillClimberServiceTests.StopDuringIteration_StopsCleanly",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "artifact-corrupt",
+                          "test":  "ClimberWeb.Tests.ProjectStatusTests.CoverageArtifact_UnusableInput_ReturnsNull",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "git-failure",
+                          "test":  "ClimberWeb.Tests.ProjectStatusTests.GetStatusAsync_GitFailure_DoesNotThrow",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "pin-wrong",
+                          "test":  "ClimberWeb.Tests.ClimberAuthTests.WrongPin_DoesNotUnlock",
+                          "passed":  true
+                      },
+                      {
+                          "id":  "scroll-live-edge",
+                          "test":  "ClimberWeb.Tests.StepScrollMathTests.ReverseScrollClampsAtTheLiveEdge",
+                          "passed":  true
+                      }
+                  ],
+    "ui":  {
+               "generated":  "2026-11-16T18:17:56.1873695Z",
+               "head":  "bdbf4ab",
+               "suites":  [
+                              {
+                                  "id":  "theme-nav",
+                                  "passed":  true,
+                                  "checks":  3
+                              },
+                              {
+                                  "id":  "security",
+                                  "passed":  true,
+                                  "checks":  10
+                              },
+                              {
+                                  "id":  "providers",
+                                  "passed":  true,
+                                  "checks":  15
+                              },
+                              {
+                                  "id":  "polish",
+                                  "passed":  true,
+                                  "checks":  560
+                              }
+                          ]
+           }
 }
