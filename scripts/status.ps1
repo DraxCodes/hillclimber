@@ -192,7 +192,8 @@ foreach ($edge in @($rubric.edgeCases)) {
 
 # Fingerprint of everything that can change the measurement. Keep this rule in
 # sync with ClimberWeb/Services/CoverageInputs.cs (same version, same file set,
-# same byte order) so the page can tell whether the artifact still applies.
+# same byte order, same LF normalisation) so the page can tell whether the
+# artifact still applies.
 function Get-SourceFingerprint {
     param([string]$Root)
 
@@ -241,12 +242,16 @@ function Get-SourceFingerprint {
 
     $sha = [System.Security.Cryptography.SHA256]::Create()
     $buffer = New-Object System.IO.MemoryStream
+    # Line endings are not semantics: git checks the same file out as CRLF on Windows
+    # and LF elsewhere. Latin-1 round-trips every byte, so this only rewrites CRLF.
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
     try {
         foreach ($relative in $ordered) {
             $pathBytes = [System.Text.Encoding]::UTF8.GetBytes($relative)
             $buffer.Write($pathBytes, 0, $pathBytes.Length)
             $buffer.WriteByte(10)
-            $content = [System.IO.File]::ReadAllBytes((Join-Path $Root ($relative -replace '/', '\')))
+            $fullPath = Join-Path $Root ($relative -replace '/', '\')
+            $content = $latin1.GetBytes($latin1.GetString([System.IO.File]::ReadAllBytes($fullPath)).Replace("`r`n", "`n"))
             $buffer.Write($content, 0, $content.Length)
             $buffer.WriteByte(10)
         }
@@ -275,6 +280,7 @@ catch {
     $head = $null
 }
 
+$fingerprintVersion = 2
 $fingerprint = Get-SourceFingerprint -Root $repoRoot
 
 New-Item -ItemType Directory -Path $statusDir -Force | Out-Null
@@ -286,7 +292,7 @@ $artifactFile = Join-Path $statusDir 'coverage.json'
 if (Test-Path -LiteralPath $artifactFile) {
     try {
         $previous = Get-Content -Raw -LiteralPath $artifactFile | ConvertFrom-Json
-        if ($previous.fingerprint -and $previous.fingerprint.version -eq 1 -and
+        if ($previous.fingerprint -and $previous.fingerprint.version -eq $fingerprintVersion -and
             $previous.fingerprint.inputs -eq $fingerprint -and $previous.ui) {
             $previousUi = $previous.ui
         }
@@ -301,7 +307,7 @@ $payload = [ordered]@{
     generated   = (Get-Date).ToUniversalTime().ToString('o')
     head        = $head
     fingerprint = [ordered]@{
-        version = 1
+        version = $fingerprintVersion
         inputs  = $fingerprint
     }
     tests       = [ordered]@{

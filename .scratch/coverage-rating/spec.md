@@ -122,8 +122,9 @@ measured yet".
 **Fingerprint instead of head-only staleness.** The artifact must be committed in the same
 commit it describes, so a HEAD comparison would report "one commit behind" immediately
 after committing. Instead the script records a SHA-256 over the measured inputs (source,
-tests, harnesses, styling, rubric; excluding `bin`, `obj`, `node_modules`). The page
-recomputes it from the working tree, so it catches both later commits and uncommitted
+tests, harnesses, styling, rubric; excluding `bin`, `obj`, `node_modules`; CRLF normalised
+to LF so a checkout cannot change it). The page recomputes it from the working tree, so it
+catches both later commits and uncommitted
 edits. `head` is kept for human context and "N commits back". A missing or mismatched
 fingerprint version reports "freshness unknown" rather than guessing that the old rule still
 applies.

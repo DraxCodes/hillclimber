@@ -82,6 +82,29 @@ public class CoverageInputsTests
     }
 
     [Fact]
+    public void Capture_IgnoresLineEndings()
+    {
+        var root = Directory.CreateTempSubdirectory("climber-fingerprint").FullName;
+        try
+        {
+            var source = Directory.CreateDirectory(Path.Combine(root, "ClimberWeb")).FullName;
+            var file = Path.Combine(source, "Thing.cs");
+
+            File.WriteAllText(file, "class Thing {\n    int Value;\n}\n");
+            var unix = CoverageInputs.Capture(root);
+
+            File.WriteAllText(file, "class Thing {\r\n    int Value;\r\n}\r\n");
+
+            Assert.NotNull(unix);
+            Assert.Equal(unix, CoverageInputs.Capture(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Capture_MissingRepository_ReturnsNull()
     {
         var missing = Path.Combine(Path.GetTempPath(), $"climber-missing-{Guid.NewGuid():N}");

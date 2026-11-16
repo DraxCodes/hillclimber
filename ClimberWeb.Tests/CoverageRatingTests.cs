@@ -45,7 +45,7 @@ public class CoverageRatingTests
             line,
             branch,
             head,
-            fingerprint ?? new CoverageFingerprint(1, "fingerprint"),
+            fingerprint ?? new CoverageFingerprint(CoverageInputs.Version, "fingerprint"),
             hotPaths ?? [new("alpha", 0.9, 0.8, 90, 20), new("beta", 0.95, 0.7, 50, 12)],
             edges ?? [new("edge-one", "T.One", true), new("edge-two", "T.Two", true)],
             ui ?? new UiEvidence(
@@ -306,7 +306,7 @@ public class CoverageRatingTests
     public void Staleness_MatchingInputsAtHead_IsVerified()
     {
         var freshness = CoverageRater.DescribeStaleness(
-            new CoverageFingerprint(1, "same"), "same", "abc1234", "abc1234", []);
+            new CoverageFingerprint(CoverageInputs.Version, "same"), "same", "abc1234", "abc1234", []);
 
         Assert.False(freshness.Stale);
         Assert.True(freshness.Verified);
@@ -317,7 +317,7 @@ public class CoverageRatingTests
     public void Staleness_ChangedInputs_IsStaleAndNamesTheCommand()
     {
         var freshness = CoverageRater.DescribeStaleness(
-            new CoverageFingerprint(1, "old"), "new", "abc1234", "def5678", []);
+            new CoverageFingerprint(CoverageInputs.Version, "old"), "new", "abc1234", "def5678", []);
 
         Assert.True(freshness.Stale);
         Assert.False(freshness.Verified);
@@ -356,7 +356,7 @@ public class CoverageRatingTests
         };
 
         var freshness = CoverageRater.DescribeStaleness(
-            new CoverageFingerprint(1, "same"), "same", "abc1234", "ccc3333", changes);
+            new CoverageFingerprint(CoverageInputs.Version, "same"), "same", "abc1234", "ccc3333", changes);
 
         Assert.True(freshness.Verified);
         Assert.False(freshness.Stale);
@@ -368,7 +368,7 @@ public class CoverageRatingTests
     public void Staleness_MeasuredHeadOutsideRecentHistory_StillVerifiesByFingerprint()
     {
         var freshness = CoverageRater.DescribeStaleness(
-            new CoverageFingerprint(1, "same"), "same", "old9999", "abc1234", []);
+            new CoverageFingerprint(CoverageInputs.Version, "same"), "same", "old9999", "abc1234", []);
 
         Assert.True(freshness.Verified);
         Assert.Contains("Measured at old9999", freshness.Note);

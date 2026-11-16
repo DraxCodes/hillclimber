@@ -40,7 +40,9 @@ at 25, because coverage claims are meaningless when the suite is red.
 
 Staleness is decided by a **fingerprint over the measured inputs**, not by HEAD: the
 artifact is committed in the same commit it describes, so HEAD would always look one
-commit behind. The page recomputes the fingerprint from the working tree, catches later
+commit behind. The rule hashes the files with CRLF collapsed to LF, because git checks the
+same sources out as CRLF on Windows and LF elsewhere — a checkout must not read as a source
+change. The page recomputes the fingerprint from the working tree, catches later
 commits and uncommitted edits, and shows the last-known rating marked unverified when it
 does not match. A fingerprint-version mismatch reports "freshness unknown" rather than
 guessing.

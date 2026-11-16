@@ -6,8 +6,8 @@
 
 <br clear="left" />
 
-[![tests](https://img.shields.io/badge/tests-500%20passing-brightgreen)](#testing)
-[![coverage](https://img.shields.io/badge/coverage-62.74%25-yellowgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-501%20passing-brightgreen)](#testing)
+[![coverage](https://img.shields.io/badge/coverage-62.82%25-yellowgreen)](#testing)
 [![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://learn.microsoft.com/aspnet/core/blazor/)
 [![personal use](https://img.shields.io/badge/license-personal%20use-lightgrey)](#license)
@@ -286,7 +286,7 @@ the first does not, and never approves a fallback. Exit codes: `0` all checks pa
 check failed, `2` refused to continue (configuration, connection, or a paid run that did
 not use Surplus).
 
-Current state: **500 tests passing, 0 failed, 0 skipped**, **62.74% line / 53.75% branch
+Current state: **501 tests passing, 0 failed, 0 skipped**, **62.82% line / 53.86% branch
 coverage**, and a **96/100 coverage rating** on `/status` (9/10 hot paths at the rubric bar;
 Scroll math at 75% line is the open gap). The token-spending `surfaces.mjs` harness is
 **not run** as part of the default checks, so it never contributes to the UI dimension.

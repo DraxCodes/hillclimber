@@ -404,7 +404,7 @@ public class ProjectStatusTests
                 {
                   "generated": "2026-11-16T08:00:00Z",
                   "head": "abc1234",
-                  "fingerprint": { "version": 1, "inputs": "{{fingerprint}}" },
+                  "fingerprint": { "version": {{CoverageInputs.Version}}, "inputs": "{{fingerprint}}" },
                   "tests": { "passed": 10, "failed": 0, "skipped": 0 },
                   "coverage": { "line": 0.9, "branch": 0.8 },
                   "hotPaths": [ { "id": "alpha", "line": 0.9, "branch": 0.8, "lines": 10, "branches": 4 } ],

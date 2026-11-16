@@ -15,12 +15,13 @@ public sealed record CoverageFingerprint(int Version, string? Inputs);
 /// <summary>
 /// Computes the fingerprint of everything that can change what the status artifact
 /// measures: application code, tests and fixtures, harness scripts, styling and the
-/// rating rubric. Build output and installed packages are ignored.
+/// rating rubric. Build output and installed packages are ignored, and line endings are
+/// normalised to LF so a checkout cannot change the result.
 /// </summary>
 public static class CoverageInputs
 {
     /// <summary>Version of the fingerprint rule. Bump when the file set or hashing changes.</summary>
-    public const int Version = 1;
+    public const int Version = 2;
 
     private static readonly string[] Roots = ["ClimberWeb", "ClimberWeb.Tests", "scripts"];
 
@@ -74,7 +75,7 @@ public static class CoverageInputs
             {
                 buffer.Write(Encoding.UTF8.GetBytes(path));
                 buffer.WriteByte(10);
-                buffer.Write(File.ReadAllBytes(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar))));
+                buffer.Write(ReadNormalized(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar))));
                 buffer.WriteByte(10);
             }
 
@@ -88,6 +89,35 @@ public static class CoverageInputs
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Reads a file's bytes with CRLF collapsed to LF. Line endings are not semantics:
+    /// git checks the same file out as CRLF on Windows and LF elsewhere, and a
+    /// fingerprint that changed with the checkout would report a false "sources changed".
+    /// </summary>
+    private static byte[] ReadNormalized(string path)
+    {
+        var bytes = File.ReadAllBytes(path);
+        if (Array.IndexOf(bytes, (byte)'\r') < 0)
+        {
+            return bytes;
+        }
+
+        using var normalized = new MemoryStream(bytes.Length);
+        for (var index = 0; index < bytes.Length; index++)
+        {
+            if (bytes[index] == (byte)'\r'
+                && index + 1 < bytes.Length
+                && bytes[index + 1] == (byte)'\n')
+            {
+                continue;
+            }
+
+            normalized.WriteByte(bytes[index]);
+        }
+
+        return normalized.ToArray();
     }
 
     private static void Collect(string directory, List<string> files)
