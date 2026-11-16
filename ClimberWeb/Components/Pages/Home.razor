@@ -236,6 +236,7 @@ else
                      data-active-tab="@_outputTab">
                 @{
                     var items = VisibleItems;
+                    var runHandoff = _outputTab == PrimaryTab ? _plan : Array.Empty<PlanStep>();
 
                     // "Newest" is a claim about the transcript, not the DOM order: the feed is
                     // rendered newest first, and the turn nearest that edge is the one a reader
@@ -273,7 +274,6 @@ else
                         // first raw event, which is stable while the run grows.
                         var isOpen = _turnOpen.TryGetValue(key, out var chosen) ? chosen : turn.Open;
                         var primary = _outputTab == PrimaryTab;
-                        var handoff = primary ? HandoffSteps(item) : Array.Empty<PlanStep>();
                         var sources = TurnSources(item);
                         var running = turn.Status == StepStatus.Running;
 
@@ -307,11 +307,6 @@ else
                                             </TraceLine>
                                         </Trigger>
                                         <ChildContent>
-                                            @if (handoff.Count >= 2)
-                                            {
-                                                <AiPlan Title="@($"Handed off to {handoff.Count} agents")" Steps="handoff" Running="running" />
-                                            }
-
                                             <Trace>
                                                 @foreach (var entry in item.Entries)
                                                 {
@@ -371,6 +366,18 @@ else
                             <div class="log-line @LineClass(plain.Raw)">@plain.Raw</div>
                         </div>
                     }
+                }
+                @if (runHandoff.Count >= 2)
+                {
+                    // One Plan for the whole run, not one per step: a handoff often spans
+                    // turns, so a per-turn plan would either repeat itself or disappear. It
+                    // is the last child before the prompt, which column-reverse reads as the
+                    // row directly under the person's question.
+                    <div class="log-item mx-auto w-full max-w-3xl">
+                        <AiPlan Title="@($"Handed off to {runHandoff.Count} agents")"
+                                Steps="runHandoff"
+                                Running="@runHandoff.Any(step => step.Status == "running")" />
+                    </div>
                 }
                 @if (VisibleEntries.Count == 0)
                 {
@@ -585,6 +592,9 @@ else
     private PromptInput? _promptInput;
     private AgentSelection _agents = new(Array.Empty<WorkflowRole>(), null);
     private IReadOnlyList<LogEntry> _entries = Array.Empty<LogEntry>();
+
+    /// <summary>Who this run handed work to, when there were two or more; rebuilt with the entries.</summary>
+    private IReadOnlyList<PlanStep> _plan = Array.Empty<PlanStep>();
     private string _outputTab = PrimaryTab;
 
     /// <summary>A reader's explicit open/closed choice per turn, keyed by its first raw event.</summary>
@@ -904,8 +914,15 @@ else
         .ToArray();
 
     /// <summary>The entries for the selected tab, oldest first: everything for the primary tab, one agent's calls otherwise.</summary>
+    /// <remarks>
+    /// On the primary tab a run with two or more delegates shows them in its Plan instead, so
+    /// the per-call rows leave the stream: the Plan is the record of who was handed what, and
+    /// repeating each agent beside it reads as two lists of the same thing.
+    /// </remarks>
     private IReadOnlyList<LogEntry> VisibleEntries => _outputTab == PrimaryTab
-        ? _entries
+        ? (_plan.Count >= 2
+            ? _entries.Where(entry => entry.Kind != LogKind.Subagent).ToArray()
+            : _entries)
         : _entries
             .Where(entry => entry.Kind == LogKind.Subagent && string.Equals(entry.Text, _outputTab, StringComparison.Ordinal))
             .ToArray();
@@ -947,7 +964,11 @@ else
         }
     }
 
-    private void RebuildEntries() => _entries = ActiveLogs.Select(_logFormatter.Format).ToArray();
+    private void RebuildEntries()
+    {
+        _entries = ActiveLogs.Select(_logFormatter.Format).ToArray();
+        _plan = BuildPlan(_entries);
+    }
 
     private static string MessageText(OutputItem item) =>
         string.Join("\n\n", item.Entries.Select(entry => entry.Text));
@@ -1024,19 +1045,34 @@ else
     };
 
     /// <summary>
-    /// The subagents a turn handed work to, when there were at least two. A single delegate
-    /// is one row, not a plan; two or more are a handoff and read as a plan.
+    /// The subagents this run handed work to, when there were at least two: one entry per
+    /// agent, in the order it first appeared, carrying its latest state. A handoff usually
+    /// spans turns, so this reads the whole run rather than one step - a single delegate is
+    /// still one row, not a plan.
     /// </summary>
-    private static IReadOnlyList<PlanStep> HandoffSteps(OutputItem item)
+    private static IReadOnlyList<PlanStep> BuildPlan(IReadOnlyList<LogEntry> entries)
     {
-        var agents = item.Entries.Where(entry => entry.Kind == LogKind.Subagent).ToArray();
-        if (agents.Length < 2)
+        var order = new List<string>();
+        var latest = new Dictionary<string, LogEntry>(StringComparer.Ordinal);
+
+        foreach (var entry in entries.Where(entry => entry.Kind == LogKind.Subagent))
+        {
+            var name = AgentName(entry);
+            if (!latest.ContainsKey(name))
+            {
+                order.Add(name);
+            }
+
+            latest[name] = entry;
+        }
+
+        if (order.Count < 2)
         {
             return Array.Empty<PlanStep>();
         }
 
-        return agents
-            .Select(entry => new PlanStep(AgentName(entry), StepKey(entry.Status)))
+        return order
+            .Select(name => new PlanStep(name, StepKey(latest[name].Status)))
             .ToArray();
     }
 
