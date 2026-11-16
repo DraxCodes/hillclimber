@@ -319,19 +319,43 @@ function auditPage({ consoleErrors }) {
   }
 
   // ---- 8. rhythm (design) ------------------------------------------------
-  const stage = document.querySelector('main.stage');
-  if (stage) {
-    const selector = '.panel, .telemetry, .statusline, .spendline, .methodbar, .providerbar';
-    const items = [...stage.children].filter((el) => el.matches(selector) && visible(el));
-    const gaps = items.map((el) => parseFloat(getComputedStyle(el).marginBottom) || 0);
-    const offGrid = items.filter((el, i) => gaps[i] > 0 && Math.abs(gaps[i] / 4 - Math.round(gaps[i] / 4)) > 0.05);
-    const nonzero = gaps.filter((gap) => gap > 0);
+  // Regions stack inside the shell, rows stack inside the transcript. Both are
+  // flex layouts, so a gap is the distance between rendered boxes, not a
+  // margin-bottom. The previous version read marginBottom off `main.stage`,
+  // which the shadcn pivot replaced with `main[data-slot=main]`; every gap read
+  // 0 and the check passed silently. Measure boxes, and treat "nothing matched
+  // while the transcript clearly has rows" as a stale selector, not a pass.
+  const stacks = [
+    ['shell regions', '[data-slot="context-strip"], [data-slot="chat"], [data-slot="composer-dock"]'],
+    ['feed rows', '#log-feed > .log-item'],
+  ];
+  let measured = 0;
+  for (const [label, selector] of stacks) {
+    const items = [...document.querySelectorAll(selector)].filter((el) => visible(el) && !isHidden(el));
+    if (items.length < 2) continue;
+    measured += 1;
+    const boxes = items.map((el) => el.getBoundingClientRect());
+    const gaps = boxes.slice(1).map((box, i) => {
+      const prev = boxes[i];
+      // A column-reverse feed lists the newest row first, so the next row is above it.
+      const gap = box.top < prev.top ? prev.top - box.bottom : box.top - prev.bottom;
+      return Math.max(0, gap);
+    });
+    // A seam under 2px is a hairline border, not a spacing decision; 0.5-1.5px
+    // showed up as the header's own border-b between two regions.
+    const offGrid = gaps.filter((gap) => gap >= 2 && Math.abs(gap / 4 - Math.round(gap / 4)) > 0.05);
     if (offGrid.length > 0) {
-      fail('rhythm', 'off 4px grid: ' + offGrid.map((el, i) => `${describe(el)} ${gaps[items.indexOf(el)].toFixed(1)}px`).join(', '));
+      fail('rhythm', `${label} off 4px grid: ` + offGrid.map((v) => `${v.toFixed(1)}px`).join(', '));
     }
+    const nonzero = gaps.filter((gap) => gap >= 2);
     if (nonzero.length > 1 && Math.max(...nonzero) - Math.min(...nonzero) > 0.5) {
-      fail('rhythm', 'inconsistent gaps: ' + nonzero.map((v) => v.toFixed(1)).join(', '));
+      fail('rhythm', `${label} inconsistent gaps: ` + gaps.map((v) => v.toFixed(1)).join(', '));
     }
+  }
+
+  const feed = document.getElementById('log-feed');
+  if (measured === 0 && feed && feed.querySelectorAll(':scope > *').length >= 2) {
+    fail('rhythm', 'transcript has rows but no rhythm stack matched; the selectors are stale');
   }
 
   // ---- 9. type floor (design) -------------------------------------------
