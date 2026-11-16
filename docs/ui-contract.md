@@ -207,6 +207,18 @@ Recorded so a later reader does not mistake each of these for drift.
 - **The composer's footnote is one line.** The delegation note already lives in the
   agent chip's `title`; printing it again under the composer added a second 10px
   mono line that said the same thing.
+- **The chat title row carries the title and nothing else.** A method badge sat
+  beside it (`run` / `hillclimb`) with the same border, radius and mono caps as the
+  interactive method tabs one band above, so it read as a second, dead control on
+  the one row that names the transcript; it also duplicated that picker and ate
+  ~40px of the title at 375. The method is stated by the tabs and, before a run,
+  by the title itself ("new run" / "new hillclimb"). Its `hidden` at 375 was also
+  never real: `UiClass.Join` cannot resolve `hidden` against `Badge`'s base
+  `inline-flex`, and `.hidden` precedes `.inline-flex` in the built sheet.
+- **The empty-state heading stays mono while its sentence is sans.** The shell's
+  heading idiom is mono and only prose is sans; the pair is deliberate, not a
+  missed font. The sentence is the reading text and follows the rule; the heading
+  is a label like the panel's other labels.
 
 ## Exception register
 
@@ -239,7 +251,15 @@ No element covers "the run is doing X right now". A `TraceLine`-shaped row plus 
 pulsing dot is allowed; it must sit on the same left edge as the feed's rows and
 carry `role="status"`.
 
-**Cost:** none known; recorded so a judge does not flag it as invented.
+The shipped indicator is a header pill (`span.log-working`) at the end of the chat
+title row, not a `TraceLine` row on the feed's left edge: it names the running
+step and its elapsed time while the transcript stays the reader's, and the head of
+the feed is where the newest row lands, so a row there would be covered by the
+stream. It keeps the pulsing dot and `role="status"` and is `aria-hidden` apart
+from the `aria-label`.
+
+**Cost:** it shares a row with the chat title, so at 375 the title truncates
+sooner during a live run.
 
 ## Scoring interaction
 
