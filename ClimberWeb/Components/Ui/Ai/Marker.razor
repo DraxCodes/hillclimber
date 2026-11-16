@@ -1,0 +1,32 @@
+@* AI Elements: Marker (registry `marker`).
+
+   A single low-emphasis row: a note, a divider between chapters, or a row that
+   closes a section. The registry draws it with `useRender` and a `cva` table; here
+   the variant classes are spelled out, and the root carries `data-variant` so
+   `MarkerContent` can read it through the `group/marker` selector.
+
+   Variants: `default` (a plain note), `separator` (centred, with a rule on each
+   side) and `border` (punctuated by a bottom rule). *@
+<div data-slot="marker"
+     data-variant="@Variant"
+     class="@UiClass.Join(
+         "group/marker relative flex min-h-4 w-full items-center gap-2 text-left text-sm text-muted-foreground [&_svg:not([class*='size-'])]:size-4 [a]:underline [a]:underline-offset-3 [a]:hover:text-foreground",
+         VariantClass,
+         Class)">
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>default, separator or border.</summary>
+    [Parameter] public string Variant { get; set; } = "default";
+
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string? VariantClass => Variant switch
+    {
+        "separator" => "before:mr-1 before:h-px before:min-w-0 before:flex-1 before:bg-border after:ml-1 after:h-px after:min-w-0 after:flex-1 after:bg-border",
+        "border" => "border-b border-border pb-2",
+        _ => null,
+    };
+}

@@ -1,0 +1,12 @@
+@* AI Elements: MarkerIcon (part of `marker`). Decorative only: the row's text carries
+   the meaning, so the icon is hidden from assistive technology. *@
+<span data-slot="marker-icon"
+      aria-hidden="true"
+      class="@UiClass.Join("size-4 shrink-0 [&_svg:not([class*='size-'])]:size-4", Class)">
+    @ChildContent
+</span>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

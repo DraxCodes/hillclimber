@@ -326,7 +326,9 @@ else
 
                                             @if (!string.IsNullOrEmpty(turn.Footer))
                                             {
-                                                <p class="pt-1 font-mono text-[0.68rem] text-muted-foreground/80">@turn.Footer</p>
+                                                <Marker Class="pt-1 font-mono text-[0.68rem] text-muted-foreground/80">
+                                                    <MarkerContent>@turn.Footer</MarkerContent>
+                                                </Marker>
                                             }
                                         </ChildContent>
                                     </TraceCollapsible>
@@ -345,9 +347,10 @@ else
                     {
                         <div class="log-item mx-auto w-full max-w-3xl" @key="key">
                             <Trace>
-                                <TraceLine Status="error">
-                                    <TraceTitle Wrap>@MarkerText(item.Entries[0])</TraceTitle>
-                                </TraceLine>
+                                <Marker Class="text-destructive!">
+                                    <MarkerIcon><UiIcon Name="circle-alert" CssClass="size-4" /></MarkerIcon>
+                                    <MarkerContent>@MarkerText(item.Entries[0])</MarkerContent>
+                                </Marker>
                             </Trace>
                         </div>
                     }
@@ -355,9 +358,9 @@ else
                     {
                         <div class="log-item mx-auto w-full max-w-3xl" @key="key">
                             <Trace>
-                                <TraceLine Class="text-xs">
-                                    <TraceTitle Wrap>@MarkerText(item.Entries[0])</TraceTitle>
-                                </TraceLine>
+                                <Marker Class="text-xs">
+                                    <MarkerContent>@MarkerText(item.Entries[0])</MarkerContent>
+                                </Marker>
                             </Trace>
                         </div>
                     }
