@@ -208,7 +208,7 @@ else
 
             @if (SubAgentNames.Count > 0)
             {
-                <div class="outtabs" role="tablist" aria-label="Output stream">
+                <div class="outtabs" role="tablist" aria-label="Output stream" data-slot="output-tabs">
                     <button class="outtab @(_outputTab == PrimaryTab ? "active" : string.Empty)" type="button" data-outtab="@PrimaryTab"
                             role="tab" aria-selected="@(_outputTab == PrimaryTab)" @onclick="() => SelectOutputTab(PrimaryTab)">@PrimaryTabLabel</button>
                     @foreach (var name in SubAgentNames)
@@ -318,7 +318,7 @@ else
                                             @if (!string.IsNullOrEmpty(turn.Footer))
                                             {
                                                 <Marker Class="pt-1 font-mono text-[0.68rem] text-muted-foreground/80">
-                                                    <MarkerContent>@turn.Footer</MarkerContent>
+                                                    <MarkerContent>@FooterText(turn.Footer)</MarkerContent>
                                                 </Marker>
                                             }
                                         </ChildContent>
@@ -350,7 +350,7 @@ else
                         <div class="log-item mx-auto w-full max-w-3xl" @key="key">
                             <Trace>
                                 <Marker Class="text-xs">
-                                    <MarkerContent>@MarkerText(item.Entries[0])</MarkerContent>
+                                    <MarkerContent>@MarkerRow(item.Entries[0])</MarkerContent>
                                 </Marker>
                             </Trace>
                         </div>
@@ -379,7 +379,7 @@ else
                 {
                     <div class="log-item mx-auto flex w-full max-w-3xl flex-col items-center justify-center py-8">
                         <Empty Icon="message" Title="@EmptyTitle" Bordered="false">
-                            <p>@EmptyBody</p>
+                            <p class="font-sans">@EmptyBody</p>
                             @if (!AnyRunning)
                             {
                                 <div class="mt-3 flex flex-wrap justify-center gap-1.5" data-slot="empty-suggestions">
@@ -403,7 +403,7 @@ else
                     <div class="log-item mx-auto w-full max-w-3xl pb-2" data-slot="chat-prompt">
                         <Message Align="end">
                             <MessageContent>
-                                <Bubble Align="end" Variant="muted">
+                                <Bubble Align="end" Variant="muted" ContentClass="max-w-[68ch]! border-border! font-sans">
                                     <span class="whitespace-pre-wrap">@startedPrompt</span>
                                 </Bubble>
                             </MessageContent>
@@ -498,10 +498,6 @@ else
 
                 <p class="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 font-mono text-[0.62rem] text-muted-foreground">
                     <span>enter sends · shift+enter adds a line</span>
-                    @if (AgentNote.Length > 0)
-                    {
-                        <span class="min-w-0 break-words">@AgentNote</span>
-                    }
                 </p>
             </div>
         </div>
@@ -962,6 +958,34 @@ else
     private static string MessageText(OutputItem item) =>
         string.Join("\n\n", item.Entries.Select(entry => entry.Text));
 
+    /// <summary>
+    /// Splits a turn's cost line into clauses. Rendered as separate no-wrap spans, a narrow
+    /// footer wraps between clauses instead of orphaning a word ("read") on its own line.
+    /// </summary>
+    private static IReadOnlyList<string> FooterParts(string footer) =>
+        footer.Split(" · ", StringSplitOptions.RemoveEmptyEntries);
+
+    private static RenderFragment FooterText(string footer) => builder =>
+    {
+        var parts = FooterParts(footer);
+        for (var index = 0; index < parts.Count; index++)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(0, "class", "whitespace-nowrap");
+
+            // The separator travels with the clause it precedes, so a wrapped footer starts
+            // its second line with "· cache …" instead of ending the first with a loose dot.
+            builder.AddContent(0, index == 0 ? parts[index] : " · " + parts[index]);
+            builder.CloseElement();
+        }
+    };
+
+    /// <summary>A standalone marker: a step footer keeps its clauses whole, any other note wraps.</summary>
+    private static RenderFragment MarkerRow(LogEntry entry) =>
+        entry.Kind == LogKind.StepFinish
+            ? FooterText(MarkerText(entry))
+            : builder => builder.AddContent(0, MarkerText(entry));
+
     /// <summary>One activity row inside a turn: reasoning prose, a tool row, or a trace row.</summary>
     /// <param name="entry">The row to render.</param>
     /// <param name="live">
@@ -1337,6 +1361,17 @@ else
         if (_renderedTab != _outputTab && await RestoreTabAsync())
         {
             _renderedTab = _outputTab;
+        }
+
+        // The strip scrolls between renders (a new agent tab, a narrower window), so its
+        // overflow state and the selected tab's position are re-read after every patch.
+        try
+        {
+            await JS.InvokeVoidAsync("climberLog.syncTabs", _outputTab);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or JSException or InvalidOperationException)
+        {
+            // Prerender, or the circuit went away; the next render tries again.
         }
 
         if (!firstRender)

@@ -17,7 +17,8 @@
              "w-fit max-w-full min-w-0 overflow-hidden rounded-3xl border border-transparent px-3 py-2.5 text-sm leading-relaxed wrap-break-word",
              "group-data-[align=end]/bubble:self-end",
              "[button,a]:transition-colors [button,a]:outline-none [button,a]:focus-visible:border-ring [button,a]:focus-visible:ring-3 [button,a]:focus-visible:ring-ring/30",
-             SurfaceClass)">
+             SurfaceClass,
+             ContentClass)">
         @ChildContent
     </div>
 </div>
@@ -30,6 +31,14 @@
     [Parameter] public string Align { get; set; } = "start";
 
     [Parameter] public string? Class { get; set; }
+
+    /// <summary>
+    /// Extra classes on the bubble surface. The registry takes one `className`; this port
+    /// splits the wrapper from the content, so a caller that changes the surface (a border,
+    /// a measure, a font) has to name the inner element.
+    /// </summary>
+    [Parameter] public string? ContentClass { get; set; }
+
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     private string SurfaceClass => Variant switch

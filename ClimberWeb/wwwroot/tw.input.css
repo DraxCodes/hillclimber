@@ -481,6 +481,14 @@
            wrong line. Narrow screens scroll the strip instead. */
         overflow-x: auto;
         scrollbar-width: none;
+        scroll-padding-inline: 0.75rem;
+    }
+
+    /* The scrollbar is hidden, so a trailing fade is the only sign that the strip
+       holds more tabs than fit. Only present while it actually overflows. */
+    .outtabs[data-scrollable] {
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.75rem), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 1.75rem), transparent);
     }
 
     .outtabs::-webkit-scrollbar {

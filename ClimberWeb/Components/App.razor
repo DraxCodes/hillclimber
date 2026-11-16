@@ -377,8 +377,32 @@
                 lastOpened = null;
             });
 
+            // The tab strip is one row that scrolls rather than wrapping, and its
+            // scrollbar is hidden. Masking the trailing edge when it can scroll is the
+            // only affordance the strip has; the selected tab is kept in view.
+            function syncTabs(activeTab) {
+                var strip = document.querySelector('[data-slot="output-tabs"]');
+                if (!strip) return;
+                if (strip.scrollWidth > strip.clientWidth + 1) strip.setAttribute("data-scrollable", "");
+                else strip.removeAttribute("data-scrollable");
+                if (!activeTab) return;
+                var tab = null;
+                var tabs = strip.querySelectorAll("[data-outtab]");
+                for (var i = 0; i < tabs.length; i++) {
+                    if (tabs[i].getAttribute("data-outtab") === activeTab) { tab = tabs[i]; break; }
+                }
+                if (!tab) return;
+                var overflowRight = tab.offsetLeft + tab.offsetWidth - strip.clientWidth;
+                if (tab.offsetLeft < strip.scrollLeft || overflowRight > 0) {
+                    strip.scrollLeft = Math.max(0, tab.offsetLeft - 12);
+                }
+            }
+
+            window.addEventListener("resize", function () { syncTabs(null); });
+
             return {
-                restoreTab: restoreTabState
+                restoreTab: restoreTabState,
+                syncTabs: syncTabs
             };
         })();
     </script>
