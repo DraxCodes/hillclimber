@@ -118,6 +118,7 @@ that decides the surface.
 | Reasoning | Reasoning | port | `Ui/Ai/AiReasoning.razor` |
 | Sources | Sources | port | `Ui/Ai/AiSources.razor` |
 | Errors / notes / footers | Marker | port | `Ui/Ai/Marker.razor`, `Pages/Home.razor` |
+| Unknown event | Tool | composition | `Services/ToolPresentation.cs` |
 | Working indicator | - (no element) | **EXCEPTION 3** | `Services/OutputActivity.cs` |
 | Jump to latest | `MessageScrollerButton` | bespoke, **debt C2** | `App.razor` |
 | Empty state | Empty | port | `Ui/Empty.razor` |
@@ -166,6 +167,46 @@ Recorded so a later reader does not mistake each of these for drift.
 - **Sources** count an MCP tool when its input names an http(s) URL, which makes
   the documented "Web or MCP targets" claim true. An MCP call with no URL adds
   nothing.
+
+### Phase 2b decisions
+
+Recorded so a later reader does not mistake each of these for drift.
+
+- **The user prompt is prose on a bordered bubble.** It renders the `Bubble`
+  `muted` variant with `font-sans`, `border-border!` and `max-w-[68ch]!`. The feed
+  sets `font-family: var(--font-mono)`, so a bubble that inherits it makes the
+  person's sentence look like data; a hairline border separates the surface from
+  `--surface-2`, which is only 8/255 lighter than `bg-muted`. The `!` is required
+  for the same reason as `text-destructive!` above: the port's `border-transparent`
+  and `max-w-full` are in the base class list and `UiClass.Join` does not resolve
+  conflicts the way the registry's `cn()` does.
+- **A tool row's argument summary is bounded** (`max-w-[12ch] sm:max-w-[34ch]`,
+  `truncate`, `title`). `TraceDescription` is `shrink-0` because the registry says
+  so, which is right for short meta ("3 of 4 done") and wrong for an 80-character
+  `query=… · url=…`: it forced the fold body to 811px and the `overflow-hidden`
+  content clipped the row at 375 and 900. The bound belongs to the composition
+  (`AiTool`), not the primitive. `TraceDescription` forwards unmatched attributes,
+  matching the registry's `...props`, so the full value stays available on hover.
+- **An unknown event is a Tool row, never a raw log line.** `session.diff` is
+  named: its title is "Changed N file(s)" and its body lists the files. Any other
+  unknown type keeps its humanized title and shows its payload without the
+  `[HH:mm:ss]` stamp. The stamped line is machinery, and the generic branch is what
+  a future event type reaches by default.
+- **The agent tab strip states that it scrolls.** One row never wraps (a second row
+  puts the underline on the wrong line), so when `scrollWidth > clientWidth` the
+  strip's trailing edge is masked and the selected tab is scrolled into view. The
+  class is `data-scrollable`; it is off when the tabs fit.
+- **A cost line wraps between clauses, not inside one.** The footer is split on
+  ` · ` into no-wrap spans, and the separator travels with the clause it precedes,
+  so a wrapped footer reads `· cache 5120 read / 640 write` rather than ending a
+  line with a loose dot or orphaning `read`. Standalone `step_finish` markers use
+  the same rendering; other markers still wrap normally.
+- **Prose is sans in the empty state too.** The feed's mono default reached the
+  empty-state sentence; it is now `font-sans` at the 14px the `Empty` description
+  already sets.
+- **The composer's footnote is one line.** The delegation note already lives in the
+  agent chip's `title`; printing it again under the composer added a second 10px
+  mono line that said the same thing.
 
 ## Exception register
 
