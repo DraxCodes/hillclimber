@@ -1,0 +1,22 @@
+﻿[
+    {
+        "blind":  "b-1.md",
+        "source":  "b-qwen.md"
+    },
+    {
+        "blind":  "b-2.md",
+        "source":  "b-sonnet.md"
+    },
+    {
+        "blind":  "b-3.md",
+        "source":  "b-haiku.md"
+    },
+    {
+        "blind":  "b-4.md",
+        "source":  "b-glm.md"
+    },
+    {
+        "blind":  "b-5.md",
+        "source":  "b-deepseek.md"
+    }
+]

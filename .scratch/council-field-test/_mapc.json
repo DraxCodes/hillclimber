@@ -1,0 +1,22 @@
+﻿[
+    {
+        "blind":  "c-1.md",
+        "source":  "c-deepseek.md"
+    },
+    {
+        "blind":  "c-2.md",
+        "source":  "c-glm.md"
+    },
+    {
+        "blind":  "c-3.md",
+        "source":  "c-qwen.md"
+    },
+    {
+        "blind":  "c-4.md",
+        "source":  "c-haiku.md"
+    },
+    {
+        "blind":  "c-5.md",
+        "source":  "c-sonnet.md"
+    }
+]

@@ -1,0 +1,15 @@
+### 1. Experience thesis
+
+At 8/10, a reader mid-scroll notices the question without losing their place: the newest row lands at the feed's head (EXCEPTION 1's `column-reverse`), so the card must arrive as the live edge — one accent moment, dot-level quiet everywhere else. The three-second read: one question sentence in sans at 14px, options below it as full-width selectable rows, the machinery (who asked, which tool) demoted to micro mono caps. First-run path to answering: Tab reaches the card, the first option holds focus by default, Enter answers, and the whole interaction is two keys — no submit detour. Copy voice: the question is opencode's verbatim; the app adds nothing except a 11px mono label ("question"). One moment that should feel good: the instant of answering — the chosen option keeps its label, everything else folds, and the run visibly resumes within 200ms ease-out. Friction to avoid: a modal-feeling card that blocks scrolling; a card whose answer state is lost on re-render (open state lives in C#); an affordance only visible on hover; a border on every surface so the question competes with the composer's radius.
+
+### 2. Three highest-value subjective calls
+
+**One click answers.** Each option is a button; pressing it submits immediately. Counter-argument: a mis-click is irreversible mid-run, and a confirm step protects the reader. How you'd notice: time-to-answer and whether people ever hover-and-hesitate before clicking; with a confirm step every question costs three interactions instead of one, and in a single-user local tool that tax buys nothing.
+
+**An answered question folds to one quiet line.** After submission the card collapses to a `TraceLine`-shaped row — question label, chosen answer in the description — provenance-clean under R1/R2. Counter-argument: the reader loses the options they didn't take, which are context for judging the run. How you'd notice: scroll back through a finished run; if the transcript reads as a wall of answers with the deliberation gone, the fold went too far — the fold body should stay reachable, not deleted (TraceCollapsible's close-unmounts rule applies).
+
+**Focus moves to the card's first option when the question arrives.** Counter-argument: focus steal mid-read is hostile, and the reader may be annotating elsewhere. How you'd notice: keyboard-only pass — if Tab-count to reach a live question exceeds three, the default was wrong; if focus jumps while you're reading a previous turn, the steal was wrong. Decide by watching one seeded first-run.
+
+### 3. The one thing you would cut
+
+The always-visible free-text field. The brief allows an optional free-text answer; rendering a textarea inside every card makes a two-key interaction a six-key one and puts a second composer on screen next to the real one. Keep the options as the card's only controls and expose free text as a trailing "other…" affordance that reveals the input on demand. If a question arrives with options but the run's behaviour shows readers always typing, that is evidence to revisit — check the transcripts, not the spec.

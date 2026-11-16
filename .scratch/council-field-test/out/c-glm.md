@@ -1,0 +1,15 @@
+### 1. Risk posture
+
+An 8/10 must guarantee: the reader's answer is data, never command syntax; untrusted model output never renders as markup; and no answer leaves the app without deliberate human intent. The trust boundary is two-sided and easy to blur: on one side, the `opencode` subprocess, whose questions and options are model-controlled untrusted content; on the other, the LAN reader, semi-trusted per the security-pass threat model (`.scratch/security-pass/spec.md`, decision 2), reachable over plaintext HTTP on `0.0.0.0` with a 4-digit PIN and no throttling. Transport for the answer is in-app → subprocess stdin/IPC of a live process; it must never travel through a shell or a re-spawned command line. Must never happen: an answer spliced into arguments; a click sending text the reader never saw in full; model-fabricated questions auto-answered; answers persisted verbatim into run JSON or Information-level logs (spec Finding 3 shows that pattern already exists).
+
+### 2. Three highest-value risks
+
+1. **Argument injection via free-text answers.** Today `OpenCodeRun.cs` builds arguments as a list, but `CommandLine` (line 13) shows the quote-and-concatenate habit. If an answer is passed by re-invoking or extending the command line, a free-text answer containing `"` or `--agent`/`--session` becomes flags the run never asked for, steering the agent. Impact: arbitrary behavior in the user-chosen folder, compounding Finding 6 (unbounded browse, arbitrary working directory). Closing constraint: the answer reaches the running process only via its stdin/session API, never through `CommandRequest` construction.
+
+2. **Prompt-injection loop through fabricated questions.** Transcript content is model output; a question is just more of it. A run whose model is manipulated renders a plausible question with options; a one-click "send option" turns model text into a human-authorized instruction fed back into the same run — the loop that makes injection self-sustaining. Impact: the reader becomes the injection vector against themselves. Closing constraint: questions render as plain text (no markup sinks — spec confirms none exist today), and sending requires an explicit confirm step for any free text.
+
+3. **Cleartext LAN answer, unauthenticated reach.** With a real PIN the app stays on `0.0.0.0` plaintext (spec decision 3, Finding 4); a question on screen and its answer are readable/forgeable by any LAN device, and PIN guessing is unthrottled. Impact: an attacker answers as the reader, or watches secrets typed in free text. Closing constraint: treat the answer as a secret-grade secret — no free text on non-loopback binds, or answers gated to loopback sessions.
+
+### 3. The one thing you would cut
+
+Cut the optional free-text answer. Options-only answering keeps every sent value a closed enum the model supplied and the reader selected, which kills risk 1 outright, shrinks risk 2 to visible choices, and removes the worst secret-leak surface in risk 3. Free text is where injection, logging, and LAN exposure concentrate; it buys little over typed options for a local single-user tool.
