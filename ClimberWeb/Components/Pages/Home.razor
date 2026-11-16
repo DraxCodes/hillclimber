@@ -77,12 +77,12 @@ else
                     }
                 </span>
 
-                <div class="methodbar inline-flex items-center rounded-md border bg-background p-0.5" role="tablist" aria-label="method">
+                <div class="methodbar inline-flex items-center rounded-md border bg-background p-0.5" role="group" aria-label="method">
                     <button class="method @(_method == RunMethod.Run ? "active" : string.Empty) focus-ring inline-flex h-7 items-center rounded-sm px-2.5 font-mono text-xs transition-colors disabled:opacity-50"
-                            type="button" role="tab" aria-selected="@(_method == RunMethod.Run)"
+                            type="button" aria-pressed="@(_method == RunMethod.Run ? "true" : "false")"
                             disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Run)">run</button>
                     <button class="method @(_method == RunMethod.Hillclimb ? "active" : string.Empty) focus-ring inline-flex h-7 items-center rounded-sm px-2.5 font-mono text-xs transition-colors disabled:opacity-50"
-                            type="button" role="tab" aria-selected="@(_method == RunMethod.Hillclimb)"
+                            type="button" aria-pressed="@(_method == RunMethod.Hillclimb ? "true" : "false")"
                             disabled="@AnyRunning" @onclick="() => SetMethod(RunMethod.Hillclimb)">hillclimb</button>
                 </div>
 

@@ -147,13 +147,11 @@ sequence problem (WCAG 1.3.2), not a labelling one.
 Chips are hand-built at `Home.razor:382` under a bespoke
 `data-slot="empty-suggestions"`.
 
-### C4 - P1: no `Tabs`
+### C4 - P1: no `Tabs` — **closed 2026-11-16**
 
-`.methodbar` (`Home.razor:80`) still declares `role="tablist"` with hand-managed
-`aria-selected` and no roving tabindex or arrow keys. The output strip
-(`Home.razor:210`) no longer claims the tab contract: it is a labelled group of
-toggle buttons with `aria-pressed`, which is complete on its own. The remaining
-half of the debt is the method picker.
+`.methodbar` (`Home.razor:80`) is a labelled group of toggle buttons with
+`aria-pressed`, matching the output strip (`Home.razor:210`). Neither switcher
+claims the tab keyboard contract it does not implement.
 
 ### C5 - P1: no `Dialog` / `Sheet`
 
@@ -302,7 +300,7 @@ scroll and keyboard behaviour across the whole panel.
 | C1 | Marker absent | **closed in 2a** |
 | C2 | Message Scroller absent, reverse DOM | 3 |
 | C3 | Suggestion absent | 3 |
-| C4 | Tabs absent, methodbar ad-hoc tablist | 3 |
+| C4 | Tabs absent, methodbar ad-hoc tablist | **closed in 2c** |
 | C5 | Dialog/Sheet absent | 3 |
 | C6 | Input/Input Group absent | 3 |
 | C7 | Model Selector - accepted exception | never |

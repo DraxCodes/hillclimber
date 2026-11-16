@@ -124,7 +124,7 @@ that decides the surface.
 | Empty state | Empty | port | `Ui/Empty.razor` |
 | Prompt suggestions | Suggestion | bespoke, **debt C3** | `Pages/Home.razor` |
 | Composer | Prompt Input | port, **debt C6** | `Ui/Ai/PromptInput.razor` |
-| Method / provider pick | Tabs / Toggle Group | bespoke, **debt C4** | `Pages/Home.razor` |
+| Method / provider pick | Toggle Group | bespoke, **decision in Phase 2c** | `Pages/Home.razor` |
 | Model chip | Model Selector | **EXCEPTION 2** | `Ui/Ai/PromptInput.razor` |
 
 Debt IDs refer to the register in the audit (section 9). A debt ID is not an
@@ -235,8 +235,11 @@ Recorded so a later reader does not mistake each of these for drift.
   tabindex, no arrow keys), and a half-implemented tablist is worse for a screen
   reader than an honest toggle: each button carries `aria-pressed`, Tab reaches
   all of them, and the container is `role="group" aria-label="Output stream"`.
-  The trailing-edge mask and the scroll-into-view are unchanged. `.methodbar`
-  still declares tabs and is the remaining half of debt C4.
+  The trailing-edge mask and the scroll-into-view are unchanged. **The method
+  picker joined it:** `role="group" aria-label="method"` with `aria-pressed` on
+  `run`/`hillclimb`, so both switchers promise only what they keep. Debt C4 is
+  closed; the provider picker was already a labelled group of `aria-pressed`
+  buttons.
 
 ## Exception register
 
