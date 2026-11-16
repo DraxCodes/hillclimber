@@ -251,6 +251,17 @@
     .ai-md > :first-child { margin-top: 0; }
     .ai-md > :last-child { margin-bottom: 0; }
 
+    /* Prose keeps a reading measure (F4). Code fences and tables opt out: they
+       are scanned, not read line by line, and may use the full column. 68ch is
+       the art-direction cap and the width the user bubble already takes. */
+    .ai-md-p,
+    .ai-md-heading,
+    .ai-md-list,
+    .ai-md-quote,
+    .ai-md-rule {
+        max-width: 68ch;
+    }
+
     .ai-md-p {
         margin: 0 0 0.6rem;
     }

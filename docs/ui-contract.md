@@ -267,6 +267,15 @@ Recorded so a later reader does not mistake each of these for drift.
 - **The telemetry `<dl>` carries `m-0`.** Its UA default `margin-block: 1em` was
   adding 32px to the band's height in every state.
 
+### Phase 2e decisions
+
+- **Answer prose keeps a 68ch measure; code and tables do not.** `.ai-md-p`,
+  `.ai-md-heading`, `.ai-md-list`, `.ai-md-quote` and `.ai-md-rule` cap at 68ch —
+  the art-direction cap and the width the user bubble already takes — while code
+  fences and tables keep the full column because they are scanned, not read line by
+  line. The cap is left-aligned, so at 900 the only visible cost is a right gutter;
+  below ~700px the column is already narrower than 68ch, so 375 is unchanged.
+
 ## Exception register
 
 ### EXCEPTION 1 - reverse transcript order
