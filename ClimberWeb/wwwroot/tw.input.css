@@ -532,7 +532,9 @@
     }
 
     .outtab:hover:not(.active) { color: var(--ink-2); }
-    .outtab.active { color: var(--ink); border-bottom-color: var(--accent); }
+    /* Selection is ink, like the method toggle. The accent belongs to the live
+       status and the primary button, nothing else (art direction). */
+    .outtab.active { color: var(--ink); border-bottom-color: var(--ink); }
     .outtab:focus-visible {
         outline: none;
         border-radius: var(--radius-sm);

@@ -234,7 +234,9 @@ public sealed class RunService : IRunService
                 {
                     Status = RunStatus.Completed,
                     FinishedAt = DateTimeOffset.Now,
-                    Message = "Run complete.",
+                    // The status word says "completed"; a message here would only
+                    // print the same fact twice in the band.
+                    Message = null,
                     FallbackAvailable = false,
                     FallbackMessage = null,
                     Fallback = null,
@@ -249,7 +251,8 @@ public sealed class RunService : IRunService
             {
                 Status = RunStatus.Stopped,
                 FinishedAt = DateTimeOffset.Now,
-                Message = "Stopped by user.",
+                // Same rule as completion: "stopped" is already the statement.
+                Message = null,
                 FallbackAvailable = false,
                 FallbackMessage = null,
                 Fallback = null,

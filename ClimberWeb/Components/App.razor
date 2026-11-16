@@ -400,6 +400,54 @@
 
             window.addEventListener("resize", function () { syncTabs(null); });
 
+            // The citation card is anchored to its chip, so a chip near the right
+            // edge pushes the 16rem card past a 375px viewport. Nudge it back inside
+            // when it would cross; CSS still shows the card if this never runs.
+            function placeCitation(host) {
+                var card = host.querySelector("[data-citation-card]");
+                if (!card) return;
+                // Escape hides the card inline; a fresh hover or focus brings it back.
+                card.style.display = "";
+                card.style.left = "";
+                var cardBox = card.getBoundingClientRect();
+                var width = cardBox.width || card.offsetWidth || 256;
+                var over = host.getBoundingClientRect().left + width - (window.innerWidth - 8);
+                if (over > 0) card.style.left = (-over) + "px";
+            }
+
+            function citationHost(target) {
+                return target && target.closest ? target.closest("[data-citation]") : null;
+            }
+
+            document.addEventListener("pointerover", function (e) {
+                var host = citationHost(e.target);
+                if (host) placeCitation(host);
+            });
+
+            document.addEventListener("focusin", function (e) {
+                var host = citationHost(e.target);
+                if (host) placeCitation(host);
+            });
+
+            // Probe 5: Escape closes what focus opened. The card is CSS-shown on
+            // focus-within, so hiding it inline keeps focus on the link.
+            document.addEventListener("keydown", function (e) {
+                if (e.key !== "Escape") return;
+                var host = citationHost(document.activeElement);
+                if (!host) return;
+                var card = host.querySelector("[data-citation-card]");
+                if (card) card.style.display = "none";
+            });
+
+            // A viewport change invalidates the offset; re-place any card still open.
+            window.addEventListener("resize", function () {
+                var hosts = document.querySelectorAll("[data-citation]");
+                for (var i = 0; i < hosts.length; i++) {
+                    var card = hosts[i].querySelector("[data-citation-card]");
+                    if (card && getComputedStyle(card).display !== "none") placeCitation(hosts[i]);
+                }
+            });
+
             return {
                 restoreTab: restoreTabState,
                 syncTabs: syncTabs

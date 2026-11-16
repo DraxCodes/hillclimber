@@ -81,7 +81,8 @@ public class PlaybackFixtureTests
         var playback = PlaybackRunService.Create(Fixture(PlaybackRunService.DefaultFixture), start);
 
         Assert.Equal(RunStatus.Completed, playback.State.Status);
-        Assert.Equal("Run complete.", playback.State.Message);
+        // Completed carries no message: the status word is the statement.
+        Assert.Null(playback.State.Message);
         Assert.Equal(start, playback.State.StartedAt);
         Assert.NotNull(playback.State.FinishedAt);
         Assert.Equal(Lines(PlaybackRunService.DefaultFixture).Length, playback.State.Logs.Count);

@@ -117,6 +117,7 @@ that decides the surface.
 | Tool / Terminal | Tool / Terminal | port | `Ui/Ai/AiTool.razor` |
 | Reasoning | Reasoning | port | `Ui/Ai/AiReasoning.razor` |
 | Sources | Sources | port | `Ui/Ai/AiSources.razor` |
+| Inline citation | Inline Citation | port | `Ui/Ai/InlineCitation.razor` |
 | Errors / notes / footers | Marker | port | `Ui/Ai/Marker.razor`, `Pages/Home.razor` |
 | Unknown event | Tool | composition | `Services/ToolPresentation.cs` |
 | Working indicator | - (no element) | **EXCEPTION 3** | `Services/OutputActivity.cs` |
@@ -238,16 +239,16 @@ Recorded so a later reader does not mistake each of these for drift.
   The trailing-edge mask and the scroll-into-view are unchanged. **The method
   picker joined it:** `role="group" aria-label="method"` with `aria-pressed` on
   `run`/`hillclimb`, so both switchers promise only what they keep. Debt C4 is
-  closed; the provider picker was already a labelled group of `aria-pressed`
-  buttons.
+  closed; the provider picker already carried `aria-pressed`, but its wrapper only
+  became a named group in Phase 2g.
 
 ### Phase 2d decisions
 
 - **The context band is two tiers, not one wrapping row.** The primary line holds
   the status (dot, word, truncated message), the method toggle and the platform
-  picker; the second holds spend plus the active method's telemetry (`tokens` /
-  `elapsed`, or `iteration` / `best score` / `last run`), one type step smaller and
-  muted. The second tier is rendered only once the active method has a start time,
+  picker; the second holds the active method's telemetry (`tokens` / `elapsed`, or
+  `iteration` / `best score` / `last run`), one type step smaller and muted. Spend
+  was its own group here and became the telemetry's first cell in Phase 2g. The second tier is rendered only once the active method has a start time,
   so the first-run band carries no zeroes, and it starts at the status's left edge:
   the old `sm:ml-auto` on the telemetry is what stranded a wrapped line alone on
   the right. `justify-between` on the primary row pushes the platform group right
@@ -284,6 +285,45 @@ Recorded so a later reader does not mistake each of these for drift.
   gone (debt R1). `polish.mjs`'s feed check now asserts both levels — 8px for a row,
   24px for a group boundary — instead of demanding one uniform gap, so a return to a
   flat pitch still fails.
+
+### Phase 2g decisions
+
+Post-score refinements, scored against the 8 already on the board.
+
+- **The secondary tier is one grammar.** Spend stopped being a sentence and became
+  a key/value cell inside the telemetry `<dl>` (`SPENT $0.0124 this run`), so it
+  matches `tokens` / `elapsed` instead of interrupting them. The cell's
+  `this run` / `this climb` qualifier is inline-capable and drops below `sm`. The
+  `<dl>`'s name is the method's ("Run telemetry" / "Climb telemetry"); the separate
+  "Spend" group is gone because spend is now one of its cells.
+- **Terminal states carry no message.** Completion and user stop set `Message` to
+  null at the producer (`RunService`, `PlaybackRunService`, `HillClimberService`),
+  because the status word already says `completed` / `stopped`; the climb's
+  iteration count and best score are already telemetry cells. Failures, approval
+  prompts and fallback offers keep their text, so the band never prints the status
+  twice and the view does not need to know producer copy. (The first attempt
+  filtered `"Run complete."` in the view; that only fixed the run branch and
+  hardcoded service copy.)
+- **The output tab's active underline is ink, not accent.** Same treatment as the
+  method and platform toggles. The accent budget is the live status and the
+  primary button; a selected-but-idle tab was the last quiet place claiming it.
+- **The platform picker is a labelled group.** `role="group" aria-label="Platform"`
+  with the visible `platform` word `aria-hidden`, so a screen reader hears the
+  group name once instead of a bare run of buttons.
+- **Telemetry values reset the UA margin.** A `<dd>` carries
+  `margin-inline-start: 40px`; with the cell's 4px gap the label and value sat
+  44px apart, reading as six loose columns and wrapping `elapsed` to a second row
+  at 375. The value class now carries `m-0`, so every cell is a 4px pair and the
+  tier is one row again: 100px band at 375, 66px at 900.
+- **The citation card is nudged inside the viewport.** The 16rem card is anchored
+  to its chip, so a chip near the right edge put its right edge 14px past a 375px
+  viewport. A delegated `pointerover`/`focusin` handler measures the card and
+  shifts it left by the overflow (to an 8px margin); CSS still shows the card on
+  its own, and a resize re-places any card still open. Escape hides the open card
+  inline, keeping focus on the link (probe 5).
+- **The header's icon-only links keep a name.** `activity` and `status` hide their
+  words below `sm`; they now carry `aria-label` and `title`, so the 375
+  accessibility tree is no longer two unnamed links.
 
 ## Exception register
 
@@ -325,6 +365,20 @@ from the `aria-label`.
 
 **Cost:** it shares a row with the chat title, so at 375 the title truncates
 sooner during a live run.
+
+### EXCEPTION 4 - closed-tail playback reports completed
+
+The seeded playback host reports a closed transcript as `completed` even when its
+tail carries a provider error, because a transcript carries no process exit code
+(README, `CLIMBER_SEED`). The status is a statement about the recording, not a
+judgement of its content.
+
+**Cost:** the seeded demo shows a green `completed` beside a red terminal row, so
+a first-time reader can read success and failure at once. A real host derives the
+status from the process and shows `failed`.
+
+**Until:** a playback fixture that records the exit code, or a seed whose tail is
+clean.
 
 ## Scoring interaction
 

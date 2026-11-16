@@ -354,7 +354,9 @@ public sealed class HillClimberService : IHillClimberService
             UpdateState(state => state with
             {
                 Status = RunStatus.Completed,
-                Message = $"Completed {maxIterations} iteration(s). Best score: {finalBest}.",
+                // The telemetry already shows the iteration count and best score;
+                // "Completed" would repeat the status word.
+                Message = null,
                 FallbackAvailable = false,
                 FallbackMessage = null,
                 Fallback = null,
@@ -367,7 +369,7 @@ public sealed class HillClimberService : IHillClimberService
             UpdateState(state => state with
             {
                 Status = RunStatus.Stopped,
-                Message = "Stopped by user.",
+                Message = null,
                 FallbackAvailable = false,
                 FallbackMessage = null,
                 Fallback = null,

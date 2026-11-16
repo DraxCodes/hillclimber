@@ -169,3 +169,69 @@ the opposite of the gate's "second line, visually demoted".
 - **Floor:** `dotnet test` 461/0/0; `theme-nav` 0; `security` 0; `providers` 15/0;
   `polish` 100 (0 defects in 560 checks). `surfaces.mjs` and seeded opencode runs
   were **not run**.
+
+## Post-score refinements (8 → 7 → 8; shipped at 8)
+
+The first score named four edges; all four are implemented in this pass:
+
+1. **Accent budget:** the output tab's active underline is ink, not accent. The
+   accent now marks the live status and the primary button only.
+2. **Status-copy duplication:** completion and stop set no message at the producer
+   (`RunService`, `PlaybackRunService`, `HillClimberService`), so `completed` /
+   `stopped` is not printed twice in either branch. Failures, approval prompts and
+   fallback offers keep their text. The view no longer matches producer copy.
+3. **Mixed spend grammar:** spend is a key/value cell inside the telemetry `<dl>`
+   (`SPENT $0.0124 this run`), not a separate sentence beside it, in both branches.
+4. **Platform group semantics:** `role="group" aria-label="Platform"`, with the
+   visible label `aria-hidden`.
+
+The code review of this pass found the first version of item 2 was run-branch-only
+(the climb's "Completed N iteration(s)…" still doubled the status word) and lived
+in the view; the producer change above replaced it.
+
+Accepted, not fixed: the live "spent —" placeholder before a cost arrives is
+honest and transient; seeded inline-link tap targets stay 20–22px (pre-existing,
+rhythm-neutral).
+
+Evidence after the producer change: done state `completed` with 0 message nodes;
+spend cell `SPENT $0.0124 this run` at 900 and `SPENT $0.0124` at 375; platform
+`role=group`/`Platform`; active tab border `rgb(32,29,29)` light /
+`rgb(253,252,252)` dark; `overflowX 0` at both widths. Floor: `dotnet test`
+461/0/0; `theme-nav` 0; `security` 0; `providers` 15/0; `polish` 100 (0/560)
+unseeded. Seeded `polish` 97.1, rhythm 56/0, 16 tap (pre-existing). Screenshots:
+`%TEMP%\climb-ui-shots\final\fixes-*`. Paid `surfaces.mjs` and seeded opencode
+runs: **not run**.
+
+Second pass, after the re-score dropped to 7: the telemetry `<dd>` now carries
+`m-0`, so the six cells pair at 4px and the 375 tier is one row again (band 100px,
+not 120; measured gap 44px → 4px). The Inline Citation card is nudged inside the
+viewport on hover/focus: at 375 the last chip's card measured right=367 against
+375 (was 389, 14px clipped), with an 8px margin; at 900 it is unchanged
+(left=334, right=590). The seeded green `completed` beside the red terminal row is
+recorded as EXCEPTION 4 (closed-tail playback; README rule), not changed. Evidence:
+`%TEMP%\climb-ui-shots\final3\fix3-*`.
+
+Third pass, after the 7 held on a pre-existing 375 a11y defect and two citation
+edges: the header's `activity`/`status` links now carry `aria-label` + `title` at
+`<sm` (the tree read two unnamed links); Escape hides the open citation card and
+leaves focus on the link; a resize re-places a card still open (verified 375 → 900
+→ 375: right 367 → 590 → 367). Inline Citation is now named in the surface map.
+Evidence: `%TEMP%\climb-ui-shots\final4\fix4-*`.
+
+## Score
+
+**8/10, shipped.** Drift 7 → 8: the three defects holding the 7 were reproduced as
+fixed. Contract: no violations. The gate stopped at 8 per the rubric (a 9 is earned
+by R7, not the floor); the named gap is art direction, not a defect on the primary
+path:
+
+- **Type scale:** nine rendered sizes, six of them micro; metadata labels at 9.92px
+  against the documented 11px, and tool rows are not one step smaller than prose.
+  Fixing it is a typed scale pass across `tw.input.css`, not a band change.
+- **Shadow weights:** `shadow-sm/md/lg/xl` are used beyond `--shadow` (citation card,
+  Card, Tooltip, Popover, mobile rail); unnamed deviation, caps R7.
+- **Accepted, recorded:** EXCEPTION 4 (closed-tail playback), inline-link tap
+  targets (pre-existing), icon-only nav names fixed for AT but visually icon-only.
+
+A 10 would also need a clean-tail seed/exit-code fixture, a deliberate anchor policy
+for the nudged citation card, and the 375 platform row folded into the primary line.

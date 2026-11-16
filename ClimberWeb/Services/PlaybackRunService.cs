@@ -172,7 +172,7 @@ public sealed class PlaybackRunService : IRunService
         return new PlaybackRunService(new RunState
         {
             Status = live ? RunStatus.Running : RunStatus.Completed,
-            Message = live ? "working" : "Run complete.",
+            Message = live ? "working" : null,
             Logs = logs,
             Metrics = metrics,
             StartedAt = start,
