@@ -139,9 +139,6 @@ Recorded so a later reader does not mistake each of these for drift.
   footers. The `separator` and `border` variants ship as port parity and are
   unused: where a divider belongs is an art-direction decision, not a
   provenance one.
-- **Error colour** is `text-destructive!`. `UiClass.Join` does not resolve
-  conflicting utilities the way the registry's `cn()` does, and the `!` is the
-  same escape the layer already uses elsewhere.
 - **Plan is run-scoped.** One Plan lists every agent the run handed work to
   (first-seen order, latest state) and renders once, above the transcript, where
   `column-reverse` reads it directly under the prompt. While a Plan exists the
@@ -173,13 +170,12 @@ Recorded so a later reader does not mistake each of these for drift.
 Recorded so a later reader does not mistake each of these for drift.
 
 - **The user prompt is prose on a bordered bubble.** It renders the `Bubble`
-  `muted` variant with `font-sans`, `border-border!` and `max-w-[68ch]!`. The feed
+  `muted` variant with `font-sans`, `border-border` and `max-w-[68ch]`. The feed
   sets `font-family: var(--font-mono)`, so a bubble that inherits it makes the
   person's sentence look like data; a hairline border separates the surface from
-  `--surface-2`, which is only 8/255 lighter than `bg-muted`. The `!` is required
-  for the same reason as `text-destructive!` above: the port's `border-transparent`
-  and `max-w-full` are in the base class list and `UiClass.Join` does not resolve
-  conflicts the way the registry's `cn()` does.
+  `--surface-2`, which is only 8/255 lighter than `bg-muted`. The caller's classes
+  beat the port's `border-transparent` and `max-w-full` through
+  `UiClass.Join`'s conflict resolution (Phase 2c), not an `!` escape.
 - **A tool row's argument summary is bounded** (`max-w-[12ch] sm:max-w-[34ch]`,
   `truncate`, `title`). `TraceDescription` is `shrink-0` because the registry says
   so, which is right for short meta ("3 of 4 done") and wrong for an 80-character
@@ -212,13 +208,26 @@ Recorded so a later reader does not mistake each of these for drift.
   interactive method tabs one band above, so it read as a second, dead control on
   the one row that names the transcript; it also duplicated that picker and ate
   ~40px of the title at 375. The method is stated by the tabs and, before a run,
-  by the title itself ("new run" / "new hillclimb"). Its `hidden` at 375 was also
-  never real: `UiClass.Join` cannot resolve `hidden` against `Badge`'s base
-  `inline-flex`, and `.hidden` precedes `.inline-flex` in the built sheet.
+  by the title itself ("new run" / "new hillclimb"). Its `hidden` at 375 was never
+  real either: the badge's base `inline-flex` won, which is one of the
+  compositions `UiClass.Join` now resolves (Phase 2c).
 - **The empty-state heading stays mono while its sentence is sans.** The shell's
   heading idiom is mono and only prose is sans; the pair is deliberate, not a
   missed font. The sentence is the reading text and follows the rule; the heading
   is a label like the panel's other labels.
+
+### Phase 2c decisions
+
+Recorded so a later reader does not mistake each of these for drift.
+
+- **`UiClass.Join` resolves conflicts like the registry's `cn()`.** A later class
+  in the same utility family wins, and a later *broader* utility removes the
+  narrower ones it covers (`p-0` over `px-4 py-2`); variants compare whole, so
+  `hover:bg-accent` and `bg-primary` both survive; an unknown utility is never a
+  conflict. `Components/Ui/TailwindConflict.cs` lists the families the ports
+  compose and `UiClassTests` pins them. The `!` escapes are gone from the
+  components (`text-destructive`, `border-border`, `max-w-[68ch]`, and
+  `PagePanel`'s spacing): the caller's class now wins on its own.
 
 ## Exception register
 

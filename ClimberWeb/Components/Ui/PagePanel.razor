@@ -1,8 +1,8 @@
 @* A page section: the shadcn Card shell plus the mono index/title/meta header
    that the activity and status pages share. `.panel-title` and `.panel-meta`
    stay on the real elements because the UI harnesses key off them. *@
-<Card Class="@UiClass.Join("gap-0! overflow-hidden py-0!", Class)">
-    <CardHeader Class="border-b px-4! py-2.5! sm:px-5!">
+<Card Class="@UiClass.Join("gap-0 overflow-hidden py-0", Class)">
+    <CardHeader Class="border-b px-4 py-2.5 sm:px-5">
         <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             @if (Index is { } index)
             {
@@ -15,7 +15,7 @@
             }
         </div>
     </CardHeader>
-    <CardContent Class="@UiClass.Join(Flush ? "p-0!" : "px-4! py-3.5! sm:px-5!", ContentClass)">
+    <CardContent Class="@UiClass.Join(Flush ? "p-0" : "px-4 py-3.5 sm:px-5", ContentClass)">
         @ChildContent
     </CardContent>
 </Card>

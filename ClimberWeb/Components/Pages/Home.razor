@@ -337,7 +337,7 @@ else
                     {
                         <div class="log-item mx-auto w-full max-w-3xl" @key="key">
                             <Trace>
-                                <Marker Class="text-destructive!">
+                                <Marker Class="text-destructive">
                                     <MarkerIcon><UiIcon Name="circle-alert" CssClass="size-4" /></MarkerIcon>
                                     <MarkerContent>@MarkerText(item.Entries[0])</MarkerContent>
                                 </Marker>
@@ -402,7 +402,7 @@ else
                     <div class="log-item mx-auto w-full max-w-3xl pb-2" data-slot="chat-prompt">
                         <Message Align="end">
                             <MessageContent>
-                                <Bubble Align="end" Variant="muted" ContentClass="max-w-[68ch]! border-border! font-sans">
+                                <Bubble Align="end" Variant="muted" ContentClass="max-w-[68ch] border-border font-sans">
                                     <span class="whitespace-pre-wrap">@startedPrompt</span>
                                 </Bubble>
                             </MessageContent>
