@@ -33,6 +33,38 @@ Run these probes before scoring. Each is an action, not an impression.
 7. **Dead-end sweep.** Click every control that looks interactive. It must respond;
    the response must lead somewhere or say why it cannot; a disabled control must
    explain itself.
+8. **Provenance probe.** For every visible AI surface, name the AI Element it is and
+   open the doc that defines it. A bespoke AI block where a documented element
+   exists is a flaw. For every non-AI surface, name the shadcn base component; a
+   one-off equivalent is a flaw. The surface map in
+   [`docs/ui-contract.md`](../ui-contract.md) is the expected answer — a surface
+   that disagrees with it is a flaw even when it looks right.
+9. **State fidelity probe.** For `Prompt Input`, `Reasoning`, `Plan`, `Sources`,
+   `Task`, `Tool` and `Inline Citation`, exercise closed, open, streaming,
+   complete, failed and disabled in both themes. A component with only its resting
+   state is a flaw, and so is a trigger whose `aria-expanded` never changes.
+10. **Composition probe.** A multi-subagent handoff renders as one Plan whose steps
+    settle in order, not as unrelated cards; `Reasoning` collapses when its stream
+    ends; `Sources` expands to real URLs; a failure opens to its output; a note or
+    a divider is a `Marker`. Styling a composition you did not compose is a flaw.
+11. **Model visibility probe.** The composer names the exact provider and model
+    before send, while streaming and when disabled; the name does not truncate at
+    375px.
+12. **Token probe.** Sample the rendered palette against `app.css` in both themes. A
+    colour outside the documented mapping, a hard-coded hex inside a port, or a
+    token that exists in one theme only is a flaw unless a recorded exception names
+    it.
+13. **Art direction probe.** Score the screen against
+    [`docs/ui-art-direction.md`](../ui-art-direction.md). At three seconds, name the
+    primary level and check that only it competes for attention. Then check the
+    measure (prose 60-75ch), the rhythm (8px inside a group, 24px+ between
+    groups), the type scale (three sizes plus one micro), the accent budget (one
+    job), and that mono appears only on data. A screen that passes probes 1-12 but
+    has no hierarchy is an 8, not a 9.
+
+Probes 8-12 are the addendum from `.scratch/ui-pivot-shadcn/spec.md`. Probe 13
+scores [`docs/ui-art-direction.md`](../ui-art-direction.md). The contract they
+check is [`docs/ui-contract.md`](../ui-contract.md).
 
 ## Levels
 
@@ -44,7 +76,7 @@ Run these probes before scoring. Each is an action, not an impression.
 
 Observable traits:
 
-- All seven probes pass, and the reviewer can say "no flaw found" without hedging.
+- All thirteen probes pass, and the reviewer can say "no flaw found" without hedging.
 - Every state — empty, loading, success, error, long content, disconnected — is
   designed and readable, with a sensible next action.
 - Defaults and preserved context mean the common task needs no setup; the obvious
@@ -58,6 +90,9 @@ Observable traits:
 ### 9 — Finished, with one named edge
 
 - The main path and every primary state meet the level-10 traits.
+- The art-direction probe passes on every primary state: three levels of hierarchy
+  are visible at three seconds, and measure, type and rhythm are consistent at 375
+  and 900 in both themes.
 - Exactly one named, low-exposure imperfection remains: a rare state, an advanced
   control, or a single microinconsistency a first-time user would not meet while
   doing the primary task.
@@ -155,6 +190,14 @@ Observable traits:
 - **Below 8:** name the specific subjective flaws holding it back (for example
   clunky transitions, visual clutter, unclear hierarchy), fix those flaws, and
   iterate.
+- **Provenance cap:** a UI surface with a provenance, composition or state
+  violation that is not recorded in the contract cannot score above 7. A recorded
+  exception does not cap the score — it is judged on its stated cost. See
+  [`docs/ui-contract.md`](../ui-contract.md).
+- **Art direction:** passing probes 1-12 caps the score at 8. A 9 or a 10 requires
+  probe 13, judged from screenshots against
+  [`docs/ui-art-direction.md`](../ui-art-direction.md). Compliance is the floor for
+  a good score, not the score.
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
   iterations, then stop and report the ceiling if the score does not move.
@@ -182,6 +225,8 @@ A score without this evidence is invalid and is treated as below 8.
   selector, viewport, theme), and *what condition* exposes it. "Cluttered" alone is
   not evidence; "three equally weighted buttons above the input at 375 light"
   is.
+- **Contract:** `no violations`, or the provenance, composition or state violation
+  with its surface and the debt or exception that covers it.
 - **Floor:** the exact commands run and their observed result; anything not run is
   labelled "not run".
 
@@ -196,15 +241,18 @@ Flaws holding it at 7:
   2. <what> — <where> — <condition>
 Why not 8: <the level-8 trait that is missing>
 Why not 6: <the level-6 trait that is absent>
+Contract: <no violations | violation, surface, debt or exception>
 Floor: dotnet test <result>; build <result>; polish <UPS and exit, or not run>
 ```
 
 ## Anti-inflation rules
 
 - An 8 or above must name the level-7 flaws that are demonstrably absent.
-- A 10 must state that no flaw was found across all seven probes.
+- A 10 must state that no flaw was found across all thirteen probes.
 - A below-8 score must name at least one concrete flaw with its location and the
   condition that exposes it.
+- A score cannot credit a surface whose debt ID is still open: "Marker renders
+  errors" is not true while C1 is in the register.
 - Scores are whole numbers; no 7.5.
 - Record the score per iteration with its delta and the reason. Two consecutive
   iterations without a higher score stop the loop; a drop reverts the change.

@@ -1,0 +1,194 @@
+# UI contract
+
+Status: **in force (2026-11-16)**. Evidence and per-surface findings:
+`.scratch/ui-provenance-audit.md`.
+
+## Why this exists
+
+The first shadcn climb produced seven style-only iterations in one hour. Nothing
+in the loop named the element a surface was supposed to be, so the gate could only
+score spacing, and spacing was all that changed. This contract is the missing
+input: it says what each surface is, what it owes, and when a deviation is a
+decision rather than drift.
+
+The contract is checkable. Every rule below names how it is checked and what
+counts as a failure.
+
+## Rules
+
+### R1 - Provenance
+
+Every visible AI surface is the documented AI Element, or a composition of
+`Trace` / `Message` / `Code Block`, or a named exception in the register.
+Every non-AI surface is a shadcn base component, or a named exception.
+
+**Checked by:** the provenance probe in
+[`docs/agents/hillclimb-rubric.md`](agents/hillclimb-rubric.md).
+**Fails when:** a bespoke row, panel or chip stands where a documented element
+exists, and no exception names it.
+
+Composing a pattern from `Trace` is provenance, not drift - the docs say every AI
+pattern "is a composition of `Trace` parts". Inventing a *new row shape* is drift.
+
+### R2 - Composition
+
+A pattern is built from its parts, not imitated with a lookalike:
+
+- A turn is `Trace` lines inside `Message`, not a bespoke card.
+- The thread is `Message` turns inside a scroller, not a list of cards.
+- A summary expands into its steps; a failure opens to its output; a note or a
+  divider is a `Marker`.
+
+**Checked by:** the composition probe.
+**Fails when:** the visual result is a lookalike whose parts, ARIA or states
+differ from the documented composition.
+
+### R3 - States
+
+Resting appearance is not evidence. Each interactive or streaming element owes:
+closed, open, running, complete, failed, disabled - both themes, 375 and 900.
+
+**Checked by:** the state-fidelity probe.
+**Fails when:** a component has one state, a dead trigger whose `aria-expanded`
+never changes, or a state that exists in the registry and not here.
+
+### R4 - Width and alignment
+
+One width model per column. A width is either the documented content-width
+(`w-fit`, as `TraceLine` defines it) or a deliberate full-width row. Mixing both
+in one column is a flaw unless an exception names the row.
+
+**Checked by:** the three-second and width probes, plus the polish harness.
+**Fails when:** sibling rows in one column resolve to different width models, or
+a description's right edge moves because a title's length changed - unless that
+is the documented behaviour and the column was designed for it.
+
+`TraceLine` is `w-fit` by design, so right-edge alignment of descriptions is not
+an official feature. If a column needs a shared right edge, that is a deviation
+and it gets written down.
+
+### R5 - Tokens
+
+Ports use only the shadcn semantic tokens (`bg-background`, `text-muted-foreground`,
+`border-border`, `bg-muted`, `ring-ring`, `text-destructive`, ...), which map onto
+the palette in [`app.css`](../ClimberWeb/wwwroot/app.css). No hard-coded hex, no
+new palette value inside a port, no raw `--ink-*` variable in a `Ui/` component.
+
+**Checked by:** the token probe.
+**Fails when:** a port introduces a colour outside the documented mapping, or a
+token exists in one theme and not the other.
+
+### R6 - Exceptions
+
+A deviation is allowed only if it is **recorded in the register below** with its
+cost. Unnamed drift is a flaw. A recorded exception is a decision and is scored on
+its stated cost, not on the rule it breaks.
+
+### R7 - Art direction
+
+The screen is arranged well, not merely assembled correctly: three levels of
+hierarchy, a 60-75ch measure for prose, 8px inside a group and 24px+ between
+groups, three type sizes plus one micro, one accent with one job, and mono only
+where the reader is reading data.
+
+**Checked by:** probe 13 against
+[`ui-art-direction.md`](ui-art-direction.md).
+**Fails when:** every element is the right one and every state exists, yet the
+answer, the machinery and the metadata all compete at the same weight.
+
+Passing R1-R6 caps the score at 8. A 9 or a 10 requires R7.
+
+## Surface map
+
+`port` = a Razor port of the registry component. `composition` = built from
+ported primitives. `bespoke` = no documented equivalent yet. Owner is the file
+that decides the surface.
+
+| Surface | Documented element | How | Owner |
+|---|---|---|---|
+| Chat shell | Chat | composition | `Pages/Home.razor` |
+| Thread scroller | Message Scroller | **EXCEPTION 1** | `Pages/Home.razor`, `wwwroot/tw.input.css` |
+| Output tabs | Tabs | bespoke, **debt C4** | `Pages/Home.razor` |
+| Message rows | Message | composition | `Ui/Ai/Message.razor` |
+| User prompt | Message + Bubble | composition | `Ui/Ai/Bubble.razor` |
+| Turn / steps | Chain of Thought | composition | `Ui/Ai/TraceCollapsible.razor` |
+| Plan | Plan | port, **debt D1** | `Ui/Ai/AiPlan.razor` |
+| Task / Subagent | Task / Subagent | port, **debt D2** | `Ui/Ai/AiTask.razor` |
+| Tool / Terminal | Tool / Terminal | port | `Ui/Ai/AiTool.razor` |
+| Reasoning | Reasoning | port | `Ui/Ai/AiReasoning.razor` |
+| Sources | Sources | port, **debt D3** | `Ui/Ai/AiSources.razor` |
+| Errors / notes / footers | Marker | bespoke, **debt C1** | `Pages/Home.razor` |
+| Working indicator | - (no element) | **EXCEPTION 3** | `Services/OutputActivity.cs` |
+| Jump to latest | `MessageScrollerButton` | bespoke, **debt C2** | `App.razor` |
+| Empty state | Empty | port | `Ui/Empty.razor` |
+| Prompt suggestions | Suggestion | bespoke, **debt C3** | `Pages/Home.razor` |
+| Composer | Prompt Input | port, **debt C6** | `Ui/Ai/PromptInput.razor` |
+| Method / provider pick | Tabs / Toggle Group | bespoke, **debt C4** | `Pages/Home.razor` |
+| Model chip | Model Selector | **EXCEPTION 2** | `Ui/Ai/PromptInput.razor` |
+
+Debt IDs refer to the register in the audit (section 9). A debt ID is not an
+exception: it is a known gap scheduled for a phase, and it does not license new
+drift on the same surface.
+
+## Exception register
+
+### EXCEPTION 1 - reverse transcript order
+
+The combined feed renders newest-first (`flex-direction: column-reverse`), not
+the chronological DOM that Message Scroller documents.
+
+**Why:** the browser pins the visual bottom for free, so a streaming row never
+moves the viewport, and 12 tests in `StepScrollMathTests.cs` pin the resulting
+scroll behaviour.
+
+**Cost:** reading order and `Ctrl+Home` are reversed for assistive technology
+(WCAG 1.3.2 sequence). Screen readers start at the newest turn.
+
+**Until:** the Message Scroller adoption (audit Phase 3). Any *new* scroll
+feature must state which axis it assumes.
+
+### EXCEPTION 2 - read-only model chip
+
+The composer names the exact provider and model but offers no selector. The Model
+Selector element is two menus; this app has one configured model per run.
+
+**Cost:** the model cannot be changed from the composer. Accepted in
+`.scratch/ui-pivot-shadcn/spec.md` section 4.
+
+### EXCEPTION 3 - working indicator
+
+No element covers "the run is doing X right now". A `TraceLine`-shaped row plus a
+pulsing dot is allowed; it must sit on the same left edge as the feed's rows and
+carry `role="status"`.
+
+**Cost:** none known; recorded so a judge does not flag it as invented.
+
+## Scoring interaction
+
+- A UI surface with an **unnamed** provenance, composition or state violation
+  cannot score above **7**.
+- A **recorded** exception does not cap the score. It is judged on its stated
+  cost - for example, EXCEPTION 1 is not a visual flaw, so it does not block an 8.
+- A **debt** item does not cap the score either, but a judge may not claim credit
+  for the surface it belongs to. "Marker renders errors" cannot be true while C1
+  is open.
+- Passing every rule in this file is a **floor**, not a ceiling: 8 is the
+  mechanical maximum. A 9 or a 10 is earned by R7 against
+  [`ui-art-direction.md`](ui-art-direction.md).
+- Every scorecard cites a `Contract:` line: `no violations`, or the violation and
+  its surface.
+
+## Checks
+
+| Rule | Probe | Command |
+|---|---|---|
+| R1, R2 | provenance, composition | rubric probes 8 and 10 |
+| R3 | state fidelity | rubric probe 9 |
+| R4 | three-second, width | rubric probes 1 and 4; `node scripts/ui/polish.mjs` |
+| R5 | token | rubric probe 12 |
+| R6 | - | this file |
+| R7 | art direction | rubric probe 13 |
+
+Registry source for a port: `https://ui.shadcn.com/r/styles/base-rhea/<name>.json`.
+Docs: `https://ui.shadcn.com/docs/ai-elements` and
+`https://ui.shadcn.com/docs/components/base/<name>`.
