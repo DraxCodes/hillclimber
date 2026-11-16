@@ -5,7 +5,7 @@
    handler (`[data-copy]`), so the block exposes the same action here. *@
 <div data-slot="code-block"
      data-size="@Size"
-     class="group/code-block relative flex w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-muted text-foreground ring-1 ring-foreground/5 data-[size=sm]:rounded-xl data-[size=sm]:text-xs dark:ring-foreground/10">
+     class="group/code-block relative flex w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-muted text-foreground ring-1 ring-foreground/5 focus-within:ring-3 focus-within:ring-ring/30 data-[size=sm]:rounded-xl data-[size=sm]:text-xs dark:ring-foreground/10">
     @if (Copyable && !string.IsNullOrEmpty(Code))
     {
         <div class="absolute end-2 top-2 z-10 opacity-0 transition-opacity group-focus-within/code-block:opacity-100 group-hover/code-block:opacity-100">
