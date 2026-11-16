@@ -1088,7 +1088,7 @@ else
 
         foreach (var entry in item.Entries)
         {
-            if (entry.Kind != LogKind.Tool || entry.Text is not ("webfetch" or "websearch"))
+            if (entry.Kind != LogKind.Tool || !IsWebTarget(entry.Text))
             {
                 continue;
             }
@@ -1107,6 +1107,16 @@ else
 
     private static readonly System.Text.RegularExpressions.Regex UrlPattern =
         new("https?://[^\\s\"'<>]+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Whether a tool call reached the web: the fetch and search tools do by definition, and an
+    /// MCP server is reached over a URL like any other target. A call that names no URL adds
+    /// nothing, so an MCP tool without one stays silent rather than inventing a source.
+    /// </summary>
+    private static bool IsWebTarget(string tool) =>
+        tool is "webfetch" or "websearch"
+        || tool.StartsWith("mcp__", StringComparison.Ordinal)
+        || tool.StartsWith("mcp.", StringComparison.Ordinal);
 
     // A step's cost line reads the same whether it hangs under a turn or stands alone, so
     // a footer marker keeps the turn footer's text; other markers keep their timestamp.
