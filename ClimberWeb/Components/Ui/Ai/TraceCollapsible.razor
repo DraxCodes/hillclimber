@@ -2,15 +2,19 @@
 
    The registry builds this on a headless Collapsible whose content animates its
    measured height. In a Blazor port the open state lives in C# (so a re-render
-   cannot lose a reader's choice) and the content uses the same enter animation
-   instead of a measured-height transition. The trigger keeps the official ARIA
-   contract: a real button with aria-expanded, and a chevron that rotates from it
-   through the group-aria-expanded variant. *@
+   cannot lose a reader's choice), and the content animates its own height from 0
+   to auto using `interpolate-size: allow-keywords` plus `@starting-style`, which
+   Chromium supports. Where those are unsupported the content simply appears at
+   once. Closing unmounts the content, so there is no exit motion: the fold is not
+   kept in the DOM while closed, which keeps a long run's transcript light.
+
+   The trigger keeps the official ARIA contract: a real button with aria-expanded,
+   and a chevron that rotates from it through the group-aria-expanded variant. *@
 <div data-slot="trace-collapsible" class="@UiClass.Join("flex w-full min-w-0 flex-col", Class)">
     <button type="button"
             data-slot="trace-collapsible-trigger"
             aria-expanded="@(Open ? "true" : "false")"
-            class="group/trace-collapsible-trigger flex min-h-6 w-fit max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-lg text-left text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring has-[[data-status=error]]:text-destructive"
+            class="group/trace-collapsible-trigger flex min-h-6 w-fit max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-lg text-left text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 has-[[data-status=error]]:text-destructive"
             @onclick="Toggle">
         @Trigger
         <span data-slot="trace-icon"
@@ -22,7 +26,10 @@
 
     @if (Open || KeepMounted)
     {
-        <div data-slot="trace-collapsible-content" class="@(Open ? "min-w-0 overflow-hidden" : "hidden")">
+        <div data-slot="trace-collapsible-content"
+             class="@(Open
+                 ? "min-w-0 overflow-hidden transition-[height] duration-200 ease-out motion-reduce:transition-none [interpolate-size:allow-keywords] starting:h-0"
+                 : "hidden")">
             <div data-slot="trace-collapsible-content-inner"
                  class="@UiClass.Join(
                      "mt-2 mb-1 ml-[calc(0.5rem-1px)] min-w-0 border-l pr-1 pl-4 leading-relaxed wrap-break-word text-muted-foreground",
