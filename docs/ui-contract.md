@@ -276,6 +276,15 @@ Recorded so a later reader does not mistake each of these for drift.
   line. The cap is left-aligned, so at 900 the only visible cost is a right gutter;
   below ~700px the column is already narrower than 68ch, so 375 is unchanged.
 
+### Phase 2f decisions
+
+- **The feed has two rhythmic levels.** `.log`'s gap is 8px; a turn or a message
+  carries `data-kind` and 16px of `margin-block-start`, so a group boundary reads
+  24px while rows inside a turn keep the Trace's 8px. The old uniform 9.6px pitch is
+  gone (debt R1). `polish.mjs`'s feed check now asserts both levels — 8px for a row,
+  24px for a group boundary — instead of demanding one uniform gap, so a return to a
+  flat pitch still fails.
+
 ## Exception register
 
 ### EXCEPTION 1 - reverse transcript order

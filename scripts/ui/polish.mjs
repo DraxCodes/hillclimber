@@ -339,17 +339,29 @@ function auditPage({ consoleErrors }) {
       const prev = boxes[i];
       // A column-reverse feed lists the newest row first, so the next row is above it.
       const gap = box.top < prev.top ? prev.top - box.bottom : box.top - prev.bottom;
-      return Math.max(0, gap);
+      // The lower (newer) item's start margin owns the gap above it.
+      return { gap: Math.max(0, gap), group: items[i].hasAttribute('data-kind') };
     });
     // A seam under 2px is a hairline border, not a spacing decision; 0.5-1.5px
     // showed up as the header's own border-b between two regions.
-    const offGrid = gaps.filter((gap) => gap >= 2 && Math.abs(gap / 4 - Math.round(gap / 4)) > 0.05);
+    const offGrid = gaps.filter(({ gap }) => gap >= 2 && Math.abs(gap / 4 - Math.round(gap / 4)) > 0.05);
     if (offGrid.length > 0) {
-      fail('rhythm', `${label} off 4px grid: ` + offGrid.map((v) => `${v.toFixed(1)}px`).join(', '));
+      fail('rhythm', `${label} off 4px grid: ` + offGrid.map(({ gap }) => `${gap.toFixed(1)}px`).join(', '));
     }
-    const nonzero = gaps.filter((gap) => gap >= 2);
-    if (nonzero.length > 1 && Math.max(...nonzero) - Math.min(...nonzero) > 0.5) {
-      fail('rhythm', `${label} inconsistent gaps: ` + gaps.map((v) => v.toFixed(1)).join(', '));
+    if (label === 'feed rows') {
+      // Art direction: rows 8px apart, a turn or message 24px from what precedes
+      // it. Assert exactly those two levels so the old uniform 9.6px pitch (R1)
+      // still fails, and a missing group margin fails with it.
+      const wrong = gaps.filter(({ gap, group }) => gap >= 2 && Math.abs(gap - (group ? 24 : 8)) > 0.6);
+      if (wrong.length > 0) {
+        fail('rhythm', 'feed rows do not hold 8px rows / 24px groups: '
+          + gaps.map(({ gap, group }) => `${gap.toFixed(1)}${group ? 'g' : ''}`).join(', '));
+      }
+    } else {
+      const nonzero = gaps.filter(({ gap }) => gap >= 2).map(({ gap }) => gap);
+      if (nonzero.length > 1 && Math.max(...nonzero) - Math.min(...nonzero) > 0.5) {
+        fail('rhythm', `${label} inconsistent gaps: ` + nonzero.map((v) => v.toFixed(1)).join(', '));
+      }
     }
   }
 

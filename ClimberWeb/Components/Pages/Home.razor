@@ -245,7 +245,7 @@ else
                     var key = item.Entries[0].Raw;
                     if (item.Kind == OutputItemKind.Message)
                     {
-                        <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                        <div class="log-item mx-auto w-full max-w-3xl" data-kind="message" @key="key">
                             <Message>
                                 <MessageContent>
                                     <Markdown Text="@MessageText(item)" />
@@ -277,7 +277,7 @@ else
                             // A delegate's tab is that delegate: one Task per call, carrying the
                             // brief it was given and what it returned. There is no turn to fold
                             // away, because the tab is the fold.
-                            <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                            <div class="log-item mx-auto w-full max-w-3xl" data-kind="turn" @key="key">
                                 <Trace>
                                     @foreach (var entry in item.Entries)
                                     {
@@ -288,7 +288,7 @@ else
                         }
                         else
                         {
-                            <div class="log-item mx-auto w-full max-w-3xl" @key="key">
+                            <div class="log-item mx-auto w-full max-w-3xl" data-kind="turn" @key="key">
                                 <Trace>
                                     <TraceCollapsible Open="isOpen" OnToggle="open => SetTurnOpen(key, open)">
                                         <Trigger>

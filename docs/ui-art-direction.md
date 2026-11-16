@@ -49,7 +49,7 @@ not from departing from them.
 - **Type.** Prose in sans at 14px / 1.65. Chrome, commands and data in mono at
   12-13px. Metadata at 11px, uppercase, letterspaced.
 - **Rhythm.** Feed rows 8px apart. Turns separated by 24px or a `Marker` divider,
-  never by a blank gap alone. The current 9.6px is debt R1.
+  never by a blank gap alone. (The old uniform 9.6px pitch was debt R1.)
 - **Width.** Container stays `max-w-3xl`. Prose inside it is capped at 68ch;
   tool output and tables may use the full width.
 - **Hierarchy in a turn.** The answer is foreground. Tool rows sit one step
