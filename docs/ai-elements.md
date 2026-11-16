@@ -41,12 +41,13 @@ Registry source for any port:
 | TraceIcon | `TraceIcon.razor` | missing second-icon tightening (debt B2) |
 | TraceTitle | `TraceTitle.razor` | exact, plus deliberate `Title` / `Wrap` |
 | TraceDescription | `TraceDescription.razor` | exact |
-| TraceCollapsible | `TraceCollapsible.razor` | no height animation; trigger ring differs (debts B3, B4) |
+| TraceCollapsible | `TraceCollapsible.razor` | height animates 0 to auto (`interpolate-size` + `@starting-style`); close unmounts |
 | Message | `Message.razor` | `Align="end"` is the person, default is the agent |
 | MessageContent | `MessageContent.razor` | exact |
 | Bubble | `Bubble.razor` | wrapper + content, `muted` / `ghost` / `outline` |
-| Code Block | `CodeBlock.razor` | `Size="sm"` for tool output; no max height (debt D4) |
+| Code Block | `CodeBlock.razor` | `Size="sm"` for tool output; the Tool composition caps it, the port does not |
 | Inline Citation | `InlineCitation.razor` | CSS-only card, no floating library |
+| Marker | `Marker.razor` (+ `MarkerIcon`, `MarkerContent`) | errors, notes and footers; `separator` and `border` unused for now |
 | Markdown | `Markdown.razor` | renders `MarkdownParser` records, never HTML |
 | Prompt Input | `PromptInput.razor` | tools row, textarea, send/stop |
 
@@ -76,7 +77,6 @@ Head, Header, Row), Tooltip, plus the `UiIcon` icon set and the `UiClass` joiner
 
 | Element | Why | Debt |
 |---|---|---|
-| Marker | errors, footers and dividers are composed `TraceLine`s today | C1 |
 | Message Scroller | the feed is a hand-rolled `column-reverse` scroller | C2 |
 | Suggestion | the empty state's chips are bespoke | C3 |
 | Tabs | `.methodbar` and `.outtabs` are hand-rolled tablists | C4 |

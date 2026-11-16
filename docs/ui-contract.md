@@ -112,12 +112,12 @@ that decides the surface.
 | Message rows | Message | composition | `Ui/Ai/Message.razor` |
 | User prompt | Message + Bubble | composition | `Ui/Ai/Bubble.razor` |
 | Turn / steps | Chain of Thought | composition | `Ui/Ai/TraceCollapsible.razor` |
-| Plan | Plan | port, **debt D1** | `Ui/Ai/AiPlan.razor` |
+| Plan | Plan | port | `Ui/Ai/AiPlan.razor` |
 | Task / Subagent | Task / Subagent | port, **debt D2** | `Ui/Ai/AiTask.razor` |
 | Tool / Terminal | Tool / Terminal | port | `Ui/Ai/AiTool.razor` |
 | Reasoning | Reasoning | port | `Ui/Ai/AiReasoning.razor` |
-| Sources | Sources | port, **debt D3** | `Ui/Ai/AiSources.razor` |
-| Errors / notes / footers | Marker | bespoke, **debt C1** | `Pages/Home.razor` |
+| Sources | Sources | port | `Ui/Ai/AiSources.razor` |
+| Errors / notes / footers | Marker | port | `Ui/Ai/Marker.razor`, `Pages/Home.razor` |
 | Working indicator | - (no element) | **EXCEPTION 3** | `Services/OutputActivity.cs` |
 | Jump to latest | `MessageScrollerButton` | bespoke, **debt C2** | `App.razor` |
 | Empty state | Empty | port | `Ui/Empty.razor` |
@@ -129,6 +129,35 @@ that decides the surface.
 Debt IDs refer to the register in the audit (section 9). A debt ID is not an
 exception: it is a known gap scheduled for a phase, and it does not license new
 drift on the same surface.
+
+### Phase 2a decisions
+
+Recorded so a later reader does not mistake each of these for drift.
+
+- **Marker** uses its `default` variant for errors, standalone notes and turn
+  footers. The `separator` and `border` variants ship as port parity and are
+  unused: where a divider belongs is an art-direction decision, not a
+  provenance one.
+- **Error colour** is `text-destructive!`. `UiClass.Join` does not resolve
+  conflicting utilities the way the registry's `cn()` does, and the `!` is the
+  same escape the layer already uses elsewhere.
+- **Plan is run-scoped.** One Plan lists every agent the run handed work to
+  (first-seen order, latest state) and renders once, above the transcript, where
+  `column-reverse` reads it directly under the prompt. While a Plan exists the
+  per-call `- see its tab` rows leave the primary stream: two agents read as one
+  two-step Plan, not four rows. A single delegate keeps its row.
+- **Code Block height cap** belongs to the Tool composition (`max-h-72`, 18rem -
+  the same number `app.css` gives a fenced block in prose), not to the port: the
+  registry's Code Block has no max height. Its focus ring is `focus-within` on
+  the wrapper because the registry's nested `has-[>[...]:focus-visible]`
+  arbitrary variant does not generate in this Tailwind build.
+- **TraceCollapsible** animates height 0 to auto over 200ms through
+  `interpolate-size` and `@starting-style`, and opens instantly under
+  `prefers-reduced-motion`. Closing unmounts the content, so there is no exit
+  motion and a long run keeps no closed content in the DOM.
+- **Sources** count an MCP tool when its input names an http(s) URL, which makes
+  the documented "Web or MCP targets" claim true. An MCP call with no URL adds
+  nothing.
 
 ## Exception register
 

@@ -296,18 +296,18 @@ scroll and keyboard behaviour across the whole panel.
 | A2 | no provenance probe | 1 |
 | A3 | stale element doc | 1 |
 | B1, B2, B5 | latent `Trace` drift | 2 if touched |
-| B3, B4 | focus ring, collapse motion | 2 |
-| C1 | Marker absent | 2 |
+| B3, B4 | focus ring, collapse motion | **closed in 2a** |
+| C1 | Marker absent | **closed in 2a** |
 | C2 | Message Scroller absent, reverse DOM | 3 |
 | C3 | Suggestion absent | 3 |
 | C4 | Tabs absent, two ad-hoc tablists | 3 |
 | C5 | Dialog/Sheet absent | 3 |
 | C6 | Input/Input Group absent | 3 |
 | C7 | Model Selector - accepted exception | never |
-| D1 | Plan gated per turn | 2 |
+| D1 | Plan gated per turn | **closed in 2a** |
 | D2 | Task steps always empty | 2 |
-| D3 | sources filter narrow | 2 |
-| D4 | CodeBlock uncapped | 2 |
+| D3 | sources filter narrow | **closed in 2a** |
+| D4 | CodeBlock uncapped | **closed in 2a** |
 | D5 | titles truncate by default | 3 |
 | R1 | feed row gap 9.6px, off the 4px grid | 2 |
 
