@@ -85,7 +85,7 @@ What an 8/10 must feel like, in observable terms:
 | Trade | What it buys | What it costs | Who feels it | Reversible? | Position | Strongest counter-argument |
 | --- | --- | --- | --- | --- | --- | --- |
 | Mirror the TUI vs smallest surface | familiarity for opencode users | a larger surface that must fail closed | every question | yes | **smallest** (4–0) | TUI parity is the reference; divergence is learned twice |
-| One click vs staged confirm | two interactions become one | a misclick lands on a live, un-editable run | every question | no, once sent | **escalated** — chair recommends one click | irreversibility, not frequency, is the structural argument |
+| One click vs staged confirm | two interactions become one | a misclick lands on a live, un-editable run | every question | no, once sent | **one click** (user decision, 2026-11-16), with the commit identical for pointer and keyboard | irreversibility, not frequency, is the structural argument |
 | Free text vs options only | covers the question with no listed answer | secrets, injection and persistence in one channel | the rare hard question | no, once persisted | **options only in v1** (3–1), with the composer escape named in-row | a feature that fails on the hard question is a toy |
 | `opencode serve` vs `opencode run` vs stdin | the only path that can answer at all | a second long-lived process, a second listener, a new failure mode | every run | yes, until shipped | **serve, verified-and-safe-by-default, behind the seam** (4–0); stdin rejected (4–0) | the whole feature may not justify a transport rewrite |
 | New card vs existing rows | a visually distinct question | a fourth bordered shape, the "card inside a panel" drift | the transcript's rhythm | yes | **existing rows** (4–0) | a question should be louder than a tool row |
@@ -120,17 +120,50 @@ Options C and D were rejected: C 3–1, D 4–0.
   one question that matters. The council accepted the diagnosis and rejected the remedy: the
   composer is the trusted path, so the row must *name* it rather than grow a second field. The
   chair's fallback position survives as the in-row copy requirement.
-- **One click (chair and shape, against experience and risk).** Unresolved. The shape seat's
-  concession is the only bridge offered: one click is acceptable **only if the commit is
-  identical for pointer and keyboard**, so the two input paths cannot teach different physics.
+- **One click (chair and shape, against experience and risk).** Decided by the user on
+  2026-11-16: one click, on the shape seat's condition that the commit is identical for pointer
+  and keyboard. The dissent stands as a constraint, not a footnote — experience and risk argued
+  that an answer consumed mid-run and un-editable by non-goal is irreversible, so the row must
+  not offer two input paths with different physics.
 
 ## Escalated — the council cannot settle these
 
-1. **One click or staged confirm?** 2–2, and the split is principled: frequency versus
-   irreversibility. A tie is not an answer.
-2. **Is the transport rewrite worth it at all?** The shape seat escalated this as a value call,
-   not a technical one: the feature may not justify a second process and a second listener,
-   even if verification passes.
+1. **One click or staged confirm?** _Settled by the user on 2026-11-16: one click_ — see Dissent.
+2. **Is the transport rewrite worth it at all?** Still open. The shape seat escalated it as a
+   value call, not a technical one: the feature may not justify a second process and a second
+   listener even if verification passes. Verification informs it; it does not settle it.
+
+## Decision
+
+_Recorded 2026-11-16._
+
+- **Answer semantics:** one click, with an identical commit for pointer and keyboard.
+- **Transport:** `opencode serve`, behind the seam. Verified loopback-by-default and
+  auth-required; Option A is no longer the fallback, because the primitive is documented.
+- **Surface:** existing rows, options only, disclosure fold, and the consent constraint
+  enforced where the answer is sent — narrowed further by the form schema below.
+- **Next:** settle the field-type subset and whether `--stdio` removes the listener, then hand
+  to `plan-architect` for the spec. The transport-rewrite value call stays open until the cost
+  is known, which is now a real number rather than a guess.
+
+## Verification outcome (2026-11-16)
+
+Gate run at `35f1d42`; full record in [verification.md](verification.md).
+
+- **Passed:** `opencode serve` is real, binds loopback by default, and requires auth
+  (`401` unauthenticated, bootstrapped by a short-lived pairing code). The question primitive is
+  a **session form** with `form.created` / `form.replied` / `form.cancelled` and a reply
+  endpoint. The transport row resolves to serve; stdin stays rejected.
+- **Corrected:** the primitive is richer than the council assumed. A form carries typed fields —
+  `string`, `number`, `integer`, `boolean`, `multiselect`, `option` — not just
+  question-plus-options. The shape seat's round-2 footnote about grouped events is now the main
+  open design question, not a footnote.
+- **De-risked:** permissions are a separate channel (`permission.asked` / `permission.replied`,
+  their own reply endpoint), so a form is not a permission. The consent constraint becomes
+  enforceable: the question row must refuse to render a permission request.
+- **Still open:** a live `form.created` round-trip, `--stdio` semantics, and disconnect
+  behaviour. If `--stdio` speaks the same API with no listener, it is the better transport and
+  the pairing question disappears — one experiment settles it.
 
 ## Thread split
 
