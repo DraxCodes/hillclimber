@@ -2,7 +2,7 @@
 description: Read-only gatekeeper that scores each hillclimb iteration against the 1–10 perception rubric and enforces the test/build floor
 display_name: Quality Gatekeeper
 mode: subagent
-model: surplus/deepseek-v4.1-flash-1017#low
+model: surplus/deepseek-v4.1-flash-1017#medium
 color: "#ff6b6b"
 permissions:
   - action: edit

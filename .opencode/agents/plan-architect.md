@@ -2,7 +2,7 @@
 description: Designs the plan, target score and evidence for a hillclimb run
 display_name: Plan Architect
 mode: subagent
-model: surplus/deepseek-v4.1-flash-1017#low
+model: surplus/deepseek-v4.1-flash-1017#medium
 color: "#6ea8fe"
 permissions:
   - action: edit
