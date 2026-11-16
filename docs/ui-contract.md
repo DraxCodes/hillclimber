@@ -325,6 +325,33 @@ Post-score refinements, scored against the 8 already on the board.
   words below `sm`; they now carry `aria-label` and `title`, so the 375
   accessibility tree is no longer two unnamed links.
 
+### Phase 2h decisions
+
+- **Sessions are a rail of real conversations.** The rail lists stored sessions
+  newest-first with the session on screen emphasised (the art-direction move "a
+  session rail with presence"), one status dot per row from a shared vocabulary
+  (`StatusDot`), and a quiet `completed · 45m` meta line. Delete is a two-step inline
+  confirm on the row itself rather than a dialog: one session is a small object, and
+  a modal would outweigh it. The delete control is always visible, not hover-only,
+  because the rail is the phone's session switcher. The row on screen and the row a
+  run is live in carry no delete: their records would be written straight back.
+  Opening the confirm moves focus to its `delete`, and cancelling returns focus to
+  the row's own trigger, so a keyboard reader never tabs through the rest of the rail
+  to answer; `aria-expanded` plus `aria-controls` name the relationship.
+- **A status dot only claims work that is happening.** A stored `running` row with no
+  live run in this process is what a crash left behind, so the rail reads it as
+  `stopped` rather than pulsing for a run that does not exist.
+- **A stored prompt is a chat bubble.** History opens each turn with the reader's own
+  question, right-aligned in the muted bubble the live view already uses, so a
+  restored transcript reads as a conversation rather than a wall of answers. The
+  transcript is still reverse-ordered (EXCEPTION 1); a prompt row follows the same
+  rule.
+- **The drawer header drops its duplicate label.** The rail's own `sessions` heading
+  sits right below the drawer's chrome, so the second word was only noise at 375.
+- **History's spend names the whole conversation.** A stored session is not one run
+  or one climb, so its figure reads `spent $0.31 this session`; the live band keeps
+  `this run` / `this climb`, and the noun still drops below `sm`.
+
 ## Exception register
 
 ### EXCEPTION 1 - reverse transcript order
@@ -379,6 +406,21 @@ status from the process and shows `failed`.
 
 **Until:** a playback fixture that records the exit code, or a seed whose tail is
 clean.
+
+### EXCEPTION 5 - session rows are bespoke nav items
+
+`MainLayout.razor` renders each rail row as a plain `<button>` in a `<nav>`, not a
+shadcn control. No shadcn base component is a single-line navigation row carrying a
+status dot, a title and a meta line; `NavigationMenu` brings a submenu surface the
+rail does not have, and `Item` is a content row with no navigation semantics.
+
+**Cost:** R1 is satisfied by this note rather than by provenance, so a change to
+shadcn's navigation primitives will not reach these rows automatically. The
+interactive controls inside the exception still come from the port: the delete
+confirm's two buttons are `Button`.
+
+**Until:** a shadcn nav-row pattern exists, or the rail is rebuilt on
+`NavigationMenu`.
 
 ## Scoring interaction
 

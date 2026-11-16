@@ -1,33 +1,33 @@
 ﻿{
     "schema":  2,
-    "generated":  "2026-11-16T18:25:59.5746075Z",
-    "head":  "0137e3d",
+    "generated":  "2026-11-16T21:50:14.7443377Z",
+    "head":  "20d2f6e",
     "fingerprint":  {
                         "version":  2,
-                        "inputs":  "311683991f668b318a85b9a36842ee3f905a6bbb135204a04bddfd6612ce401b"
+                        "inputs":  "31317819e895df7f099c80363bf362658bc952cfea1ffb395ffdc5d7b83c9175"
                     },
     "tests":  {
-                  "passed":  501,
+                  "passed":  550,
                   "failed":  0,
                   "skipped":  0
               },
     "coverage":  {
-                     "line":  0.6282,
-                     "branch":  0.5386
+                     "line":  0.631,
+                     "branch":  0.5336
                  },
     "hotPaths":  [
                      {
                          "id":  "run-lifecycle",
-                         "line":  0.984,
+                         "line":  0.9841,
                          "branch":  0.875,
-                         "lines":  188,
+                         "lines":  189,
                          "branches":  56
                      },
                      {
                          "id":  "climb-loop",
                          "line":  0.9836,
                          "branch":  0.8625,
-                         "lines":  304,
+                         "lines":  305,
                          "branches":  80
                      },
                      {
@@ -39,10 +39,10 @@
                      },
                      {
                          "id":  "log-format",
-                         "line":  0.944,
-                         "branch":  0.8393,
-                         "lines":  411,
-                         "branches":  280
+                         "line":  0.9444,
+                         "branch":  0.8423,
+                         "lines":  414,
+                         "branches":  279
                      },
                      {
                          "id":  "output-presentation",
@@ -140,8 +140,8 @@
                       }
                   ],
     "ui":  {
-               "generated":  "2026-11-16T18:28:26.4028842Z",
-               "head":  "0137e3d",
+               "generated":  "2026-11-16T21:58:09.2711675Z",
+               "head":  "20d2f6e",
                "suites":  [
                               {
                                   "id":  "theme-nav",

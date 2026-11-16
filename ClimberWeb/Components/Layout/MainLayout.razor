@@ -1,7 +1,7 @@
 ﻿@inherits LayoutComponentBase
 @implements IDisposable
-@inject IRunService Run
-@inject IHillClimberService Climber
+@inject SessionCoordinator Coordinator
+@inject NavigationManager Nav
 @inject IJSRuntime JS
 
 <div class="flex h-dvh flex-col overflow-hidden bg-background text-foreground" data-slot="app">
@@ -85,8 +85,7 @@
                    tabindex="-1"
                    @ref="_drawer"
                    @onkeydown="OnDrawerKeyDown">
-                <div class="flex h-12 items-center justify-between border-b px-3">
-                    <span class="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-muted-foreground">sessions</span>
+                <div class="flex h-12 items-center justify-end border-b px-3">
                     <Button Variant="ghost" Size="icon-sm" AriaLabel="Close menu" OnClick="CloseRail">
                         <UiIcon Name="x" />
                     </Button>
@@ -110,55 +109,93 @@
 @code {
     private bool _railOpen;
     private ElementReference _drawer;
-
-    private RunState RunState => Run.State;
-    private ClimberState ClimbState => Climber.State;
-
-    private bool ShowingClimb => ClimbState.Logs.Count > 0 && ClimbState.Status != RunStatus.Idle;
-    private RunStatus CurrentStatus => ShowingClimb ? ClimbState.Status : RunState.Status;
-    private string StatusLabel => CurrentStatus.Label();
-
-    private string SessionTitle => "current session";
-
-    private string DotClass => CurrentStatus switch
-    {
-        RunStatus.Running => "bg-primary",
-        RunStatus.Completed => "bg-green",
-        RunStatus.Stopped => "bg-orange",
-        RunStatus.Failed => "bg-red",
-        RunStatus.AwaitingApproval => "bg-orange",
-        _ => "bg-muted-foreground/50",
-    };
+    private string? _deleteId;
 
     private RenderFragment Rail => @<text>
         <div class="flex items-center justify-between px-3 pb-2 pt-3">
             <span class="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-muted-foreground">sessions</span>
-            <Tooltip Text="Focus the prompt">
+            <Tooltip Text="New session">
                 <button type="button"
+                        id="new-session"
                         class="focus-ring inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        aria-label="New run"
-                        @onclick="FocusComposer">
+                        aria-label="New session"
+                        @onclick="NewSession">
                     <UiIcon Name="plus" CssClass="size-3.5" />
                 </button>
             </Tooltip>
         </div>
 
-        <div class="px-2">
-            <a href="/"
-               class="focus-ring flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-2 text-sm shadow-xs"
-               aria-current="page">
-                <span class="@UiClass.Join("size-2 shrink-0 rounded-full", DotClass)" aria-hidden="true"></span>
-                <span class="min-w-0 flex-1 truncate">@SessionTitle</span>
-                <span class="shrink-0 font-mono text-[0.64rem] text-muted-foreground">@StatusLabel</span>
-            </a>
-        </div>
+        <nav class="flex flex-col gap-0.5 px-2" aria-label="Sessions">
+            @if (Coordinator.Active is null)
+            {
+                <div class="flex items-center gap-2 rounded-md border border-dashed px-2.5 py-1.5 text-sm text-muted-foreground" aria-current="page">
+                    <span class="size-2 shrink-0 rounded-full bg-muted-foreground/45" aria-hidden="true"></span>
+                    <span class="min-w-0 flex-1 truncate">new session</span>
+                </div>
+            }
 
-        <div class="px-3 pt-4">
-            <div class="rounded-lg border border-dashed px-3 py-3">
-                <div class="text-xs font-medium text-muted-foreground">No earlier sessions</div>
-                <p class="mt-1 text-xs leading-relaxed text-muted-foreground/80">Runs are not persisted yet. This workspace keeps the current one.</p>
+            @foreach (var row in SessionRows)
+            {
+                <div class="flex items-center gap-0.5">
+                    <button type="button"
+                            class="focus-ring flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-sm transition-colors @(row.Active ? "border-border bg-background shadow-xs" : "border-transparent text-foreground/85 hover:bg-accent hover:text-foreground")"
+                            aria-current="@(row.Active ? "page" : null)"
+                            title="@row.Title"
+                            @onclick="() => SelectSession(row.Id)">
+                        <span class="@UiClass.Join("size-2 shrink-0 rounded-full", row.DotClass)" aria-hidden="true"></span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate">@row.Title</span>
+                            <span class="mt-0.5 block truncate font-mono text-[0.62rem] text-muted-foreground">@row.Meta</span>
+                        </span>
+                    </button>
+
+                    @if (row.Deletable)
+                    {
+                        <Tooltip Text="Delete session" Align="end">
+                            <button type="button"
+                                    id="@($"delete-{row.Id}")"
+                                    class="focus-ring inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground @(_deleteId == row.Id ? "bg-accent text-foreground" : string.Empty)"
+                                    aria-label="@($"Delete {row.Title}")"
+                                    aria-expanded="@(_deleteId == row.Id ? "true" : "false")"
+                                    aria-controls="@(_deleteId == row.Id ? $"delete-confirm-{row.Id}" : null)"
+                                    @onclick="() => AskDelete(row.Id)">
+                                <UiIcon Name="trash" CssClass="size-3.5" />
+                            </button>
+                        </Tooltip>
+                    }
+                </div>
+
+                @if (_deleteId == row.Id)
+                {
+                    <div id="@($"delete-confirm-{row.Id}")" class="ml-1 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1.5">
+                        <p class="text-[0.68rem] leading-snug text-muted-foreground">Delete this session and its transcript?</p>
+                        <div class="mt-1.5 flex items-center gap-1">
+                            <Button Variant="destructive"
+                                    Size="xs"
+                                    id="@($"delete-confirm-yes-{row.Id}")"
+                                    AriaLabel="Delete this session and its transcript"
+                                    Class="h-6 rounded-sm px-2 font-mono text-[0.62rem]"
+                                    OnClick="() => DeleteSession(row.Id)">delete</Button>
+                            <Button Variant="outline"
+                                    Size="xs"
+                                    id="@($"delete-confirm-no-{row.Id}")"
+                                    Class="h-6 rounded-sm px-2 font-mono text-[0.62rem] text-muted-foreground"
+                                    OnClick="() => CancelDelete(row.Id)">cancel</Button>
+                        </div>
+                    </div>
+                }
+            }
+        </nav>
+
+        @if (!SessionRows.Any())
+        {
+            <div class="px-3 pt-4">
+                <div class="rounded-lg border border-dashed px-3 py-3">
+                    <div class="text-xs font-medium text-muted-foreground">No earlier sessions</div>
+                    <p class="mt-1 text-xs leading-relaxed text-muted-foreground/80">A session is saved here once you send its first prompt, and can be resumed later.</p>
+                </div>
             </div>
-        </div>
+        }
 
         <div class="mt-auto border-t px-3 py-3 font-mono text-[0.64rem] leading-relaxed text-muted-foreground">
             <div>single-user · local</div>
@@ -166,10 +203,70 @@
         </div>
     </text>;
 
+    /// <summary>
+    /// The rail's rows: the session on screen first, then every stored session, newest
+    /// activity first. The active record is read from the coordinator rather than the store,
+    /// because a launch's first write lands a moment after it appears.
+    /// </summary>
+    private IReadOnlyList<RailRow> SessionRows
+    {
+        get
+        {
+            var now = DateTimeOffset.Now;
+            var active = Coordinator.Active;
+            var rows = new List<RailRow>(Coordinator.List().Count + 1);
+
+            if (active is { } record)
+            {
+                rows.Add(Row(record.Summary, now, active: true));
+            }
+
+            foreach (var summary in Coordinator.List())
+            {
+                if (active?.Id == summary.Id)
+                {
+                    continue;
+                }
+
+                rows.Add(Row(summary, now, active: false));
+            }
+
+            return rows;
+        }
+    }
+
+    private RailRow Row(SessionSummary summary, DateTimeOffset now, bool active)
+    {
+        var live = Coordinator.IsLive(summary.Id);
+        var status = summary.Status;
+        return new RailRow(
+            summary.Id,
+            summary.Title,
+            live ? status.Label() : $"{status.Label()} · {SessionFormat.Relative(summary.UpdatedAt, now)}",
+            StatusDot.Class(status, pulse: live && status == RunStatus.Running),
+            active,
+            // A live run's row cannot be deleted: its next write would bring the record back.
+            Deletable: !active && !live);
+    }
+
+    /// <summary>One row of the sessions rail.</summary>
+    /// <param name="Id">The stored session's id.</param>
+    /// <param name="Title">The title the coordinator minted from the first prompt.</param>
+    /// <param name="Meta">Status and, for a resting session, how long ago it was written.</param>
+    /// <param name="DotClass">The status dot's colour classes.</param>
+    /// <param name="Active">True for the session the page is showing.</param>
+    /// <param name="Deletable">True when the row offers a delete action.</param>
+    private sealed record RailRow(
+        string Id,
+        string Title,
+        string Meta,
+        string DotClass,
+        bool Active,
+        bool Deletable);
+
     protected override void OnInitialized()
     {
-        Run.StateChanged += OnStateChanged;
-        Climber.StateChanged += OnStateChanged;
+        Coordinator.Changed += OnSessionsChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -185,8 +282,16 @@
         catch (Exception) { /* JS not ready, or the circuit is gone */ }
     }
 
-    private void OnStateChanged(RunState state) => _ = InvokeAsync(StateHasChanged);
-    private void OnStateChanged(ClimberState state) => _ = InvokeAsync(StateHasChanged);
+    /// <summary>A write changed the stored list: repaint, and drop a confirm for a row that is gone.</summary>
+    private void OnSessionsChanged() => _ = InvokeAsync(() =>
+    {
+        if (_deleteId is { } id && Coordinator.List().All(summary => summary.Id != id))
+        {
+            _deleteId = null;
+        }
+
+        StateHasChanged();
+    });
 
     private async Task OpenRail()
     {
@@ -202,16 +307,106 @@
         if (e.Key == "Escape") _railOpen = false;
     }
 
+    /// <summary>Shows a stored session, and leaves another page for the transcript that owns it.</summary>
+    private void SelectSession(string sessionId)
+    {
+        if (!Coordinator.Switch(sessionId))
+        {
+            return;
+        }
+
+        _railOpen = false;
+        _deleteId = null;
+        TryGoHome();
+    }
+
+    /// <summary>Starts a fresh conversation: the current one stays in the rail.</summary>
+    private async Task NewSession()
+    {
+        _deleteId = null;
+        _railOpen = false;
+        Coordinator.Archive();
+
+        // Leaving another page: the composer does not exist yet, so focus waits for it.
+        if (TryGoHome())
+        {
+            _ = FocusWhenRenderedAsync("prompt");
+            return;
+        }
+
+        await FocusComposer();
+    }
+
+    /// <summary>Navigates to the transcript unless it is already on screen. Returns whether it navigated.</summary>
+    private bool TryGoHome()
+    {
+        if (Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/').Length == 0)
+        {
+            return false;
+        }
+
+        Nav.NavigateTo("/");
+        return true;
+    }
+
+    /// <summary>
+    /// Opens the row's inline confirm and moves focus into it, so a keyboard reader does not
+    /// have to tab past every later row to reach the two answers.
+    /// </summary>
+    private async Task AskDelete(string sessionId)
+    {
+        _deleteId = sessionId;
+        await FocusWhenRenderedAsync($"delete-confirm-yes-{sessionId}");
+    }
+
+    /// <summary>Closes the confirm and puts focus back on the row's own delete control.</summary>
+    private async Task CancelDelete(string sessionId)
+    {
+        _deleteId = null;
+        await FocusWhenRenderedAsync($"delete-{sessionId}");
+    }
+
+    /// <summary>Removes the row, then lands focus on the rail's `+` rather than a gone row.</summary>
+    private async Task DeleteSession(string sessionId)
+    {
+        _deleteId = null;
+        Coordinator.Delete(sessionId);
+        await FocusWhenRenderedAsync("new-session");
+    }
+
     private async Task FocusComposer()
     {
-        _railOpen = false;
-        try { await JS.InvokeVoidAsync("climberUi.focusId", "prompt"); }
+        try { await JS.InvokeAsync<bool>("climberUi.focusId", "prompt"); }
         catch (Exception) { /* JS not ready during prerender */ }
+    }
+
+    /// <summary>
+    /// Focuses an element once a render has produced it. A state change that replaces the
+    /// focused element — a navigation, an inline confirm — needs a frame or two, so this
+    /// retries briefly instead of racing the renderer.
+    /// </summary>
+    private async Task FocusWhenRenderedAsync(string id)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(100);
+            try
+            {
+                if (await JS.InvokeAsync<bool>("climberUi.focusId", id))
+                {
+                    return;
+                }
+            }
+            catch (Exception)
+            {
+                // The circuit is gone; nothing left to focus.
+                return;
+            }
+        }
     }
 
     public void Dispose()
     {
-        Run.StateChanged -= OnStateChanged;
-        Climber.StateChanged -= OnStateChanged;
+        Coordinator.Changed -= OnSessionsChanged;
     }
 }

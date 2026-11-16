@@ -43,6 +43,13 @@ public enum LogKind
     /// available verbatim behind a disclosure instead of filling the feed.
     /// </summary>
     Unrecognized,
+
+    /// <summary>
+    /// The prompt that opened a turn. Never produced by parsing: the session coordinator
+    /// synthesizes one when a stored session is restored, so the reader's own question is
+    /// part of the transcript and not only the model's answer.
+    /// </summary>
+    UserPrompt,
 }
 
 /// <summary>A log line prepared for display.</summary>
@@ -183,7 +190,7 @@ public sealed class LogFormatter
                 "reasoning" => plain with
                 {
                     Kind = LogKind.Reasoning,
-                    Text = Truncate(Clean(GetString(part, "text") ?? string.Empty), MaxReasoningLength),
+                    Text = Truncation.Cut(Clean(GetString(part, "text") ?? string.Empty), MaxReasoningLength),
                 },
                 "tool_use" => ToolEntry(plain, part),
                 "step_start" => plain with { Kind = LogKind.StepStart, Text = "step start" },
@@ -202,8 +209,8 @@ public sealed class LogFormatter
                 _ => plain with
                 {
                     Kind = LogKind.Unrecognized,
-                    Text = Truncate(Clean(type), MaxSummaryLength),
-                    ToolOutput = Truncate(Clean(payload), MaxPayloadLength),
+                    Text = Truncation.Cut(Clean(type), MaxSummaryLength),
+                    ToolOutput = Truncation.Cut(Clean(payload), MaxPayloadLength),
                 },
             };
         }
@@ -266,7 +273,7 @@ public sealed class LogFormatter
             Status = status,
             ToolTitle = title is null || string.Equals(title, tool, StringComparison.Ordinal)
                 ? null
-                : Truncate(Clean(title), MaxTitleLength),
+                : Truncation.Cut(Clean(title), MaxTitleLength),
             Command = isShell ? ReadCommand(input) : null,
             ExitCode = exitCode,
         };
@@ -306,7 +313,7 @@ public sealed class LogFormatter
             var value = GetString(input, name);
             if (!string.IsNullOrWhiteSpace(value))
             {
-                return Truncate(Clean(value), MaxCommandLength);
+                return Truncation.Cut(Clean(value), MaxCommandLength);
             }
         }
 
@@ -336,7 +343,7 @@ public sealed class LogFormatter
         {
             Kind = LogKind.Subagent,
             Text = string.IsNullOrEmpty(agent) ? "subagent" : agent,
-            ToolInput = string.IsNullOrEmpty(prompt) ? null : Truncate(Flatten(prompt), MaxPromptLength),
+            ToolInput = string.IsNullOrEmpty(prompt) ? null : Truncation.Cut(Flatten(prompt), MaxPromptLength),
             ToolOutput = string.IsNullOrEmpty(result) ? null : result,
             Status = status,
         };
@@ -486,7 +493,7 @@ public sealed class LogFormatter
 
             if (value is not null)
             {
-                parts.Add($"{property.Name}={Truncate(Flatten(value), MaxSummaryLength)}");
+                parts.Add($"{property.Name}={Truncation.Cut(Flatten(value), MaxSummaryLength)}");
             }
         }
 
@@ -562,7 +569,4 @@ public sealed class LogFormatter
 
         return builder?.ToString() ?? value;
     }
-
-    private static string Truncate(string value, int maxLength) =>
-        value.Length <= maxLength ? value : string.Concat(value.AsSpan(0, maxLength), "…");
 }

@@ -6,8 +6,8 @@
 
 <br clear="left" />
 
-[![tests](https://img.shields.io/badge/tests-501%20passing-brightgreen)](#testing)
-[![coverage](https://img.shields.io/badge/coverage-62.82%25-yellowgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-550%20passing-brightgreen)](#testing)
+[![coverage](https://img.shields.io/badge/coverage-63.10%25-yellowgreen)](#testing)
 [![.NET](https://img.shields.io/badge/.NET-11-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://learn.microsoft.com/aspnet/core/blazor/)
 [![personal use](https://img.shields.io/badge/license-personal%20use-lightgrey)](#license)
@@ -33,6 +33,10 @@ throwaway script. It runs on the LAN so a phone can drive it, behind a PIN.
   own, and the primary tab keeps a marker pointing at the delegated work.
 - **Telemetry** — status, spend, tokens, elapsed time, iteration, best score, and last test
   result, streamed from OpenCode's own events.
+- **Sessions** — every run and climb is saved as a conversation in the rail, titled by its
+  first prompt. Switching back restores the transcript and continues the same OpenCode
+  session (`--session`), and `+` starts a fresh one. One JSON file per session under
+  `Climber:SessionsPath`; deleting from the rail is the only pruning.
 - **Prompt handoff** — the instruction leaves the prompt box as soon as a run or climb takes
   it (so the same text can't be fired twice), and an idle box offers the last prompt back
   with one click.
@@ -146,6 +150,7 @@ Surplus/OpenRouter pair from the legacy keys below.
 | `Climber:SessionMinutes` | `30` | Idle minutes before a session re-locks. |
 | `Climber:DefaultFolder` | user profile | Folder shown in the target picker. |
 | `Climber:DefaultAgent` | `task-orchestrator` | Agent to run when the target provides one. |
+| `Climber:SessionsPath` | `%APPDATA%/ClimberWeb/sessions` | Where session transcripts are stored. One JSON file per session. |
 
 Legacy provider keys remain aliases when `Climber:Providers` is absent:
 
@@ -186,7 +191,7 @@ throttling, tool-output logging, filesystem scope, and the OpenRouter base-URL o
 
 ```
 ClimberWeb/            Blazor Server app (pages, services, auth, command runner)
-ClimberWeb.Tests/      xUnit tests (311 passing)
+ClimberWeb.Tests/      xUnit tests (550 passing)
 scripts/               status/coverage, fixture, and Playwright UI checks
 status/                committed coverage/test artifact read by /status
 fixtures/              throwaway sample project for climb proofs
@@ -286,7 +291,7 @@ the first does not, and never approves a fallback. Exit codes: `0` all checks pa
 check failed, `2` refused to continue (configuration, connection, or a paid run that did
 not use Surplus).
 
-Current state: **501 tests passing, 0 failed, 0 skipped**, **62.82% line / 53.86% branch
+Current state: **550 tests passing, 0 failed, 0 skipped**, **63.10% line / 53.36% branch
 coverage**, and a **96/100 coverage rating** on `/status` (9/10 hot paths at the rubric bar;
 Scroll math at 75% line is the open gap). The token-spending `surfaces.mjs` harness is
 **not run** as part of the default checks, so it never contributes to the UI dimension.

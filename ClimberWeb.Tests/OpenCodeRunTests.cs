@@ -49,4 +49,30 @@ public class OpenCodeRunTests
             "opencode run \"do it\" --agent task-orchestrator --model surplus/deepseek-v4.1-flash-1017 --format json",
             OpenCodeRun.CommandLine("do it", "task-orchestrator", "surplus/deepseek-v4.1-flash-1017"));
     }
+
+    [Fact]
+    public void Request_WithSession_ContinuesThatConversation()
+    {
+        var request = OpenCodeRun.Request("do it", @"C:\repo", sessionId: "ses_abc123");
+
+        Assert.Equal(
+            new[] { "run", "do it", "--session", "ses_abc123", "--format", "json" },
+            request.Arguments);
+    }
+
+    [Fact]
+    public void CommandLine_ShowsTheSessionWhenSet()
+    {
+        Assert.Equal(
+            "opencode run \"do it\" --session ses_abc123 --format json",
+            OpenCodeRun.CommandLine("do it", sessionId: "ses_abc123"));
+    }
+
+    [Fact]
+    public void Request_WithoutSession_LetsOpencodeMintItsOwn()
+    {
+        var request = OpenCodeRun.Request("do it", @"C:\repo", sessionId: null);
+
+        Assert.DoesNotContain("--session", request.Arguments);
+    }
 }

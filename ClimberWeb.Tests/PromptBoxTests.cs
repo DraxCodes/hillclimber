@@ -144,6 +144,20 @@ public class PromptBoxTests
         Assert.Equal("tidy the tests", box.Text);
     }
 
+    [Fact]
+    public void Forget_DropsThePromptOfTheConversationLeftBehind()
+    {
+        var box = new PromptBox();
+        box.Launch("tidy the tests", () => { });
+
+        box.Forget();
+
+        Assert.Null(box.LastPrompt);
+        Assert.False(box.CanRecall(running: false));
+        Assert.False(box.Recall());
+        Assert.False(box.OwesFocus);
+    }
+
     // ---- the focus the emptied box owes -------------------------------------
 
     [Fact]

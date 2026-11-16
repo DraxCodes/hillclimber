@@ -52,6 +52,19 @@ public class RunServiceTests
     }
 
     [Fact]
+    public async Task Run_PassesTheSessionIdToOpencode_SoAResumedSessionContinues()
+    {
+        var runner = new FakeCommandRunner((_, _) => CannedResults.Raw(string.Empty));
+        var service = new RunService(runner);
+
+        await service.StartAsync(new RunOptions(@"C:\repo", "go", SessionId: "ses_abc"));
+
+        var request = Assert.Single(runner.RequestsFor("opencode"));
+        Assert.Equal(new[] { "run", "go", "--session", "ses_abc", "--format", "json" }, request.Arguments);
+        Assert.Equal("ses_abc", service.State.SessionId);
+    }
+
+    [Fact]
     public async Task Run_NonZeroExit_IsFailed_WithReason()
     {
         var runner = new FakeCommandRunner((_, _) => CannedResults.Raw("boom", exitCode: 1));

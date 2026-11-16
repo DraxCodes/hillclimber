@@ -58,6 +58,29 @@ public class HillClimberServiceTests
     }
 
     [Fact]
+    public async Task EveryIteration_ContinuesTheSameSession()
+    {
+        var runner = RunnerWithScores(1, 2);
+        var service = new HillClimberService(runner);
+
+        await service.StartAsync(new ClimberOptions(
+            @"C:\work\repo",
+            "make tests pass",
+            2,
+            SessionId: "ses_climb"));
+
+        Assert.Equal("ses_climb", service.State.SessionId);
+        var calls = runner.RequestsFor("opencode");
+        Assert.Equal(2, calls.Count);
+        Assert.All(calls, call =>
+        {
+            var index = Array.IndexOf(call.Arguments.ToArray(), "--session");
+            Assert.True(index >= 0, "every iteration must name its session");
+            Assert.Equal("ses_climb", call.Arguments[index + 1]);
+        });
+    }
+
+    [Fact]
     public async Task OpenCodeNonZeroExit_IsLogged_AndRunCompletes()
     {
         var runner = new FakeCommandRunner((request, _) => request.FileName switch

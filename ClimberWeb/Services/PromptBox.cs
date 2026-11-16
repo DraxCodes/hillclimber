@@ -58,6 +58,16 @@ public sealed class PromptBox
     }
 
     /// <summary>
+    /// Drops the remembered prompt, for a new conversation. Recalling the previous session's
+    /// prompt into a fresh one would put the wrong words in the composer.
+    /// </summary>
+    public void Forget()
+    {
+        LastPrompt = null;
+        OwesFocus = false;
+    }
+
+    /// <summary>
     /// Claims the pending focus once the box can take it: the page unlocked and no run holding
     /// the (disabled) textarea. The flag clears first, so a launch focuses at most once.
     /// </summary>

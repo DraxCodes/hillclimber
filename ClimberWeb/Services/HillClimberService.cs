@@ -20,6 +20,12 @@ public sealed record ClimberState
 
     public RunStatus Status { get; init; } = RunStatus.Idle;
 
+    /// <summary>
+    /// The session this climb belongs to, when it was started through one. The session
+    /// coordinator keys its persistence by this id; a null means no session is bound.
+    /// </summary>
+    public string? SessionId { get; init; }
+
     /// <summary>Human-readable detail about the current status.</summary>
     public string? Message { get; init; }
 
@@ -70,13 +76,15 @@ public sealed record ClimberState
 /// <param name="Agent">Agent to run with, or null to use opencode's own default.</param>
 /// <param name="Provider">The provider/model for this climb, or null to let opencode decide.</param>
 /// <param name="Fallbacks">Providers offered, one approved step at a time, after a failure.</param>
+/// <param name="SessionId">The conversation to continue, or null to let opencode mint its own.</param>
 public sealed record ClimberOptions(
     string TargetFolder,
     string GoalPrompt,
     int MaxIterations = 5,
     string? Agent = null,
     ProviderSelection? Provider = null,
-    IReadOnlyList<ProviderSelection>? Fallbacks = null)
+    IReadOnlyList<ProviderSelection>? Fallbacks = null,
+    string? SessionId = null)
 {
     /// <summary>Provides a non-null view of <see cref="Fallbacks"/>.</summary>
     public IReadOnlyList<ProviderSelection> FallbackList => Fallbacks ?? Array.Empty<ProviderSelection>();
@@ -195,6 +203,7 @@ public sealed class HillClimberService : IHillClimberService
                 BestScore = 0,
                 Logs = Array.Empty<string>(),
                 Provider = options.Provider,
+                SessionId = options.SessionId,
             };
         }
 
@@ -256,12 +265,12 @@ public sealed class HillClimberService : IHillClimberService
 
                 while (true)
                 {
-                    Log($"$ {OpenCodeRun.CommandLine(options.GoalPrompt, options.Agent, current?.Model)}");
+                    Log($"$ {OpenCodeRun.CommandLine(options.GoalPrompt, options.Agent, current?.Model, options.SessionId)}");
                     CommandResult opencode;
                     try
                     {
                         opencode = await _runner.RunAsync(
-                            OpenCodeRun.Request(options.GoalPrompt, options.TargetFolder, options.Agent, current?.Model),
+                            OpenCodeRun.Request(options.GoalPrompt, options.TargetFolder, options.Agent, current?.Model, options.SessionId),
                             OnOpenCodeLine,
                             cancellationToken).ConfigureAwait(false);
                     }

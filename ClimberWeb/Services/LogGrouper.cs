@@ -6,6 +6,9 @@ public enum OutputItemKind
     /// <summary>One or more consecutive <see cref="LogKind.Text"/> entries.</summary>
     Message,
 
+    /// <summary>The prompt that opened a turn, rendered where a chat shows the reader's own question.</summary>
+    Prompt,
+
     /// <summary>One step's reasoning and tool calls, folded behind a summary.</summary>
     Turn,
 
@@ -39,8 +42,9 @@ public sealed record OutputItem(
 /// Prose belongs to the reader, not the fold: text is never hidden inside a turn, so text that
 /// arrives during one closes that turn and renders in place, and the activity after it opens
 /// the next. Unknown events join the turn they arrive in, or stand alone between turns. Errors
-/// and plain lines end the current turn and render as their own rows. Pure and order-preserving,
-/// so it is cheap to test and to call on every render.
+/// and plain lines end the current turn and render as their own rows, and so does a
+/// restored session's prompt. Pure and order-preserving, so it is cheap to test and to
+/// call on every render.
 /// </summary>
 public static class LogGrouper
 {
@@ -166,6 +170,15 @@ public static class LogGrouper
                     FlushMessage();
                     FlushTurn();
                     items.Add(new OutputItem(OutputItemKind.Error, new[] { entry }));
+                    break;
+
+                // A restored session's question: its own row, never folded into the work
+                // that answered it. It closes whatever came before for the same reason a
+                // message does — the reader's words are not activity.
+                case LogKind.UserPrompt:
+                    FlushMessage();
+                    FlushTurn();
+                    items.Add(new OutputItem(OutputItemKind.Prompt, new[] { entry }));
                     break;
 
                 default:

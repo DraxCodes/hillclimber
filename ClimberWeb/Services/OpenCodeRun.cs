@@ -8,9 +8,14 @@ namespace ClimberWeb.Services;
 public static class OpenCodeRun
 {
     /// <summary>The command line as shown in the output panel.</summary>
-    public static string CommandLine(string prompt, string? agent = null, string? model = null)
+    public static string CommandLine(string prompt, string? agent = null, string? model = null, string? sessionId = null)
     {
         var line = "opencode run \"" + prompt + "\"";
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            line += $" --session {sessionId}";
+        }
+
         if (!string.IsNullOrEmpty(agent))
         {
             line += $" --agent {agent}";
@@ -27,11 +32,19 @@ public static class OpenCodeRun
     /// <summary>
     /// The request <see cref="CommandLine"/> describes, run in <paramref name="folder"/>.
     /// <paramref name="agent"/> and <paramref name="model"/> are omitted when null, so
-    /// opencode falls back to its own defaults.
+    /// opencode falls back to its own defaults. A non-null <paramref name="sessionId"/>
+    /// continues that conversation (opencode creates it when it does not exist yet), so
+    /// a session's turns share one history.
     /// </summary>
-    public static CommandRequest Request(string prompt, string folder, string? agent = null, string? model = null)
+    public static CommandRequest Request(string prompt, string folder, string? agent = null, string? model = null, string? sessionId = null)
     {
         var arguments = new List<string> { "run", prompt };
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            arguments.Add("--session");
+            arguments.Add(sessionId);
+        }
+
         if (!string.IsNullOrEmpty(agent))
         {
             arguments.Add("--agent");

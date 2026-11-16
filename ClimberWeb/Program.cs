@@ -23,7 +23,8 @@ builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 // Production host never registers it, even when CLIMBER_SEED is set. The hillclimb loop is
 // real work rather than a transcript, so the fixture host replaces it with a refusing guard
 // too: a playback host never drives opencode, whichever method is chosen.
-if (PlaybackRunService.IsEnabled(builder.Environment.IsDevelopment()))
+var playback = PlaybackRunService.IsEnabled(builder.Environment.IsDevelopment());
+if (playback)
 {
     builder.Services.AddSingleton<IRunService>(
         PlaybackRunService.FromEnvironment(builder.Environment.IsDevelopment(), builder.Environment.ContentRootPath));
@@ -35,6 +36,22 @@ else
     builder.Services.AddSingleton<IHillClimberService, HillClimberService>();
 }
 builder.Services.AddSingleton<IFileBrowser, FileBrowser>();
+
+// Sessions. Filesystem-backed in a real host; in memory under the transcript fixture, whose
+// runs are a display rather than work, so a playback host never writes a session file. The
+// coordinator is the single owner of the active session and its transcript, and subscribes
+// to the run services itself so a background run keeps persisting with no page rendered.
+if (playback)
+{
+    builder.Services.AddSingleton<ISessionStore, MemorySessionStore>();
+}
+else
+{
+    builder.Services.AddSingleton<ISessionStore>(sp => new JsonSessionStore(
+        JsonSessionStore.ResolveFolder(sp.GetRequiredService<IConfiguration>()["Climber:SessionsPath"]),
+        sp.GetService<ILogger<JsonSessionStore>>()));
+}
+builder.Services.AddSingleton<SessionCoordinator>();
 
 // Project status page: git history is read live, coverage/test status comes from the
 // committed artifact under status/.

@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject IRunService Run
 @inject IHillClimberService Climber
+@inject SessionCoordinator Coordinator
 @inject IConfiguration Config
 @inject IFileBrowser Browser
 @inject IClimberAuth Auth
@@ -108,13 +109,13 @@ else
             </div>
 
             <div class="min-w-0 flex-wrap items-center gap-x-4 gap-y-1 px-2.5 pb-1.5 sm:px-3 @(ActiveStartedAt is null ? "hidden" : "flex")">
-                @if (_method == RunMethod.Run)
+                @if (ViewingHistory || _method == RunMethod.Run)
                 {
-                    <dl class="spendline telemetry m-0 flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="Run telemetry">
+                    <dl class="spendline telemetry m-0 flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="@(ViewingHistory ? "Session telemetry" : "Run telemetry")">
                         @SpendCell
                         <div class="@MetricCellClass">
                             <dt class="@MetricLabelClass">tokens</dt>
-                            <dd class="@MetricValueClass">@SpendFormat.Tokens(_run.Metrics.TotalTokens)</dd>
+                            <dd class="@MetricValueClass">@SpendFormat.Tokens(ActiveTokens)</dd>
                         </div>
                         <div class="@MetricCellClass">
                             <dt class="@MetricLabelClass">elapsed</dt>
@@ -240,6 +241,20 @@ else
                             <Message>
                                 <MessageContent>
                                     <Markdown Text="@MessageText(item)" />
+                                </MessageContent>
+                            </Message>
+                        </div>
+                    }
+                    else if (item.Kind == OutputItemKind.Prompt)
+                    {
+                        // A restored session's question, in the place a chat puts it. The
+                        // feed is column-reverse, so this reads above the work it asked for.
+                        <div class="log-item mx-auto w-full max-w-3xl pb-2" data-kind="prompt" data-slot="chat-prompt" @key="key">
+                            <Message Align="end">
+                                <MessageContent>
+                                    <Bubble Align="end" Variant="muted" ContentClass="max-w-[68ch] border-border font-sans">
+                                        <span class="whitespace-pre-wrap">@item.Entries[0].Text</span>
+                                    </Bubble>
                                 </MessageContent>
                             </Message>
                         </div>
@@ -382,10 +397,11 @@ else
                         </Empty>
                     </div>
                 }
-                else if (_prompt.LastPrompt is { Length: > 0 } startedPrompt)
+                else if (!HasPromptRow && _prompt.LastPrompt is { Length: > 0 } startedPrompt)
                 {
-                    // The prompt that opened this run, shown where a chat would show it: the
-                    // feed is column-reverse, so this is the last child and reads at the top.
+                    // A run with no stored session (the fixture host): the prompt that opened
+                    // it is still shown where a chat would show it. A persisted session
+                    // carries its prompts in the transcript instead, so it never doubles.
                     <div class="log-item mx-auto w-full max-w-3xl pb-2" data-slot="chat-prompt">
                         <Message Align="end">
                             <MessageContent>
@@ -577,6 +593,9 @@ else
     private ClimberState _climb = new();
     private RunMethod _method = RunMethod.Run;
     private string _folderPath = string.Empty;
+
+    /// <summary>The session whose transcript is on screen, or null for a fresh one.</summary>
+    private string? _viewedId;
     private readonly PromptBox _prompt = new();
     private PromptInput? _promptInput;
     private AgentSelection _agents = new(Array.Empty<WorkflowRole>(), null);
@@ -618,6 +637,21 @@ else
         ? _run.Status is RunStatus.Running or RunStatus.AwaitingApproval
         : _climb.Status is RunStatus.Running or RunStatus.AwaitingApproval;
 
+    /// <summary>The stored session on screen, or null for a fresh, unrun one.</summary>
+    private SessionRecord? Viewed => Coordinator.Active;
+
+    /// <summary>True while the run that owns the session on screen is still live.</summary>
+    private bool ViewingLive => Viewed is { } viewed && Coordinator.IsLive(viewed.Id);
+
+    /// <summary>True when the page is showing a session's history rather than live work.</summary>
+    private bool ViewingHistory => Viewed is not null && !ViewingLive;
+
+    /// <summary>
+    /// The stored summary history is read from, or null while the page shows live work. Every
+    /// history figure comes from here, so they cannot disagree about what is on screen.
+    /// </summary>
+    private SessionSummary? History => ViewingHistory ? Viewed!.Summary : null;
+
     /// <summary>
     /// True only while the method on screen is streaming. Awaiting approval is paused, so
     /// a turn left "running" settles instead of shimmering beside a waiting status card.
@@ -635,18 +669,25 @@ else
         _run.Status is RunStatus.Running or RunStatus.AwaitingApproval
         || _climb.Status is RunStatus.Running or RunStatus.AwaitingApproval;
 
-    private RunStatus ActiveStatus => _method == RunMethod.Run ? _run.Status : _climb.Status;
+    private RunStatus ActiveStatus => History?.Status
+        ?? (_method == RunMethod.Run ? _run.Status : _climb.Status);
 
-    private string? ActiveMessage => _method == RunMethod.Run ? _run.Message : _climb.Message;
+    private string? ActiveMessage => ViewingHistory
+        ? null
+        : _method == RunMethod.Run ? _run.Message : _climb.Message;
 
     private IReadOnlyList<string> ActiveLogs =>
         _method == RunMethod.Run ? _run.Logs : _climb.Logs;
 
-    private decimal ActiveReportedSpendUsd => _method == RunMethod.Run ? _run.Metrics.SpendUsd : _climb.SpendUsd;
+    private decimal ActiveReportedSpendUsd => History?.SpendUsd
+        ?? (_method == RunMethod.Run ? _run.Metrics.SpendUsd : _climb.SpendUsd);
 
-    private decimal ActiveEstimatedSpendUsd => _method == RunMethod.Run
-        ? _run.Metrics.EstimatedSpendUsd
-        : _climb.EstimatedSpendUsd;
+    private decimal ActiveEstimatedSpendUsd => History?.EstimatedSpendUsd
+        ?? (_method == RunMethod.Run ? _run.Metrics.EstimatedSpendUsd : _climb.EstimatedSpendUsd);
+
+    /// <summary>Prompt plus completion tokens: the run's counts, or the stored session's total.</summary>
+    private long ActiveTokens => History?.TotalTokens
+        ?? (_method == RunMethod.Run ? _run.Metrics.TotalTokens : _climb.InputTokens + _climb.OutputTokens);
 
     /// <summary>
     /// An estimated provider shows the token-based estimate, marked "est."; a reported
@@ -655,17 +696,25 @@ else
     private string ActiveSpendText =>
         SpendFormat.Spend((double)ActiveReportedSpendUsd, (double)ActiveEstimatedSpendUsd, ActiveProvider?.SpendMode ?? SpendMode.None);
 
-    private ProviderSelection? ActiveProvider => _method == RunMethod.Run ? _run.Provider : _climb.Provider;
+    private ProviderSelection? ActiveProvider => ViewingHistory
+        ? null
+        : _method == RunMethod.Run ? _run.Provider : _climb.Provider;
 
-    private string ActiveSpendNoun => _method == RunMethod.Run ? "this run" : "this climb";
+    /// <summary>
+    /// What the spend figure covers. A stored session is not one run or one climb: it is
+    /// every turn it holds, so history names the whole conversation.
+    /// </summary>
+    private string ActiveSpendNoun => ViewingHistory
+        ? "this session"
+        : _method == RunMethod.Run ? "this run" : "this climb";
 
-    private bool ActiveFallbackAvailable => _method == RunMethod.Run
-        ? _run.FallbackAvailable
-        : _climb.FallbackAvailable;
+    private bool ActiveFallbackAvailable => ViewingHistory
+        ? false
+        : _method == RunMethod.Run ? _run.FallbackAvailable : _climb.FallbackAvailable;
 
-    private string? ActiveFallbackMessage => _method == RunMethod.Run
-        ? _run.FallbackMessage
-        : _climb.FallbackMessage;
+    private string? ActiveFallbackMessage => ViewingHistory
+        ? null
+        : _method == RunMethod.Run ? _run.FallbackMessage : _climb.FallbackMessage;
 
     private string PromptLabel => _method == RunMethod.Run ? "prompt" : "goal prompt";
 
@@ -676,11 +725,16 @@ else
     /// <summary>True when the composer may start a run: idle and something to send.</summary>
     private bool CanSend => !AnyRunning && !string.IsNullOrWhiteSpace(_prompt.Text);
 
-    /// <summary>The transcript's heading: the prompt that opened it, or the pending method.</summary>
+    /// <summary>The transcript's heading: the session's title, or the pending method.</summary>
     private string ChatTitle
     {
         get
         {
+            if (Viewed is { } viewed)
+            {
+                return viewed.Title;
+            }
+
             if (_prompt.LastPrompt is not { Length: > 0 } prompt)
             {
                 return _method == RunMethod.Run ? "new run" : "new hillclimb";
@@ -761,15 +815,7 @@ else
         }
     }
 
-    private string PulseClass => ActiveStatus switch
-    {
-        RunStatus.Running => "bg-primary animate-pulse",
-        RunStatus.Completed => "bg-green",
-        RunStatus.Stopped => "bg-orange",
-        RunStatus.Failed => "bg-red",
-        RunStatus.AwaitingApproval => "bg-orange",
-        _ => "bg-muted-foreground/45",
-    };
+    private string PulseClass => StatusDot.Class(ActiveStatus, pulse: ActiveStatus == RunStatus.Running);
 
     /// <summary>Provider connection dot: green reachable, red unavailable, gray unknown.</summary>
     private string ToneDot(RegisteredProvider provider) => ProviderTone(provider) switch
@@ -861,11 +907,24 @@ else
                 : $"{AgentCatalog.WorkflowName} — delegates to {string.Join(" / ", Delegates.Select(role => role.Name))} as needed"
             : $"{AgentCatalog.WorkflowName} — gated loop";
 
-    private string ElapsedLabel =>
-        _run.StartedAt is { } start ? Duration((_run.FinishedAt ?? DateTimeOffset.Now) - start) : "—";
+    private string ElapsedLabel
+    {
+        get
+        {
+            if (History is { } history)
+            {
+                return history.StartedAt is { } from
+                    ? Duration((history.FinishedAt ?? DateTimeOffset.Now) - from)
+                    : "—";
+            }
 
-    /// <summary>When the method on screen started, for the output header's live clock.</summary>
-    private DateTimeOffset? ActiveStartedAt => _method == RunMethod.Run ? _run.StartedAt : _climb.StartedAt;
+            return _run.StartedAt is { } start ? Duration((_run.FinishedAt ?? DateTimeOffset.Now) - start) : "—";
+        }
+    }
+
+    /// <summary>When the session or run on screen started, for the output header's live clock.</summary>
+    private DateTimeOffset? ActiveStartedAt => History?.StartedAt
+        ?? (_method == RunMethod.Run ? _run.StartedAt : _climb.StartedAt);
 
     /// <summary>The header clock while the panel is working; empty when nothing is live.</summary>
     private string ActiveElapsed => ActiveStartedAt is { } start ? Duration(DateTimeOffset.Now - start) : string.Empty;
@@ -946,8 +1005,69 @@ else
 
     private void RebuildEntries()
     {
-        _entries = ActiveLogs.Select(_logFormatter.Format).ToArray();
+        _entries = TranscriptEntries();
         _plan = BuildPlan(_entries);
+    }
+
+    /// <summary>
+    /// The transcript on screen: a stored session's history (with the live run's own feed
+    /// appended while that run is live), or the service feed directly when no session is
+    /// bound — which is the fixture host, whose transcript is a display and never a session.
+    /// </summary>
+    private IReadOnlyList<LogEntry> TranscriptEntries()
+    {
+        var live = ActiveLogs.Select(_logFormatter.Format).ToArray();
+
+        if (Viewed is { } viewed)
+        {
+            var stored = Coordinator.StoredEntries();
+            return Coordinator.IsLive(viewed.Id) ? stored.Concat(live).ToArray() : stored;
+        }
+
+        // No session was bound to the feed: it belongs to the page only when neither service
+        // carries a session id (a fixture). Otherwise it is an archived session's last run.
+        return _run.SessionId is null && _climb.SessionId is null ? live : Array.Empty<LogEntry>();
+    }
+
+    /// <summary>True when the transcript already carries the reader's questions.</summary>
+    private bool HasPromptRow => _entries.Any(entry => entry.Kind == LogKind.UserPrompt);
+
+    /// <summary>
+    /// Adopts the session the coordinator made active: its workflow, its target folder and
+    /// its transcript replace whatever the page was showing. A switch is a new conversation,
+    /// so the reader's per-turn choices from the last one are dropped.
+    /// </summary>
+    /// <returns>True when the session on screen actually changed.</returns>
+    private bool AdoptSession(SessionRecord? record)
+    {
+        var id = record?.Id;
+        if (id == _viewedId)
+        {
+            return false;
+        }
+
+        _viewedId = id;
+        _turnOpen.Clear();
+        _outputTab = PrimaryTab;
+        _error = null;
+        _preflightWarnings = Array.Empty<string>();
+        _startFallbackOffer = false;
+        _startFallbackProviderId = null;
+        _pendingProviderApproval = false;
+        _pendingProviderId = null;
+
+        if (record is not { } session)
+        {
+            return true;
+        }
+
+        _method = session.Summary.Method;
+        if (!string.IsNullOrWhiteSpace(session.TargetFolder))
+        {
+            _folderPath = session.TargetFolder;
+        }
+
+        return true;
     }
 
     private static string MessageText(OutputItem item) =>
@@ -1170,6 +1290,8 @@ else
         _climb = Climber.State;
         Run.StateChanged += OnRunStateChanged;
         Climber.StateChanged += OnClimbStateChanged;
+        Coordinator.Changed += OnCoordinatorChanged;
+        AdoptSession(Coordinator.Active);
 
         _ = WatchClockAsync(_clockCts.Token);
 
@@ -1184,6 +1306,33 @@ else
         RebuildEntries();
         await RefreshProviderSurfacesAsync();
     }
+
+    /// <summary>
+    /// The coordinator changed the session on screen (a switch, an archive, or a prompt that
+    /// opened a new one). Repaint from its transcript; a switch also re-reads the folder's
+    /// agents, because a stored session can belong to a different repository. The coordinator
+    /// raises this from the run's own thread, so the whole update is marshalled to the renderer.
+    /// </summary>
+    private void OnCoordinatorChanged() => _ = InvokeAsync(() =>
+    {
+        var wasViewing = _viewedId is not null;
+        var switched = AdoptSession(Coordinator.Active);
+
+        // A stored session can belong to a different repository, and its agents come with it.
+        if (switched && Coordinator.Active is not null)
+        {
+            ResolveAgents();
+        }
+
+        // Archiving leaves a fresh conversation: the last prompt belongs to the one left behind.
+        if (wasViewing && Coordinator.Active is null)
+        {
+            _prompt.Forget();
+        }
+
+        RebuildEntries();
+        StateHasChanged();
+    });
 
     /// <summary>
     /// Repaints once a second while a run is active so the elapsed clocks advance even
@@ -1560,14 +1709,26 @@ else
             // run starts with the defaults rather than inheriting keys that cannot recur.
             _turnOpen.Clear();
 
-            if (_method == RunMethod.Hillclimb)
+            // The session is bound before the run starts, so the coordinator owns the
+            // transcript from the first line and opencode continues the same conversation.
+            // A start that is refused synchronously must not leave the binding behind.
+            var sessionId = Coordinator.Begin(prompt, _method, folder);
+            try
             {
-                _ = Climber.StartAsync(new ClimberOptions(
-                    folder, prompt, Math.Max(1, _maxIterations), _agents.DefaultAgent, selection, fallbacks));
+                if (_method == RunMethod.Hillclimb)
+                {
+                    _ = Climber.StartAsync(new ClimberOptions(
+                        folder, prompt, Math.Max(1, _maxIterations), _agents.DefaultAgent, selection, fallbacks, sessionId));
+                }
+                else
+                {
+                    _ = Run.StartAsync(new RunOptions(folder, prompt, _agents.DefaultAgent, selection, fallbacks, sessionId));
+                }
             }
-            else
+            catch
             {
-                _ = Run.StartAsync(new RunOptions(folder, prompt, _agents.DefaultAgent, selection, fallbacks));
+                Coordinator.Abandon(sessionId);
+                throw;
             }
         });
 
@@ -1696,6 +1857,7 @@ else
     {
         Run.StateChanged -= OnRunStateChanged;
         Climber.StateChanged -= OnClimbStateChanged;
+        Coordinator.Changed -= OnCoordinatorChanged;
         _expiryCts?.Cancel();
         _expiryCts?.Dispose();
         _clockCts.Cancel();

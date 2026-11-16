@@ -79,6 +79,25 @@ public class LogGrouperTests
     }
 
     [Fact]
+    public void AUserPromptIsItsOwnRowAndClosesTheWorkBeforeIt()
+    {
+        var prompt = Entry(LogKind.UserPrompt, "explain the code", 5);
+        var items = LogGrouper.Group([
+            Start(1),
+            Tool("shell", 2),
+            Finish(3),
+            Text("it is green", 4),
+            prompt,
+            Tool("read", 6),
+        ]);
+
+        Assert.Equal(
+            new[] { OutputItemKind.Turn, OutputItemKind.Message, OutputItemKind.Prompt, OutputItemKind.Turn },
+            items.Select(item => item.Kind));
+        Assert.Same(prompt, items[2].Entries.Single());
+    }
+
+    [Fact]
     public void ProseBeforeAStepFinishKeepsTheFooterOnItsTurn()
     {
         var finish = Finish(3);

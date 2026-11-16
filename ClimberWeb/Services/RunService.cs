@@ -2,10 +2,18 @@ using Microsoft.Extensions.Logging;
 
 namespace ClimberWeb.Services;
 
-/// <summary>Immutable snapshot of a general OpenCode run, everything the main page renders.</summary>
+/// <summary>
+/// Immutable snapshot of a general OpenCode run, everything the main page renders.
+/// </summary>
 public sealed record RunState
 {
     public RunStatus Status { get; init; } = RunStatus.Idle;
+
+    /// <summary>
+    /// The session this run belongs to, when it was started through one. The session
+    /// coordinator keys its persistence by this id; a null means no session is bound.
+    /// </summary>
+    public string? SessionId { get; init; }
 
     /// <summary>Human-readable detail about the current status.</summary>
     public string? Message { get; init; }
@@ -41,12 +49,14 @@ public sealed record RunState
 /// <param name="Agent">Agent to run with, or null to use opencode's own default.</param>
 /// <param name="Provider">The provider/model for this run, or null to let opencode decide.</param>
 /// <param name="Fallbacks">Providers offered, one approved step at a time, after a failure.</param>
+/// <param name="SessionId">The conversation to continue, or null to let opencode mint its own.</param>
 public sealed record RunOptions(
     string TargetFolder,
     string Prompt,
     string? Agent = null,
     ProviderSelection? Provider = null,
-    IReadOnlyList<ProviderSelection>? Fallbacks = null)
+    IReadOnlyList<ProviderSelection>? Fallbacks = null,
+    string? SessionId = null)
 {
     /// <summary>Provides a non-null view of <see cref="Fallbacks"/>.</summary>
     public IReadOnlyList<ProviderSelection> FallbackList => Fallbacks ?? Array.Empty<ProviderSelection>();
@@ -161,6 +171,7 @@ public sealed class RunService : IRunService
                 StartedAt = DateTimeOffset.Now,
                 Logs = Array.Empty<string>(),
                 Provider = options.Provider,
+                SessionId = options.SessionId,
             };
         }
 
@@ -207,9 +218,9 @@ public sealed class RunService : IRunService
     {
         try
         {
-            Log($"$ {OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Provider?.Model)}");
+            Log($"$ {OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Provider?.Model, options.SessionId)}");
             var result = await _runner.RunAsync(
-                OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model),
+                OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
                 OnOpenCodeLine,
                 cancellationToken).ConfigureAwait(false);
 

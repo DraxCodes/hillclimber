@@ -46,6 +46,26 @@ public static class RunStatusText
     };
 }
 
+/// <summary>
+/// The status dot's classes. One place so the sessions rail and the page header cannot
+/// disagree about what "failed" looks like.
+/// </summary>
+public static class StatusDot
+{
+    /// <summary>The dot's colour classes for <paramref name="status"/>.</summary>
+    /// <param name="status">The state the dot describes.</param>
+    /// <param name="pulse">True for work in progress, which breathes; paused work does not.</param>
+    public static string Class(RunStatus status, bool pulse = false) => status switch
+    {
+        RunStatus.Running => pulse ? "bg-primary animate-pulse" : "bg-primary",
+        RunStatus.Completed => "bg-green",
+        RunStatus.Stopped => "bg-orange",
+        RunStatus.Failed => "bg-red",
+        RunStatus.AwaitingApproval => "bg-orange",
+        _ => "bg-muted-foreground/45",
+    };
+}
+
 /// <summary>Which workflow the dashboard is driving.</summary>
 public enum RunMethod
 {
