@@ -300,10 +300,6 @@ else
                                             <TraceLine Status="@TurnTraceStatus(turn.Status)">
                                                 <TraceIcon><UiIcon Name="sparkles" CssClass="size-4" /></TraceIcon>
                                                 <TraceTitle>@turn.Summary</TraceTitle>
-                                                @if (!string.IsNullOrEmpty(turn.Footer) && !isOpen)
-                                                {
-                                                    <TraceDescription>@turn.Footer</TraceDescription>
-                                                }
                                             </TraceLine>
                                         </Trigger>
                                         <ChildContent>
@@ -914,15 +910,8 @@ else
         .ToArray();
 
     /// <summary>The entries for the selected tab, oldest first: everything for the primary tab, one agent's calls otherwise.</summary>
-    /// <remarks>
-    /// On the primary tab a run with two or more delegates shows them in its Plan instead, so
-    /// the per-call rows leave the stream: the Plan is the record of who was handed what, and
-    /// repeating each agent beside it reads as two lists of the same thing.
-    /// </remarks>
     private IReadOnlyList<LogEntry> VisibleEntries => _outputTab == PrimaryTab
-        ? (_plan.Count >= 2
-            ? _entries.Where(entry => entry.Kind != LogKind.Subagent).ToArray()
-            : _entries)
+        ? _entries
         : _entries
             .Where(entry => entry.Kind == LogKind.Subagent && string.Equals(entry.Text, _outputTab, StringComparison.Ordinal))
             .ToArray();
@@ -983,6 +972,12 @@ else
         @if (entry.Kind == LogKind.Reasoning)
         {
             <AiReasoning @key="entry.Raw" Text="@entry.Text" Running="@live" />
+        }
+        else if (entry.Kind == LogKind.Subagent && _outputTab == PrimaryTab && _plan.Count >= 2)
+        {
+            // One of the Plan's steps. The Plan already names the agent, its order and its
+            // state, so a second row pointing at its tab repeats it; the entry stays in the
+            // turn so the summary still counts the work it did.
         }
         else if (entry.Kind == LogKind.Subagent && _outputTab != PrimaryTab)
         {
