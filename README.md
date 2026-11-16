@@ -228,9 +228,12 @@ dotnet run --project ClimberWeb
 ```
 
 The host is registered only in Development, `PlaybackRunService` refuses any
-other environment, and a playback host never drives opencode (starting a run
-tells you to unset `CLIMBER_SEED`). The fixture feeds the transcript only: the
-prompt bubble is page-local input state, so the heading stays "new run".
+other environment, and a playback host never drives opencode (both methods refuse:
+starting a run or a hillclimb tells you to unset `CLIMBER_SEED`). The transcript
+decides the status: an open tail replays as running, a closed one as complete,
+because a transcript carries no process exit code. The fixture feeds the
+transcript only: the prompt bubble is page-local input state, so the heading
+stays "new run".
 
 The token-spending harness refuses (exit `2`) unless Surplus is the *only* configured
 provider and reports `connected`. The legacy keys always synthesise Surplus **and**

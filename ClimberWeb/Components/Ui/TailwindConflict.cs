@@ -151,8 +151,49 @@ internal static class TailwindConflict
     private static readonly string[] SpacingAxes = ["x", "y", "s", "e", "t", "r", "b", "l"];
     private static readonly string[] BorderAxes = ["x", "y", "s", "e", "t", "r", "b", "l"];
     private static readonly string[] RadiusCorners = ["tl", "tr", "bl", "br", "t", "r", "b", "l", "s", "e"];
-    private static readonly string[] InsetAxes = ["x", "y", "s", "e", "t", "r", "b", "l"];
+    private static readonly string[] InsetAxes = ["x", "y"];
+    private static readonly (string Side, string Axis)[] InsetSides =
+    [
+        ("top", "t"), ("right", "r"), ("bottom", "b"), ("left", "l"), ("start", "s"), ("end", "e"),
+    ];
     private static readonly string[] TransformAxes = ["x", "y", "z"];
+
+    /// <summary>
+    /// Sibling coverage: a two-axis utility also sets the single-side utilities named here,
+    /// though their paths are not prefixes of one another (<c>px</c> vs <c>pl</c>). A later
+    /// broad axis removes the side classes it covers; the reverse keeps both, as twMerge does.
+    /// </summary>
+    private static readonly Dictionary<string, HashSet<string>> AxisCoverage = new(StringComparer.Ordinal)
+    {
+        ["padding/x"] = new(StringComparer.Ordinal) { "l", "r" },
+        ["padding/y"] = new(StringComparer.Ordinal) { "t", "b" },
+        ["margin/x"] = new(StringComparer.Ordinal) { "l", "r" },
+        ["margin/y"] = new(StringComparer.Ordinal) { "t", "b" },
+        ["inset/x"] = new(StringComparer.Ordinal) { "l", "r" },
+        ["inset/y"] = new(StringComparer.Ordinal) { "t", "b" },
+        ["border-width/x"] = new(StringComparer.Ordinal) { "l", "r" },
+        ["border-width/y"] = new(StringComparer.Ordinal) { "t", "b" },
+        ["border-color/x"] = new(StringComparer.Ordinal) { "l", "r" },
+        ["border-color/y"] = new(StringComparer.Ordinal) { "t", "b" },
+        ["radius/t"] = new(StringComparer.Ordinal) { "tl", "tr" },
+        ["radius/r"] = new(StringComparer.Ordinal) { "tr", "br" },
+        ["radius/b"] = new(StringComparer.Ordinal) { "bl", "br" },
+        ["radius/l"] = new(StringComparer.Ordinal) { "tl", "bl" },
+    };
+
+    /// <summary>
+    /// True when a later <paramref name="incoming"/> utility makes an earlier
+    /// <paramref name="existing"/> one redundant: the incoming path is the existing path's
+    /// ancestor, or the incoming axis covers the existing side.
+    /// </summary>
+    public static bool Covers(string[] incoming, string[] existing) =>
+        (incoming.Length <= existing.Length
+            && incoming.AsSpan().SequenceEqual(existing.AsSpan(0, incoming.Length)))
+        || (incoming.Length == 2
+            && existing.Length == 2
+            && string.Equals(incoming[0], existing[0], StringComparison.Ordinal)
+            && AxisCoverage.TryGetValue($"{incoming[0]}/{incoming[1]}", out var covered)
+            && covered.Contains(existing[1]));
 
     /// <summary>The conflict family for <paramref name="utility"/>, or null when it is unknown.</summary>
     public static string[]? Path(string utility)
@@ -385,7 +426,7 @@ internal static class TailwindConflict
         if (TextAligns.Contains(rest)) return TextAlignFamily;
         if (TextWraps.Contains(rest)) return TextWrapFamily;
 
-        // An arbitrary value that reads as a length is a size; `text-[length:…]` says so
+        // An arbitrary value that reads as a length is a size; `text-[length:â€¦]` says so
         // explicitly. Everything else is a colour, matching Tailwind's own ambiguity rule.
         if (rest.StartsWith('[') && rest.EndsWith(']'))
         {
@@ -401,8 +442,13 @@ internal static class TailwindConflict
     private static string[]? Font(string rest)
     {
         if (FontFamilies.Contains(rest)) return FontFamilyFamily;
+
+        // `font-` is Tailwind's ambiguous slot: a named weight, or a bare number in an
+        // arbitrary value, sets weight. Everything else (including `font-['Inter']`) is a
+        // family, so an unrecognised name cannot silently collide with a real weight.
         if (FontWeights.Contains(rest)) return FontWeightFamily;
-        return FontWeightFamily;
+        if (rest.StartsWith('[') && rest.EndsWith(']') && LooksLikeNumber(rest[1..^1])) return FontWeightFamily;
+        return FontFamilyFamily;
     }
 
     private static string[]? Background(string rest)
@@ -463,7 +509,7 @@ internal static class TailwindConflict
         if (value.StartsWith("inset-", StringComparison.Ordinal))
         {
             var rest = value[6..];
-            foreach (var axis in new[] { "x", "y" })
+            foreach (var axis in InsetAxes)
             {
                 if (rest == axis || rest.StartsWith(axis + "-", StringComparison.Ordinal))
                 {
@@ -474,9 +520,9 @@ internal static class TailwindConflict
             return InsetFamily;
         }
 
-        foreach (var axis in InsetAxes)
+        foreach (var (side, axis) in InsetSides)
         {
-            if (value == axis || value.StartsWith(axis + "-", StringComparison.Ordinal))
+            if (value == side || value.StartsWith(side + "-", StringComparison.Ordinal))
             {
                 return [.. InsetFamily, axis];
             }
@@ -500,4 +546,8 @@ internal static class TailwindConflict
         || value.Contains("vw", StringComparison.Ordinal)
         || value.Contains("vh", StringComparison.Ordinal)
         || value.Contains('%');
+
+    /// <summary>A bare numeric arbitrary value, the shape a font weight takes.</summary>
+    private static bool LooksLikeNumber(string value) =>
+        value.Length > 0 && value.All(c => char.IsAsciiDigit(c) || c == '.');
 }

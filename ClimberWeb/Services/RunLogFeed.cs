@@ -15,7 +15,7 @@ internal sealed class RunLogFeed
     /// <summary>Stamps <paramref name="line"/> with the current time and appends it, returning the stamped line.</summary>
     public string Append(string line)
     {
-        var stamped = $"[{DateTime.Now:HH:mm:ss}] {line}";
+        var stamped = Stamp(line, DateTime.Now);
         _lines.Add(stamped);
         if (_lines.Count > MaxLines)
         {
@@ -24,6 +24,12 @@ internal sealed class RunLogFeed
 
         return stamped;
     }
+
+    /// <summary>
+    /// The one place that decides a transcript line's stamp. The feed uses the wall clock;
+    /// the playback fixture passes a synthetic clock so screenshots repeat.
+    /// </summary>
+    public static string Stamp(string line, DateTimeOffset at) => $"[{at:HH:mm:ss}] {line}";
 
     public void Clear() => _lines.Clear();
 

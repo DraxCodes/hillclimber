@@ -13,11 +13,14 @@
 @layer theme, base, components, legacy, utilities;
 
 @import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
 @import "tw-animate-css";
 
-@source "../../Components/**/*.razor";
-@source "../../Components/**/*.cs";
+/* The Razor components are the only place that uses utilities: they are written as classes
+   in markup, never in C#. `source(none)` turns off automatic detection so the conflict table
+   in `TailwindConflict.cs` (whose strings are lookup keys, not usages) cannot add every
+   family it names to the built sheet; the explicit source below is authoritative. */
+@source "../Components/**/*.razor";
 
 /* Our theme is an attribute, not a class, and not the OS preference alone. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));

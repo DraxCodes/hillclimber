@@ -12,8 +12,9 @@ namespace ClimberWeb.Services;
 /// fixture (<c>1</c> for the default transcript, <c>live</c> for the streaming one, or a
 /// path). <see cref="FromEnvironment"/> refuses any other environment, and
 /// <c>Program.cs</c> registers it only behind <c>IsDevelopment()</c>, so a Production host
-/// cannot reach it even with the variable set. A playback host never drives opencode:
-/// <see cref="StartAsync"/> fails with instructions instead of pretending to run.
+/// cannot reach it even with the variable set. A playback host never drives opencode, whichever
+/// method is chosen: <see cref="StartAsync"/> fails with instructions instead of pretending to
+/// run, and <see cref="PlaybackHillClimberService"/> refuses the hillclimb loop's real commands.
 /// </remarks>
 public sealed class PlaybackRunService : IRunService
 {
@@ -89,7 +90,7 @@ public sealed class PlaybackRunService : IRunService
     }
 
     /// <summary>
-    /// Resolves <c>1</c>/<c>true</c>/<c>on</c> to the default transcript, <c>live</c> to the
+    /// Resolves <c>1</c> to the default transcript, <c>live</c> to the
     /// streaming one, and anything else to a path (absolute, or relative to the content root
     /// or to a parent of it, which is how <c>dotnet run --project ClimberWeb</c> finds the
     /// fixtures under <c>ClimberWeb.Tests/Fixtures</c>).
@@ -99,7 +100,7 @@ public sealed class PlaybackRunService : IRunService
     {
         var name = seed.ToLowerInvariant() switch
         {
-            "1" or "true" or "on" => DefaultFixture,
+            "1" => DefaultFixture,
             "live" => LiveFixture,
             _ => seed,
         };
@@ -134,7 +135,9 @@ public sealed class PlaybackRunService : IRunService
     /// Reads a JSONL fixture and builds the state the page would have seen had the run written
     /// those events: each line is validated by the real formatter, grouped by the real grouper
     /// (which decides whether the transcript ends open), stamped the way the log feed stamps,
-    /// and summed the way the run sums its <c>step_finish</c> usage.
+    /// and summed the way the run sums its <c>step_finish</c> usage. A transcript has no process
+    /// exit code, so the status follows its shape: an open tail replays as running, a closed one
+    /// as complete.
     /// </summary>
     public static PlaybackRunService Create(string fixturePath, DateTimeOffset? startedAt = null)
     {
@@ -158,7 +161,7 @@ public sealed class PlaybackRunService : IRunService
         var clock = start;
         foreach (var line in lines)
         {
-            logs.Add($"[{clock:HH:mm:ss}] {line}");
+            logs.Add(RunLogFeed.Stamp(line, clock));
             metrics = metrics.Add(line);
             clock = clock.AddSeconds(SecondsBetweenEvents);
         }

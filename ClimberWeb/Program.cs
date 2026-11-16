@@ -20,17 +20,20 @@ builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 
 // A development-only transcript fixture, so a UI pass starts from the same recorded run
 // every time. The environment gate is checked here and again inside the fixture itself; a
-// Production host never registers it, even when CLIMBER_SEED is set.
+// Production host never registers it, even when CLIMBER_SEED is set. The hillclimb loop is
+// real work rather than a transcript, so the fixture host replaces it with a refusing guard
+// too: a playback host never drives opencode, whichever method is chosen.
 if (PlaybackRunService.IsEnabled(builder.Environment.IsDevelopment()))
 {
     builder.Services.AddSingleton<IRunService>(
         PlaybackRunService.FromEnvironment(builder.Environment.IsDevelopment(), builder.Environment.ContentRootPath));
+    builder.Services.AddSingleton<IHillClimberService, PlaybackHillClimberService>();
 }
 else
 {
     builder.Services.AddSingleton<IRunService, RunService>();
+    builder.Services.AddSingleton<IHillClimberService, HillClimberService>();
 }
-builder.Services.AddSingleton<IHillClimberService, HillClimberService>();
 builder.Services.AddSingleton<IFileBrowser, FileBrowser>();
 
 // Project status page: git history is read live, coverage/test status comes from the

@@ -13,9 +13,10 @@ namespace ClimberWeb.Components.Ui;
 /// This is a small ordered resolver, not a Tailwind compiler: it knows the families the ported
 /// components actually compose (spacing, sizing, display, colour, radius, type, flex/grid,
 /// positioning, motion). A utility it does not recognise is never a conflict, so the fallback is
-/// the old append behaviour rather than a silently dropped class. A later *broader* utility also
-/// removes the narrower ones it covers (<c>p-0</c> over <c>px-4 py-2</c>), while a later narrower
-/// one keeps its broader ancestor, exactly as <c>twMerge</c> does.
+/// the old append behaviour rather than a silently dropped class. A later *broader* utility
+/// also removes the narrower ones it covers, whether the narrower one is a child in the tree
+/// (<c>p-0</c> over <c>px-4 py-2</c>) or a single side of the same axis (<c>px-4</c> over
+/// <c>pl-2</c>); a later narrower one keeps its broader ancestor, exactly as <c>twMerge</c> does.
 /// </remarks>
 public static class UiClass
 {
@@ -42,13 +43,13 @@ public static class UiClass
                     continue;
                 }
 
-                if (token.Group is { } group)
+                if (token.Path is { } path)
                 {
                     for (var index = resolved.Count - 1; index >= 0; index--)
                     {
                         if (resolved[index].Variants == token.Variants
-                            && resolved[index].Group is { } existing
-                            && IsPrefix(group, existing))
+                            && resolved[index].Path is { } existing
+                            && TailwindConflict.Covers(path, existing))
                         {
                             resolved.RemoveAt(index);
                         }
@@ -62,13 +63,8 @@ public static class UiClass
         return string.Join(" ", resolved.Select(token => token.Class));
     }
 
-    /// <summary>True when <paramref name="ancestor"/> equals or contains <paramref name="descendant"/>.</summary>
-    private static bool IsPrefix(string[] ancestor, string[] descendant) =>
-        ancestor.Length <= descendant.Length
-        && ancestor.AsSpan().SequenceEqual(descendant.AsSpan(0, ancestor.Length));
-
-    /// <summary>One class, split into its variant prefix, its conflict family and its source text.</summary>
-    private readonly record struct ClassToken(string Class, string Variants, string[]? Group)
+    /// <summary>One class, split into its variant prefix, its family path and its source text.</summary>
+    private readonly record struct ClassToken(string Class, string Variants, string[]? Path)
     {
         public static ClassToken Parse(string raw)
         {

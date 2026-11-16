@@ -122,6 +122,30 @@ public class PlaybackFixtureTests
     }
 
     [Fact]
+    public void AnAbsoluteOrRelativePathSeedResolvesToTheNamedFile()
+    {
+        var absolute = Path.GetFullPath(Fixture(PlaybackRunService.DefaultFixture));
+        Assert.Equal(absolute, PlaybackRunService.ResolveFixture(absolute, AppContext.BaseDirectory));
+
+        var relative = Path.Combine("Fixtures", PlaybackRunService.LiveFixture);
+        Assert.Equal(
+            Path.GetFullPath(Fixture(PlaybackRunService.LiveFixture)),
+            PlaybackRunService.ResolveFixture(relative, AppContext.BaseDirectory));
+    }
+
+    [Fact]
+    public async Task PlaybackCannotStartAHillclimb()
+    {
+        var guard = new PlaybackHillClimberService();
+
+        Assert.False(guard.IsRunning);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => guard.StartAsync(new ClimberOptions(".", "climb the tests")));
+
+        Assert.Contains(PlaybackRunService.EnvVar, error.Message);
+    }
+
+    [Fact]
     public void TheFixtureGateNeedsDevelopmentAndTheEnvironmentVariable()
     {
         WithSeed(null, () => Assert.False(PlaybackRunService.IsEnabled(isDevelopment: true)));

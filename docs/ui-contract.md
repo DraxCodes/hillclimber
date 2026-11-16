@@ -222,12 +222,14 @@ Recorded so a later reader does not mistake each of these for drift.
 
 - **`UiClass.Join` resolves conflicts like the registry's `cn()`.** A later class
   in the same utility family wins, and a later *broader* utility removes the
-  narrower ones it covers (`p-0` over `px-4 py-2`); variants compare whole, so
-  `hover:bg-accent` and `bg-primary` both survive; an unknown utility is never a
-  conflict. `Components/Ui/TailwindConflict.cs` lists the families the ports
-  compose and `UiClassTests` pins them. The `!` escapes are gone from the
-  components (`text-destructive`, `border-border`, `max-w-[68ch]`, and
-  `PagePanel`'s spacing): the caller's class now wins on its own.
+  narrower ones it covers (`p-0` over `px-4 py-2`, and `px-4` over `pl-2`); a
+  later narrower one keeps its broader ancestor (`px-4 pl-2`). Variants compare
+  whole, so `hover:bg-accent` and `bg-primary` both survive; an unknown utility is
+  never a conflict. `Components/Ui/TailwindConflict.cs` lists the families and the
+  two-axis coverage the ports compose, and `UiClassTests` pins them. The `!`
+  escapes are gone from the components (`text-destructive`, `border-border`,
+  `max-w-[68ch]`, and `PagePanel`'s spacing): the caller's class now wins on its
+  own.
 - **The output strip is a labelled group of toggle buttons, not a tablist.**
   `role="tab"` promised a keyboard contract the strip never kept (no roving
   tabindex, no arrow keys), and a half-implemented tablist is worse for a screen

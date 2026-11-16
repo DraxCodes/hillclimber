@@ -38,8 +38,12 @@ and handoffs inherit them without re-asking:
 2. **Verify visual changes with temporary sample data.** When a change is visual,
    start the app seeded with temporary sample data that exercises the new rendering,
    look at it (screenshot via the Playwright harness in the temp `climb-ui` folder),
-   then remove the seed. Keep the seed clearly marked, uncommitted, and confined to
-   one throwaway file plus a single hook, so it is trivial to delete.
+   then remove the seed. For transcript states that a committed fixture can reach,
+   start the app with `CLIMBER_SEED` instead of writing a seed at all (see README);
+   the playback fixture is product code and stays committed. Page-local state the
+   fixture cannot reach still uses a throwaway seed: clearly marked, uncommitted,
+   and confined to one throwaway file plus a single hook, so it is trivial to
+   delete.
 3. **Run the free tests, always.** After any code change, run the full test suite
    (`dotnet test`) and report its real output — never a cached, filtered, or
    remembered result you did not just produce. Tests that spend tokens (the

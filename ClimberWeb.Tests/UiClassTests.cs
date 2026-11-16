@@ -99,6 +99,19 @@ public class UiClassTests
     {
         // `p-4 px-2` is meaningful: the x padding overrides half of the shorthand.
         Assert.Equal("p-4 px-2", UiClass.Join("p-4", "px-2"));
+        Assert.Equal("px-4 pl-2", UiClass.Join("px-4", "pl-2"));
+    }
+
+    [Fact]
+    public void ABroaderAxisRemovesTheSidesItCovers()
+    {
+        // `px` and `pl` are siblings in the tree, not ancestors: they both set padding, so a
+        // later `px` subsumes `pl` exactly as twMerge's conflicting groups do.
+        Assert.Equal("px-4", UiClass.Join("pl-2", "px-4"));
+        Assert.Equal("py-4", UiClass.Join("pt-2", "pb-3", "py-4"));
+        Assert.Equal("border-x", UiClass.Join("border-l", "border-x"));
+        Assert.Equal("rounded-t", UiClass.Join("rounded-tl", "rounded-t"));
+        Assert.Equal("inset-x-0", UiClass.Join("left-0", "inset-x-0"));
     }
 
     [Fact]
@@ -183,6 +196,19 @@ public class UiClassTests
     public void FontFamilyAndFontWeightAreDifferentFamilies()
     {
         Assert.Equal("font-mono text-sm font-medium", UiClass.Join("font-mono", "text-sm", "font-medium"));
+    }
+
+    [Fact]
+    public void AnUnknownFontNameIsAFamilyNotAWeight()
+    {
+        Assert.Equal("font-medium font-['Inter']", UiClass.Join("font-medium", "font-['Inter']"));
+        Assert.Equal("font-['Inter']", UiClass.Join("font-sans", "font-['Inter']"));
+    }
+
+    [Fact]
+    public void AnArbitraryNumericFontValueIsAWeight()
+    {
+        Assert.Equal("font-[700]", UiClass.Join("font-bold", "font-[700]"));
     }
 
     [Fact]
