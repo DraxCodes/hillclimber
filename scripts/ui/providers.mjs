@@ -5,7 +5,7 @@
 //   node providers.mjs
 //   BASE_URL=http://localhost:5179 node providers.mjs
 //
-// It verifies that the spend line and provider bar render every configured provider, that
+// It verifies that the provider bar renders every configured provider, that
 // a non-primary provider asks for approval by name, that cancelling keeps the primary, and
 // that /activity renders one card per provider. It never starts a run and spends no tokens.
 //
@@ -38,23 +38,23 @@ await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.fill('#pin', PIN);
 await page.click('text=unlock →');
 await page.waitForTimeout(1000);
-check('PIN unlocks the dashboard', (await page.locator('.telemetry').count()) > 0);
+check('PIN unlocks the dashboard', (await page.locator('.providerbar .method').count()) > 0);
 
 // --- every configured provider renders -----------------------------------
 await page
-  .waitForFunction(() => (document.querySelectorAll('.spendline .conn').length ?? 0) > 0, null, { timeout: 20_000 })
+  .waitForFunction(() => (document.querySelectorAll('.providerbar .method[data-provider]').length ?? 0) > 0, null, { timeout: 20_000 })
   .catch(() => {});
 
 const buttons = page.locator('.providerbar .method');
 await buttons.first().waitFor({ timeout: 10_000 }).catch(() => {});
 const providerLabels = (await buttons.allInnerTexts()).map((text) => text.trim().toLowerCase());
-const providerIds = await page.locator('.spendline .conn').evaluateAll((nodes) =>
+const providerIds = await page.locator('.providerbar .method[data-provider]').evaluateAll((nodes) =>
   nodes.map((node) => node.getAttribute('data-provider')).filter(Boolean));
 
 check('at least two providers are configured', providerLabels.length >= 2, providerLabels.join(', '));
 check('the provider bar has one button per provider', providerLabels.length === providerIds.length,
-  `${providerLabels.length} buttons / ${providerIds.length} connections`);
-check('every provider has a spend-line entry', providerIds.length > 0, providerIds.join(', '));
+  `${providerLabels.length} buttons / ${providerIds.length} ids`);
+check('every provider button carries a provider id', providerIds.length > 0, providerIds.join(', '));
 
 const activeLabel = (await page.locator('.providerbar .method.active').innerText()).trim().toLowerCase();
 check('the first configured provider is active by default', activeLabel === providerLabels[0], activeLabel);

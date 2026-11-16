@@ -57,7 +57,7 @@ not from departing from them.
   live.
 - **Header.** One primary line: status, method, model. Secondary data (spend,
   tokens, platform) on the second line and visually demoted. Six groups competing
-  in one band is the current flaw.
+  in one band was the flaw F6 fixed.
 - **Accent.** Live dot and the primary button. Nothing else.
 - **Radius.** 6px in chrome, 12px on the composer - the one soft object on the
   page.

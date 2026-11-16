@@ -68,13 +68,13 @@ check('wrong PIN is rejected', (await page.locator('.notice-bad').innerText()).i
 await page.fill('#pin', PIN);
 await page.click('text=unlock →');
 await page.waitForTimeout(500);
-check('correct PIN unlocks the dashboard', (await page.locator('.telemetry').count()) > 0);
+check('correct PIN unlocks the dashboard', (await page.locator('.providerbar .method').count()) > 0);
 
-// --- spend line -----------------------------------------------------------
-const surplusConn = page.locator('.spendline .conn[data-provider="surplus"]');
-check('spend line is present', (await page.locator('.spendline').count()) === 1);
-check('spend line shows Surplus as primary', (await surplusConn.innerText()).toLowerCase().includes('surplus'));
-check('spend line shows a spend figure', (await page.locator('.spendline .spend-item').first().innerText()).trim().length > 0);
+// --- platform picker ------------------------------------------------------
+const surplusBtn = page.locator('.providerbar .method[data-provider="surplus"]');
+check('provider bar is present', (await page.locator('.providerbar').count()) === 1);
+check('provider bar shows Surplus as primary',
+  (await page.locator('.providerbar .method.active').getAttribute('data-provider')) === 'surplus');
 
 // --- provider guard: paid checks only ever run on Surplus -----------------
 // The run and climb below call a paid API. Surplus is the only provider they may spend
@@ -99,9 +99,11 @@ if (configuredProviders.length !== 1 || configuredProviders[0] !== 'surplus') {
 }
 
 await page
-  .waitForFunction(() => !/checking/i.test(document.querySelector('.spendline .conn[data-provider="surplus"]')?.textContent ?? ''), null, { timeout: 20_000 })
+  .waitForFunction(() => !/checking/i.test(
+    document.querySelector('.providerbar .method[data-provider="surplus"]')?.getAttribute('aria-label') ?? ''),
+    null, { timeout: 20_000 })
   .catch(() => {});
-const surplusState = (await surplusConn.innerText()).split(':').pop().trim().toLowerCase();
+const surplusState = ((await surplusBtn.getAttribute('aria-label')) ?? '').split(':').pop().trim().toLowerCase();
 if (surplusState !== 'connected') {
   await refuse(
     `Surplus is not connected (state: ${surplusState}).\n` +
@@ -207,6 +209,8 @@ await page.waitForTimeout(150);
 check('prompt clears as soon as the run starts', (await page.inputValue('#prompt')).trim() === '', `status ${await status()}`);
 await settle();
 check('run starts and settles', ['running', 'completed', 'stopped', 'failed'].includes(await status()), await status());
+check('spend line appears once a run starts', await page.locator('.spendline').isVisible());
+check('spend line shows a spend figure', (await page.locator('.spendline .spend-item').first().innerText()).trim().length > 0);
 check('run live output panel fills', (await page.locator('.log-item').count()) > 0);
 const primaryTab = (await page.locator('.outtab').first().innerText()).toLowerCase();
 check('output labels the running agent', primaryTab.includes('orchestrator') || primaryTab.includes('main'), primaryTab);

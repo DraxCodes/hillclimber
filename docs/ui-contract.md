@@ -241,6 +241,32 @@ Recorded so a later reader does not mistake each of these for drift.
   closed; the provider picker was already a labelled group of `aria-pressed`
   buttons.
 
+### Phase 2d decisions
+
+- **The context band is two tiers, not one wrapping row.** The primary line holds
+  the status (dot, word, truncated message), the method toggle and the platform
+  picker; the second holds spend plus the active method's telemetry (`tokens` /
+  `elapsed`, or `iteration` / `best score` / `last run`), one type step smaller and
+  muted. The second tier is rendered only once the active method has a start time,
+  so the first-run band carries no zeroes, and it starts at the status's left edge:
+  the old `sm:ml-auto` on the telemetry is what stranded a wrapped line alone on
+  the right. `justify-between` on the primary row pushes the platform group right
+  when it fits and lets it wrap to the left edge when it does not.
+- **The platform picker sits on the primary line, not the secondary one.** This is
+  a named deviation from the art-direction sentence that lists platform with spend
+  and tokens. With one model per provider (EXCEPTION 2) the picker is the only
+  model control on screen — the exact `provider/model` string stays in the composer
+  chip, where probe 11 looks for it — and a control the user must operate outranks
+  spend and telemetry. Cost: the primary row carries one more group than the
+  target, so it is wider and wraps to a second, left-aligned row below ~660px; the
+  secondary line then has no platform entry, only the connection state carried by
+  the picker itself. Spend and telemetry are demoted as listed.
+- **The platform's selected state is neutral, not accent.** It is ink on
+  `--surface` with a `--line-2` border, the same treatment as the method toggle;
+  the accent in the band belongs to the live status alone.
+- **The telemetry `<dl>` carries `m-0`.** Its UA default `margin-block: 1em` was
+  adding 32px to the band's height in every state.
+
 ## Exception register
 
 ### EXCEPTION 1 - reverse transcript order

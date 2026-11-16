@@ -555,12 +555,9 @@
     }
 
     .providerbar .method { border-color: transparent; }
-    .providerbar .method.active {
-        border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-        background: color-mix(in srgb, var(--accent) 10%, transparent);
-        color: var(--accent-text);
-        box-shadow: none;
-    }
+    /* Selection is ink on surface, like the method toggle. The accent is the
+       live state's alone (art direction: one accent job). */
+    .providerbar .method.active { border-color: var(--line-2); }
 
     .st-idle { color: var(--ink-2); }
     .st-running { color: var(--accent-text); }

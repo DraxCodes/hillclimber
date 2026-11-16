@@ -1,10 +1,10 @@
 # Spec: the header band (F6) — two levels, not six groups
 
-Status: **proposed 2026-11-16; implementation approach not yet chosen.** F6 is the
-first of the three blockers the Phase 2b gate ordered for the 9/10 push (then F4
-answer measure, then F7/R1 feed rhythm). It is a hillclimb-sized visual change:
-`docs/agents/hillclimb-rubric.md` scores it, and `docs/ui-art-direction.md` is the
-expected answer.
+Status: **implemented 2026-11-16 (option A, two tiers); code-review fixes applied;
+gatekeeper score pending.** F6 is the first of the three blockers the Phase 2b gate
+ordered for the 9/10 push (then F4 answer measure, then F7/R1 feed rhythm). It is a
+hillclimb-sized visual change: `docs/agents/hillclimb-rubric.md` scores it, and
+`docs/ui-art-direction.md` is the expected answer.
 
 ## The flaw, as the gate stated it
 
@@ -137,9 +137,35 @@ the opposite of the gate's "second line, visually demoted".
 - **Score:** `quality-gatekeeper` against the rubric, then `/code-review` before
   the final commit.
 
-## Open questions for the user
+## Decisions (answered by the user, 2026-11-16)
 
-1. Which option: A (two-tier, recommended), B (minimal orphan fix) or C (compact
-   status bar)?
-2. If A: platform on the primary row (recommended) or the secondary row as the art
-   direction literally lists? And drop the platform accent (recommended) or keep it?
+1. **Option A**, the two-tier band.
+2. **Platform on the primary row**, with the accent dropped; the exact model string
+   stays in the composer chip (EXCEPTION 2). Recorded as a named deviation in
+   `docs/ui-contract.md` Phase 2d, with its width cost.
+3. **C4 first**: the method picker became `role="group"` + `aria-pressed` in commit
+   `a237c99`, before F6.
+
+## Evidence (after the code-review fixes)
+
+- **Shots:** `%TEMP%\climb-ui-shots\f6\after-{live,done,idle}-*.png` and
+  `after-header-*` at 900/375, light/dark. Strip heights: 900 live/done 66px, 375
+  live/done 100px, 900 idle 43px, 375 idle 77px. No horizontal overflow, no console
+  errors.
+- **Wrap probe:** the 40ch message no longer strands a right-aligned line; the
+  platform group wraps to the left edge at narrow widths and stays on line one from
+  ~700px up.
+- **Climb branch probe (synthetic):** the fixture seeds a run, not a climb, so the
+  three climb cells were cloned into the live `dl` with the same classes. At 900
+  they sit on one line (x=135/282/412, strip 66px); at 375 and 320 the third
+  (`last run`) wraps to a second line starting at x=10, not the right edge, with
+  `overflowX: 0`. Worst case is a taller metadata tier, never a stranded line.
+- **Keyboard:** Tab order is `run → hillclimb → surplus → openrouter`; every stop is
+  `:focus-visible` with a 2px solid ring; Space on `hillclimb` flips
+  `aria-pressed` from `false` to `true`. Telemetry is not focusable.
+- **ARIA:** `.spendline` is `role="group" aria-label="Spend"`; the platform buttons
+  carry string `aria-pressed` (`"true"`/`"false"`, not a minimized boolean) and
+  `data-provider`; the duplicated sr-only `.conn` spans are gone.
+- **Floor:** `dotnet test` 461/0/0; `theme-nav` 0; `security` 0; `providers` 15/0;
+  `polish` 100 (0 defects in 560 checks). `surfaces.mjs` and seeded opencode runs
+  were **not run**.
