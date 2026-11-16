@@ -144,8 +144,11 @@ Recorded so a later reader does not mistake each of these for drift.
 - **Plan is run-scoped.** One Plan lists every agent the run handed work to
   (first-seen order, latest state) and renders once, above the transcript, where
   `column-reverse` reads it directly under the prompt. While a Plan exists the
-  per-call `- see its tab` rows leave the primary stream: two agents read as one
-  two-step Plan, not four rows. A single delegate keeps its row.
+  per-call `- see its tab` rows are not drawn: the entry stays in its turn, so the
+  turn still counts the work it did, but the Plan is the record of who ran and in
+  what state. A run with a single delegate has no Plan, so that row is drawn.
+- **A collapsed turn shows its summary alone.** Its cost footer lives in the body:
+  printed beside the label it took the whole row and squeezed the label to `W…`.
 - **Code Block height cap** belongs to the Tool composition (`max-h-72`, 18rem -
   the same number `app.css` gives a fenced block in prose), not to the port: the
   registry's Code Block has no max height. Its focus ring is `focus-within` on
@@ -155,6 +158,11 @@ Recorded so a later reader does not mistake each of these for drift.
   `interpolate-size` and `@starting-style`, and opens instantly under
   `prefers-reduced-motion`. Closing unmounts the content, so there is no exit
   motion and a long run keeps no closed content in the DOM.
+- **Focus rings use `ring-ring`, not `ring-ring/30`.** The registry's `/30`
+  assumes an opaque `--ring`; this palette's is already 72% opaque, so `/30`
+  measured about 1.4:1 and became the faintest indicator in the app. Both new
+  rings (fold trigger, code block wrapper) now match the weight of the app's
+  existing `focus-ring` outline.
 - **Sources** count an MCP tool when its input names an http(s) URL, which makes
   the documented "Web or MCP targets" claim true. An MCP call with no URL adds
   nothing.
