@@ -189,7 +189,7 @@ else
                 {
                     <span class="log-working" role="status" aria-live="polite" aria-label="Working: @activity.Label">
                         <span class="log-working-dot" aria-hidden="true"></span>
-                        <span class="log-working-what" aria-hidden="true">@activity.Label</span>
+                        <span class="log-working-what" aria-hidden="true" title="@activity.Label">@activity.Label</span>
                         @if (ActiveElapsed is { Length: > 0 } elapsed)
                         {
                             <span class="log-working-elapsed" aria-hidden="true">@elapsed</span>
