@@ -207,15 +207,15 @@ else
 
             @if (SubAgentNames.Count > 0)
             {
-                <div class="outtabs" role="tablist" aria-label="Output stream" data-slot="output-tabs">
+                <div class="outtabs" role="group" aria-label="Output stream" data-slot="output-tabs">
                     <button class="outtab @(_outputTab == PrimaryTab ? "active" : string.Empty)" type="button" data-outtab="@PrimaryTab"
-                            role="tab" aria-selected="@(_outputTab == PrimaryTab)" @onclick="() => SelectOutputTab(PrimaryTab)">@PrimaryTabLabel</button>
+                            aria-pressed="@(_outputTab == PrimaryTab ? "true" : "false")" @onclick="() => SelectOutputTab(PrimaryTab)">@PrimaryTabLabel</button>
                     @foreach (var name in SubAgentNames)
                     {
                         var working = TabWorking(name);
                         <button class="outtab @(_outputTab == name ? "active" : string.Empty) @(working ? "working" : string.Empty)"
                                 type="button" data-outtab="@name" data-working="@(working ? "true" : null)"
-                                role="tab" aria-selected="@(_outputTab == name)"
+                                aria-pressed="@(_outputTab == name ? "true" : "false")"
                                 aria-label="@(working ? $"{SubLabel(name)} (working)" : null)"
                                 @onclick="() => SelectOutputTab(name)">
                             @if (working)

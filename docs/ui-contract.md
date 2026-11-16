@@ -108,7 +108,7 @@ that decides the surface.
 |---|---|---|---|
 | Chat shell | Chat | composition | `Pages/Home.razor` |
 | Thread scroller | Message Scroller | **EXCEPTION 1** | `Pages/Home.razor`, `wwwroot/tw.input.css` |
-| Output tabs | Tabs | bespoke, **debt C4** | `Pages/Home.razor` |
+| Output strip | Toggle Group | bespoke, **decision below** | `Pages/Home.razor` |
 | Message rows | Message | composition | `Ui/Ai/Message.razor` |
 | User prompt | Message + Bubble | composition | `Ui/Ai/Bubble.razor` |
 | Turn / steps | Chain of Thought | composition | `Ui/Ai/TraceCollapsible.razor` |
@@ -188,10 +188,10 @@ Recorded so a later reader does not mistake each of these for drift.
   unknown type keeps its humanized title and shows its payload without the
   `[HH:mm:ss]` stamp. The stamped line is machinery, and the generic branch is what
   a future event type reaches by default.
-- **The agent tab strip states that it scrolls.** One row never wraps (a second row
+- **The output strip states that it scrolls.** One row never wraps (a second row
   puts the underline on the wrong line), so when `scrollWidth > clientWidth` the
-  strip's trailing edge is masked and the selected tab is scrolled into view. The
-  class is `data-scrollable`; it is off when the tabs fit.
+  strip's trailing edge is masked and the selected button is scrolled into view.
+  The class is `data-scrollable`; it is off when the buttons fit.
 - **A cost line wraps between clauses, not inside one.** The footer is split on
   ` · ` into no-wrap spans, and the separator travels with the clause it precedes,
   so a wrapped footer reads `· cache 5120 read / 640 write` rather than ending a
@@ -228,6 +228,13 @@ Recorded so a later reader does not mistake each of these for drift.
   compose and `UiClassTests` pins them. The `!` escapes are gone from the
   components (`text-destructive`, `border-border`, `max-w-[68ch]`, and
   `PagePanel`'s spacing): the caller's class now wins on its own.
+- **The output strip is a labelled group of toggle buttons, not a tablist.**
+  `role="tab"` promised a keyboard contract the strip never kept (no roving
+  tabindex, no arrow keys), and a half-implemented tablist is worse for a screen
+  reader than an honest toggle: each button carries `aria-pressed`, Tab reaches
+  all of them, and the container is `role="group" aria-label="Output stream"`.
+  The trailing-edge mask and the scroll-into-view are unchanged. `.methodbar`
+  still declares tabs and is the remaining half of debt C4.
 
 ## Exception register
 

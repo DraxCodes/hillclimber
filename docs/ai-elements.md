@@ -79,7 +79,7 @@ Head, Header, Row), Tooltip, plus the `UiIcon` icon set and the `UiClass` joiner
 |---|---|---|
 | Message Scroller | the feed is a hand-rolled `column-reverse` scroller | C2 |
 | Suggestion | the empty state's chips are bespoke | C3 |
-| Tabs | `.methodbar` and `.outtabs` are hand-rolled tablists | C4 |
+| Tabs | `.methodbar` is a hand-rolled tablist | C4 |
 | Dialog, Sheet | the folder picker and mobile rail are bespoke `role="dialog"` | C5 |
 | Input, Input Group | folder, iterations and PIN are raw `<input>` | C6 |
 | Model Selector | one configured model per run; read-only by design (exception) | EXCEPTION 2 |

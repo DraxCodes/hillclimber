@@ -44,7 +44,7 @@ why a screenshot-scoring judge kept shipping.
 |---|---|---|---|---|
 | 1 | Chat shell | `<section data-slot="chat">` (`Home.razor:179`) | Chat | bespoke |
 | 2 | Transcript scroll | `.log` `column-reverse`, `.log-shell::before`, `.log-latest` | Message Scroller | missing |
-| 3 | Output tabs | `.outtabs` `role="tablist"` | Tabs | bespoke |
+| 3 | Output strip | `.outtabs` `role="group"` + `aria-pressed` | Toggle Group | bespoke |
 | 4 | Message rows | `Message` + `MessageContent` + `Markdown` | Message | clean |
 | 5 | User prompt | `Message Align="end"` + `Bubble` | Message | clean |
 | 6 | Turn / steps | `TraceCollapsible` + `TraceLine`, hand-composed | Chain of Thought | composed |
@@ -149,9 +149,11 @@ Chips are hand-built at `Home.razor:382` under a bespoke
 
 ### C4 - P1: no `Tabs`
 
-`.methodbar` (`Home.razor:80`) and `.outtabs` (`Home.razor:211`) both declare
-`role="tablist"` with hand-managed `aria-selected` and no roving tabindex or
-arrow keys: two half-implementations of one contract.
+`.methodbar` (`Home.razor:80`) still declares `role="tablist"` with hand-managed
+`aria-selected` and no roving tabindex or arrow keys. The output strip
+(`Home.razor:210`) no longer claims the tab contract: it is a labelled group of
+toggle buttons with `aria-pressed`, which is complete on its own. The remaining
+half of the debt is the method picker.
 
 ### C5 - P1: no `Dialog` / `Sheet`
 
@@ -300,7 +302,7 @@ scroll and keyboard behaviour across the whole panel.
 | C1 | Marker absent | **closed in 2a** |
 | C2 | Message Scroller absent, reverse DOM | 3 |
 | C3 | Suggestion absent | 3 |
-| C4 | Tabs absent, two ad-hoc tablists | 3 |
+| C4 | Tabs absent, methodbar ad-hoc tablist | 3 |
 | C5 | Dialog/Sheet absent | 3 |
 | C6 | Input/Input Group absent | 3 |
 | C7 | Model Selector - accepted exception | never |
