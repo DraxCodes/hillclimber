@@ -25,6 +25,23 @@ The gate is the 1–10 rubric in `docs/agents/hillclimb-rubric.md`:
 The score is the only iterate/stop signal. A green floor does not earn a ship; a
 number moving does not earn a ship.
 
+## Council workflow
+
+For a larger feature — one where the shape is worth more than the code — run a council
+before planning. Convene when **at least two** of these hold: a new user-facing surface; a
+new subsystem, protocol, dependency or transport; it crosses a seam (run, session, stream,
+storage); it is expensive to reverse; more than one design is credible; or the user asks.
+
+A council is **divergence**: whether to build, what it must feel like at 8/10, and which
+trade-off is accepted. Hillclimb is **convergence**: whether the built artifact is good
+enough. Security is a veto lens in both; the user decides value.
+
+`/council <proposal>` or the `council` skill. One artifact, `.scratch/<feature>/council.md`,
+which the spec links. The experience thesis travels into the spec, so the hillclimb gate
+later scores against intent plus the rubric rather than re-inventing it. Seat models and the
+`min80` routing floor are in the skill — a model whose sellers do not clear 80% off fails
+with a 404, so re-probe before swapping a seat.
+
 ## Working preferences
 
 Four standing preferences, chosen deliberately and recorded here so fresh sessions

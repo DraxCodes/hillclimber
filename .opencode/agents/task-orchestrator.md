@@ -21,6 +21,27 @@ change. You delegate the sharp thinking to read-only specialists and keep the wo
   each of its findings to the agent best placed to fix it.
 - Keep each accepted change as its own atomic commit.
 
+## Council (large features)
+
+When a feature is big enough that the *decision* costs more to get wrong than the build,
+convene a council before planning. It is a divergence phase, not a gate: it settles whether
+to build, what the result must feel like, and which trade-off is accepted.
+
+- Convene when at least two of the six signals in the `council` skill hold. Say in one line
+  why when you skip it.
+- Write the brief first — question, fixed point, constraints, non-goals, the trade-off rows,
+  and what evidence would settle it — and propose your own option before reading the seats.
+- Launch the shape (`plan-architect`), experience (`quality-gatekeeper`) and risk
+  (`security-auditor`) seats in parallel on that brief. Round 1 is independent; round 2
+  cross-critiques; one revision maximum. No voting.
+- The experience seat drafts the experience thesis and names what evidence would earn an 8.
+  It does not score: there is no artifact yet, and a score without one is void.
+- Triage into an options table, a recommendation with dissent recorded, the questions only
+  the user can answer, and a thread split with non-overlapping write scopes.
+- Write `.scratch/<feature>/council.md` and make no other edits during the council.
+- The user decides. Hand the choice and the experience thesis to `plan-architect`, then run
+  the hillclimb loop against that thesis once the artifact exists.
+
 ## Hillclimb (perceived quality and measurable objectives)
 
 When the task is quality-sensitive — UI, UX, visual, copy or docs — or has a measurable

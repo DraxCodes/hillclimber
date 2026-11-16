@@ -10,6 +10,52 @@
     "max_lines": 500,
     "max_bytes": 32768
   },
+  "provider": {
+    "surplus": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Surplus Intelligence",
+      "options": {
+        "baseURL": "https://api.surplusintelligence.ai/min80/v1",
+        "apiKey": "{env:SURPLUS_API_KEY}"
+      },
+      "models": {
+        "deepseek-v4.1-flash-1017": {
+          "name": "DeepSeek 4.1 Flash 1017 (Surplus)",
+          "limit": { "context": 250000, "output": 32000 }
+        },
+        "glm-5.3-flash": {
+          "name": "GLM 5.3 Flash (Surplus)",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 250000, "output": 32000 }
+        },
+        "qwen3.8-flash": {
+          "name": "Qwen 3.8 Flash (Surplus)",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 250000, "output": 32000 }
+        },
+        "claude-haiku-4.5": {
+          "name": "Claude Haiku 4.5 (Surplus)",
+          "tool_call": true,
+          "reasoning": false,
+          "limit": { "context": 200000, "output": 32000 }
+        },
+        "claude-sonnet-5": {
+          "name": "Claude Sonnet 5 (Surplus)",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 250000, "output": 32000 }
+        },
+        "claude-sonnet-4.6": {
+          "name": "Claude Sonnet 4.6 (Surplus)",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 250000, "output": 32000 }
+        }
+      }
+    }
+  },
   "permissions": [
     { "action": "shell", "resource": "*", "effect": "allow" },
     { "action": "read", "resource": "**/.env*", "effect": "ask" },
@@ -23,8 +69,6 @@
     { "action": "shell", "resource": "git clean *", "effect": "ask" },
 
     { "action": "skill", "resource": "*", "effect": "allow" },
-    { "action": "skill", "resource": "codebase-design", "effect": "deny" },
-    { "action": "skill", "resource": "documentation-and-adrs", "effect": "deny" },
     { "action": "skill", "resource": "setup-pre-commit", "effect": "deny" },
     { "action": "skill", "resource": "context-engineering", "effect": "deny" }
   ]
