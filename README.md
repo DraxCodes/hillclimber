@@ -214,6 +214,24 @@ node providers.mjs      # provider bar, approval copy, one /activity card per pr
 npm run surfaces
 ```
 
+### Development transcript fixture
+
+A UI pass or a review can start from the same recorded opencode run instead of a
+hand-written seed. The fixtures are real `opencode run --format json` event
+shapes (`ClimberWeb.Tests/Fixtures/*.jsonl`) replayed through the same
+`LogFormatter`/`LogGrouper` the page uses:
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = 'Development'
+$env:CLIMBER_SEED = '1'      # 'live' ends mid-turn; a path reads another fixture
+dotnet run --project ClimberWeb
+```
+
+The host is registered only in Development, `PlaybackRunService` refuses any
+other environment, and a playback host never drives opencode (starting a run
+tells you to unset `CLIMBER_SEED`). The fixture feeds the transcript only: the
+prompt bubble is page-local input state, so the heading stays "new run".
+
 The token-spending harness refuses (exit `2`) unless Surplus is the *only* configured
 provider and reports `connected`. The legacy keys always synthesise Surplus **and**
 OpenRouter, so pin the array to one entry before running it:

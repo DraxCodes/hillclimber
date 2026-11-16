@@ -17,7 +17,19 @@ builder.Services.AddRazorComponents()
 // observable) across page reloads and mobile reconnects: the general opencode run is the
 // default method, and the hillclimb loop wraps the same opencode step.
 builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
-builder.Services.AddSingleton<IRunService, RunService>();
+
+// A development-only transcript fixture, so a UI pass starts from the same recorded run
+// every time. The environment gate is checked here and again inside the fixture itself; a
+// Production host never registers it, even when CLIMBER_SEED is set.
+if (PlaybackRunService.IsEnabled(builder.Environment.IsDevelopment()))
+{
+    builder.Services.AddSingleton<IRunService>(
+        PlaybackRunService.FromEnvironment(builder.Environment.IsDevelopment(), builder.Environment.ContentRootPath));
+}
+else
+{
+    builder.Services.AddSingleton<IRunService, RunService>();
+}
 builder.Services.AddSingleton<IHillClimberService, HillClimberService>();
 builder.Services.AddSingleton<IFileBrowser, FileBrowser>();
 

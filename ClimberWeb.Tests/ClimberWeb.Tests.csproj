@@ -22,4 +22,10 @@
     <ProjectReference Include="..\ClimberWeb\ClimberWeb.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The committed playback fixtures: shipped beside the test assembly so the tests read
+         exactly the bytes the dev host replays. -->
+    <Content Include="Fixtures\**\*.jsonl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
