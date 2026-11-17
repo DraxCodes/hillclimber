@@ -1,7 +1,14 @@
 # Handoff — interactive model questions
 
-**Branch:** `feat/interactive-questions` (12 commits). `master` is back at `23be0ba`
-(`= origin/master`) and carries none of this. Nothing is pushed.
+> **Superseded in part (2026-11-17).** This file predates lane 7. The producer migration it lists
+> below as "deliberately NOT built" is now built and gated at **8/10** (`5f3798b`, `2f593fd`,
+> `3a8c1d0`) behind `Climber:Questions=serve` (still default `off`). See `plan.md` Lane 7 and
+> `verification.md` ("The producer turn", "After the first gate"). The row, persistence, lane 6
+> and the environment/traps sections below still stand.
+
+**Branch:** `feat/interactive-questions` (12 commits when this file was written; now 28 ahead of
+`23be0ba` including lane 7). `master` is back at `23be0ba` (`= origin/master`) and carries none of
+this. Nothing is pushed.
 
 **Where it stands:** the transport seam, the row, its evidence, and persistence are
 built, gated and committed. The live row scored **8/10 — Clean & Clear** (7 → 8); the
