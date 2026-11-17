@@ -25,8 +25,9 @@ builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 // too: a playback host never drives opencode, whichever method is chosen.
 var playback = PlaybackRunService.IsEnabled(builder.Environment.IsDevelopment());
 
-// Questions ride a per-run `opencode serve --stdio` child. Off unless Climber:Questions is
-// `serve`: the plain producer stays the default, so a typo or an unset key costs nothing.
+// Questions ride a per-run `opencode serve --stdio` child. Shipped `appsettings.json` sets
+// Climber:Questions to `serve`; an unset, empty or unrecognised value is `off`, so clearing the
+// key is a safe revert and a typo can never start a second process.
 builder.Services.AddSingleton<IQuestionChannelFactory>(sp =>
     QuestionTransport.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 

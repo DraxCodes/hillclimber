@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace ClimberWeb.Services;
 
-/// <summary>How a run gets its questions. The plain producer is the default.</summary>
+/// <summary>How a run gets its questions. The shipped config asks for the served producer.</summary>
 public enum QuestionTransportMode
 {
     /// <summary>No channel: every run is <c>opencode run --format json</c> only.</summary>

@@ -334,6 +334,12 @@ test: `OpenCodeFormClient.ListAsync` treats `404` as an empty list
 (`ListOfASessionThatDoesNotExistYetIsEmpty`), and `QuestionChannel` reconciles again when the
 event stream opens, closing the list/open race (`TheLiveStreamListsFormsCreatedBeforeItOpened`).
 
+**Decision (2026-11-17).** With the loop proved, the shipped `Climber:Questions` in
+`appsettings.json` is now `serve`, so a question is answerable by default. The parse is unchanged:
+an unset, empty or unrecognised value is still `off`, so removing the key is a safe revert and a
+typo still cannot start a second process. README's settings table and the spec's producer line
+carry the new default.
+
 **Still open**
 
 - A channel that fails to attach *after* the child started leaves a form unanswerable and the

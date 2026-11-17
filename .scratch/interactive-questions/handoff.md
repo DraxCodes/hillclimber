@@ -2,9 +2,11 @@
 
 > **Superseded in part (2026-11-17).** This file predates lane 7. The producer migration it lists
 > below as "deliberately NOT built" is now built and gated at **8/10** (`5f3798b`, `2f593fd`,
-> `3a8c1d0`) behind `Climber:Questions=serve` (still default `off`). See `plan.md` Lane 7 and
-> `verification.md` ("The producer turn", "After the first gate"). The row, persistence, lane 6
-> and the environment/traps sections below still stand.
+> `3a8c1d0`). It first shipped behind `Climber:Questions=serve` (default `off`); after the live
+> form turn was proved, the shipped `appsettings.json` was flipped to `serve` (2026-11-17), so the
+> "NOT built" line below is historical. See `plan.md` Lane 7 and `verification.md` ("The producer
+> turn", "The form turn", "After the first gate"). The row, persistence, lane 6 and the
+> environment/traps sections below still stand.
 
 **Branch:** `feat/interactive-questions` (12 commits when this file was written; now 28 ahead of
 `23be0ba` including lane 7). `master` is back at `23be0ba` (`= origin/master`) and carries none of

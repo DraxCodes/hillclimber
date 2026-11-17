@@ -26,12 +26,13 @@ on demand.
   run.
 - **Consent:** a form is not a permission. `permission.asked` never reaches the row. An answer is
   data to the model; no click executes a filesystem, tool or app action.
-- **Producer:** `opencode run --format json` stays the default. `Climber:Questions = serve` moves
-  *both* halves of a run onto one `opencode serve --stdio` child: the producer maps the served
-  events back into the same JSON lines, and the question channel subscribes to that same child.
-  One child is not a detail — a form is process-local to the server that created it, so a second
-  server could never see the run's forms. Why a flag: flipping every run onto serve is a producer
-  migration worth reverting on its own, and `off` keeps the CLI path byte-for-byte.
+- **Producer:** `Climber:Questions = serve` is the shipped default (set in `appsettings.json`)
+  and moves *both* halves of a run onto one `opencode serve --stdio` child: the producer maps
+  the served events back into the same JSON lines, and the question channel subscribes to that
+  same child. One child is not a detail — a form is process-local to the server that created it,
+  so a second server could never see the run's forms. Why a flag: the switch is a producer
+  migration worth reverting on its own, and `off` (or an unset or unrecognised value) keeps the
+  CLI path byte-for-byte.
 - **Non-goals:** multiple simultaneous runs; a general permission UI; replacing or bypassing the
   composer; editing an answer after send.
 

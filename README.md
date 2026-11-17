@@ -192,7 +192,7 @@ Surplus/OpenRouter pair from the legacy keys below.
 | `Climber:DefaultFolder` | user profile | Folder shown in the target picker. |
 | `Climber:DefaultAgent` | `task-orchestrator` | Agent to run when the target provides one. |
 | `Climber:SessionsPath` | `%APPDATA%/ClimberWeb/sessions` | Where session transcripts are stored. One JSON file per session. |
-| `Climber:Questions` | `off` | `serve` moves the whole run onto one `opencode serve --stdio` child — the producer feeds the transcript from its event stream, and the question channel subscribes to that same child, so a question the run asks is answerable instead of cancelled. `off` (or any other value) keeps the plain `opencode run --format json` producer. |
+| `Climber:Questions` | `serve` | `serve` moves the whole run onto one `opencode serve --stdio` child - the producer feeds the transcript from its event stream, and the question channel subscribes to that same child, so a question the run asks is answerable instead of cancelled. `off` (or an unset or unrecognised value) keeps the plain `opencode run --format json` producer; the shipped `appsettings.json` sets `serve` explicitly, so removing the key is the way back. |
 
 Legacy provider keys remain aliases when `Climber:Providers` is absent:
 
