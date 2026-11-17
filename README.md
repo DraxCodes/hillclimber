@@ -342,7 +342,7 @@ Scroll math at 75% line is the open gap). The token-spending `surfaces.mjs` harn
 
 The project-agnostic agent workflows — council, hillclimb, grilling, handoff, the
 security lens and the 1–10 rubric — are a pinned, vendored copy of the
-`drax-ai-workflow` base. The seam is
+[`drax-ai-workflow`](https://github.com/DraxCodes/drax-ai-workflow) base. The seam is
 [`.opencode/workflow.json`](.opencode/workflow.json); the ownership split, the
 daily commands and update/eject are in [`.opencode/README.md`](.opencode/README.md).
 This repo's additions live in the seam, `scripts/ui`, the design docs and the
