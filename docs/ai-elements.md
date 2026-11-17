@@ -62,6 +62,7 @@ Shared presentation types are in `Ai/AiTypes.cs`: `PlanStep`, `SourceLink`.
 | Plan | `AiPlan.razor` | `Trace` of `TraceLine` steps with a done-of-total description |
 | Task | `AiTask.razor` | nested `Trace` of steps; receives no steps today (debt D2) |
 | Sources | `AiSources.razor` | `Trace` of links, newest first |
+| Question | `AiQuestion.razor` | `Trace` + `TraceCollapsible` + `Button`; a radiogroup of option rows with roving tabindex and one commit path, `QuestionOptionRow.razor` for the element reference |
 
 **Chain of Thought** is not a file: the turn chrome is composed inline in
 `Pages/Home.razor` (`TraceCollapsible` around a summary line, with the turn's rows
@@ -84,7 +85,7 @@ Head, Header, Row), Tooltip, plus the `UiIcon` icon set and the `UiClass` joiner
 | Dialog, Sheet | the folder picker and mobile rail are bespoke `role="dialog"` | C5 |
 | Input, Input Group | folder, iterations and PIN are raw `<input>` | C6 |
 | Model Selector | one configured model per run; read-only by design (exception) | EXCEPTION 2 |
-| Queue, Context, Checkpoint, Confirmation, File Tree, Stack Trace, Test Results, Attachment, Questionnaire | the events or metadata are not emitted by `opencode run`, or the surface does not exist | - |
+| Queue, Context, Checkpoint, Confirmation, File Tree, Stack Trace, Test Results, Attachment | the events or metadata are not emitted by `opencode run`, or the surface does not exist | - |
 
 The working indicator has no element in the catalogue; a `TraceLine`-shaped row
 with `role="status"` is the recorded exception (EXCEPTION 3).

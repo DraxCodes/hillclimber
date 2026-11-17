@@ -44,31 +44,38 @@ first.
 
 ## Lane 3 — surface (`ClimberWeb/Components/Ui/` + minimal `Home.razor`)
 
-- [ ] **3.1** `Ui/Ai/QuestionView.cs` (pure): state → copy, kind label, classes,
+- [x] **3.1** `Ui/Ai/QuestionView.cs` (pure): state → copy, kind label, classes,
   `FirstOptionLabel`, `IsInteractive`.
   *Tests:* every copy string exactly; a 60-char label renders verbatim; no string contains
-  `permission`, `allow` or `deny`.
-- [ ] **3.2** `Ui/Ai/AiQuestion.razor`: `Trace`/`TraceLine`/`TraceTitle`/`TraceCollapsible`/
+  `permission`, `allow` or `deny`. (`QuestionViewTests`, 15 cases.)
+- [x] **3.2** `Ui/Ai/AiQuestion.razor`: `Trace`/`TraceLine`/`TraceTitle`/`TraceCollapsible`/
   `Button`; `role="radiogroup"` + `radio` rows with roving tabindex, `aria-checked`,
-  `aria-busy`; answered disclosure; `dismiss`/`check` as `Button Variant="outline" Size="xs"`.
-  Add the surface-map row and a Phase 2i decision block to `docs/ui-contract.md`.
+  `aria-busy`; answered disclosure; `dismiss`/`check` as `Button Variant="outline" Size="xs"`
+  overridden to a micro mono chip (`border-border`, 11px) so the action does not outrank the
+  notice it belongs to.
+  Add the surface-map row and a Phase 2i decision block to `docs/ui-contract.md`. *(both written)*
   *Test:* none renderable; the decision block is what the provenance probe reads.
-- [ ] **3.3** `Home.razor` hook: one `OutputItemKind.Question` branch keyed by form id,
-  `ElementReference`s for the first option and the composer, focus on arrival / back on settle,
+- [x] **3.3** `Home.razor` hook: one `OutputItemKind.Question` branch keyed by form id,
+  `ElementReference`s for the options, focus on arrival / back on settle,
   one `role="status"` announcement, `StatusText` override `awaiting answer`.
   *Test:* build; the read-through is the evidence.
+  *Fix found by the read-through:* the row's own `OnAfterRenderAsync(firstRender)` ran before the
+  option rows reported their `ElementReference`, so arrival focus never moved. The row now focuses
+  on the first render pass that has a reference; the announcement was already true.
 
-## Lane 3.5 — dev stimulus (part of lane 3's evidence, `[free]`)
+## Lane 3.5 — dev evidence (replaces the runtime stimulus; `[free]`)
 
-- [ ] **3.5.1** `IQuestionStimulus` + scenario host, `Development` only:
-  `CLIMBER_QUESTIONS=pending,boolean,unsupported,restored`. Uses a fake channel so the real
-  submit → fold path runs; the answer is recorded, not sent.
-- [ ] **3.5.2** One throwaway timed arrival hook for the focus-move capture, marked
-  `// THROWAWAY SEED`, removed before the score.
-- [ ] **3.5.3** `scripts/ui/questions.mjs`: asserts the row, `radiogroup`, roving tabindex,
-  ArrowDown, Enter commit, `aria-expanded`, `scrollWidth <= clientWidth` at 375; writes the
-  16 shots.
-- [ ] **3.5.4** `README.md`: one row for `CLIMBER_QUESTIONS`, dev-only.
+- [x] **3.5.1** Committed replay seed instead of a scenario switch:
+  `ClimberWeb.Tests/Fixtures/questions.jsonl`, five row states replayed through the real
+  formatter and grouper by `CLIMBER_SEED=questions.jsonl`, pinned by
+  `PlaybackFixtureTests.TheQuestionsFixtureReachesEveryRowState`.
+- [x] **3.5.2** Throwaway Playwright probes in the temp `climb-ui` folder (focus, keyboard,
+  pointer, computed style, aria). No timed arrival hook was needed: a seeded row arrives as data,
+  so the focus move could be captured against the real render.
+- [ ] **3.5.3** `IQuestionStimulus` (runtime arrival, fake channel, recorded answer) moved to
+  lane 6 — it is the groundwork for the live-app lane, not evidence for this row.
+- [x] **3.5.4** No new `README.md` row: the seed rides the documented `CLIMBER_SEED`, which is a
+  fixture switch that already exists rather than a new one.
 
 ## Lane 4 — persistence
 
@@ -113,10 +120,10 @@ anything not run as "not run".
 
 - [x] 0.1 spec + plan
 - [x] 2.1–2.6 seam, supervisor, client, channel, wiring, flag
-- [ ] floor: build + `dotnet test`
-- [ ] 3.1–3.3 row, contract block, `Home.razor` hook
-- [ ] 3.5 dev stimulus + `questions.mjs` + 16 shots
-- [ ] floor: build + `dotnet test` + theme-nav + security + providers
+- [x] floor: build + `dotnet test` (700/700)
+- [x] 3.1–3.3 row, contract block, `Home.razor` hook
+- [x] 3.5.1–3.5.2, 3.5.4 committed replay seed + probes (3.5.3 → lane 6)
+- [x] floor: build + `dotnet test` + theme-nav + security + providers + polish (100, 0/560)
 - [ ] hillclimb gate: score 8 on pending + answered + unsupported at 900/375, both themes
 - [ ] 4.1–4.3 persistence
 - [ ] 5.1–5.2 committed seed + evidence note

@@ -157,16 +157,25 @@ falls back to `key`.
 ## Dev and test seam
 
 The row must be testable without a model turn and without tokens, and the same seam must serve
-the future live-app harness. Therefore:
+the future live-app harness. This pass built the second half only:
 
-- `IQuestionStimulus` (dev-only, `ClimberWeb/Services/`) exposes `Emit(QuestionState)` and
-  `Reset()`. It is registered only under `Development`, never in a production host.
-- Today it is driven by `CLIMBER_QUESTIONS=<scenario>` at startup, and by a throwaway timed
-  arrival hook while the focus move is captured. The scenario host uses a fake channel so the
-  real `AnswerQuestionAsync` → fold path runs; the answer is recorded, not sent.
+- **Built now — a committed replay seed.** `ClimberWeb.Tests/Fixtures/questions.jsonl` is replayed
+  through the real `LogFormatter` and `LogGrouper` by the existing `CLIMBER_SEED` host, so the row
+  can be studied in every state it has (pending, answered, cancelled, stale, unsupported) without
+  a model turn, a channel or a token. `PlaybackFixtureTests` pins the states it must reach, so the
+  evidence cannot rot silently.
+- **Deferred — the runtime stimulus.** `IQuestionStimulus` (dev-only `Emit(QuestionState)` /
+  `Reset()`, registered only under `Development`) is lane 6, not this pass: a question that
+  arrives mid-turn, answered against a fake channel so the real `AnswerQuestionAsync` → fold path
+  runs and the answer is recorded rather than sent. A replay cannot exercise that, and building
+  it now would add a dev-only surface before the live-app lane that needs it exists.
 - No HTTP test route and no MCP server in this pass. The seam is runtime-callable by design, so
   the future live-app lane can add a dev-only endpoint and an MCP sidecar without changing the
   row or the channel.
+- **Consequence, recorded as evidence, not as a flaw:** in the replay host a click on an option
+  is inert. `PlaybackRunService.AnswerQuestionAsync` returns `Disconnected` and nothing publishes
+  `Submitting`, so the row only changes when a real channel is attached. The submit path is
+  covered by the transport gate and the live round-trip in `verification.md`.
 - **Future lane (not built now):** `dotnet watch` keeps the app up; a dev-only control endpoint
   pushes questions and activity; an MCP sidecar exposes `emit_question`, `answer`,
   `read_transcript`, `screenshot`. ACP is not part of this: it is the app↔opencode transport,

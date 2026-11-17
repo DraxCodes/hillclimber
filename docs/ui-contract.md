@@ -127,6 +127,7 @@ that decides the surface.
 | Composer | Prompt Input | port, **debt C6** | `Ui/Ai/PromptInput.razor` |
 | Method / provider pick | Toggle Group | bespoke, **decision in Phase 2c** | `Pages/Home.razor` |
 | Model chip | Model Selector | **EXCEPTION 2** | `Ui/Ai/PromptInput.razor` |
+| Model question | - (no element) | composition, **decision in Phase 2i** | `Ui/Ai/AiQuestion.razor` |
 
 Debt IDs refer to the register in the audit (section 9). A debt ID is not an
 exception: it is a known gap scheduled for a phase, and it does not license new
@@ -351,6 +352,48 @@ Post-score refinements, scored against the 8 already on the board.
 - **History's spend names the whole conversation.** A stored session is not one run
   or one climb, so its figure reads `spent $0.31 this session`; the live band keeps
   `this run` / `this climb`, and the noun still drops below `sm`.
+
+### Phase 2i decisions
+
+- **A question is a trace row, not a card.** AI Elements has no element for a model
+  question, and the transcript's own language is already a trace: a glyph, a title,
+  a quiet meta line. So the row is composed from `Trace`/`TraceLine`/`TraceTitle`/
+  `TraceCollapsible`/`Button`. A new bordered card would be the only boxed object in
+  a feed of lines, which reads as a system dialog in the middle of a conversation.
+- **Only pending takes the edge.** A waiting question is the one thing below the
+  band that is at answer weight: a 2px `border-primary` leading edge, the model's
+  question verbatim in sans at 16px/500, options as rows beneath. The edge is the
+  live accent because the run is waiting on the reader, not working; nothing else in
+  the transcript borrows it, so "the run is blocked here" is legible at a glance.
+- **One commit, whichever hand gives it.** The options are a `radiogroup` of
+  `role="radio"` buttons with a roving tabindex; Enter and Space arrive as the
+  button's own click, so pointer and keyboard call the same handler exactly once.
+  The `›` gutter marks the row the keyboard is on and is `aria-hidden`, so the
+  accessible name is the label alone.
+- **Arrival moves focus, and says so.** A question that appears while the reader is
+  looking elsewhere is a silent state change, so the first option takes focus on the
+  render after its element is registered and a `role="status"` line announces
+  `question from the run · focus moved to <first label>`. The row's own after-render
+  retries rather than trusting one pass: the parent renders before its option rows
+  report their `ElementReference`.
+- **A settled question keeps the glyph.** `answered:` folds into a `TraceLine` with
+  the `message` icon; `cancelled`, `no answer sent` and `questions unavailable` keep
+  that same glyph and a micro line, so a question that ended still reads as a
+  question instead of a stray sentence of prose. An unsupported answer keeps `asks:`
+  and offers `dismiss`, because it is still a live ask that cannot be answered here.
+- **`dismiss` is a micro chip, not the outline keycap.** The port's `outline` variant
+  draws a bare `border`, and preflight is off, so `border` resolves to `currentColor`
+  and renders near-black. In a row of micro mono lines that box would outrank the
+  notice it belongs to; the row passes `border-border` and 11px mono so the one
+  control sits at the row's own scale and is still visibly a control.
+- **The band word is a view override.** While a question waits, the band reads
+  `awaiting answer`; the key stays `running`, so the dot and the accent keep saying
+  "the run is live" and the word says what it is live on. A second status state
+  would have needed a second dot colour for one transient word.
+- **An answer is data, never an app action.** The row sends a listed option's
+  `value` back through the run seam; there is no free text, no `allow`/`deny`, and
+  nothing a click can execute. The copy tables in
+  `.scratch/interactive-questions/spec.md` pin every string the row can show.
 
 ## Exception register
 

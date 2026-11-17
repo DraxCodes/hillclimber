@@ -1,0 +1,57 @@
+@using Microsoft.AspNetCore.Components.Web
+@using ClimberWeb.Components.Ui.Ai
+
+@* One option in a question row. It is its own component only so the parent can hold an
+   ElementReference to it for roving focus; visually it is just the option button. *@
+<button type="button"
+        role="radio"
+        aria-checked="@(Chosen ? "true" : "false")"
+        tabindex="@(Focused ? 0 : -1)"
+        data-slot="question-option"
+        data-chosen="@(Chosen ? "true" : null)"
+        class="group flex w-full min-w-0 cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-left font-sans text-sm text-foreground/90 outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-60"
+        disabled="@Disabled"
+        @ref="_element"
+        @onfocus="OnFocus"
+        @onclick="OnCommit"
+        @onkeydown="OnKeyDown">
+    <span aria-hidden="true" class="w-3 shrink-0 pt-0.5 font-mono text-[0.68rem] text-primary">@(Focused && !Disabled ? "›" : string.Empty)</span>
+    <span class="min-w-0 break-words">
+        @Option.Label
+        @if (!string.IsNullOrWhiteSpace(Option.Description))
+        {
+            <span class="block text-[0.72rem] text-muted-foreground">@Option.Description</span>
+        }
+    </span>
+</button>
+
+@code {
+    [Parameter, EditorRequired] public QuestionOptionView Option { get; set; } = default!;
+
+    [Parameter] public bool Chosen { get; set; }
+
+    [Parameter] public bool Focused { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public EventCallback OnCommit { get; set; }
+
+    [Parameter] public EventCallback OnFocus { get; set; }
+
+    [Parameter] public EventCallback<KeyboardEventArgs> OnKeyDown { get; set; }
+
+    /// <summary>Tells the parent where this row's element is, once it is in the DOM.</summary>
+    [Parameter] public EventCallback<ElementReference> Registered { get; set; }
+
+    private ElementReference _element;
+    private bool _registered;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_registered)
+        {
+            _registered = true;
+            await Registered.InvokeAsync(_element);
+        }
+    }
+}

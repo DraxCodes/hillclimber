@@ -396,8 +396,11 @@
         min-width: 0;
     }
 
+    /* A question is an object in the conversation like a message, not a row of the turn
+       above it: it takes the group step so the row's own 2px edge starts a block. */
     .log-item[data-kind="turn"],
-    .log-item[data-kind="message"] {
+    .log-item[data-kind="message"],
+    .log-item[data-kind="question"] {
         margin-block-start: 1rem;
     }
 
