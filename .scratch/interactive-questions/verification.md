@@ -279,7 +279,68 @@ child. Raising a form needs the model to call the form tool, which this prompt d
 The single-child invariant is covered by `ServeProducerWiringTests` (a borrowed child is never
 disposed), and form create/reply/cancel against a real child are already covered by the guarded
 live tests in `OpenCodeFormClient`/`QuestionChannel`. The end-to-end form path needs a run that
-happens to ask a question; it is not simulated.
+happens to ask a question; it is not simulated. (The form turn below settles it live.)
+
+## The form turn (2026-11-17)
+
+One approved live turn with `Climber__Questions=serve`, against a scratch folder holding
+`Alpha.cs` and `Beta.cs`. The prompt forced the installed server's own `question` tool: one
+question, header "Which file?", two options "Alpha.cs" and "Beta.cs", nothing else until an
+answer, then one sentence naming the chosen file.
+
+**What the host log shows, in order:**
+
+```
+[18:12:27] $ opencode serve --stdio · POST /api/session/ses_9010…/prompt "Use the question tool…"
+[18:12:31] {"type":"tool_use","part":{"tool":"question","state":{"status":"running",…}}}
+[18:12:31] {"type":"climber.question",…"title":"Which of these two files should I edit?",
+            "fieldKey":"q0","kind":"Choice","status":"Pending"}
+[18:13:06] {"type":"climber.question",…"chosenValue":null,"status":"Submitting"}
+[18:13:06] {"type":"climber.question",…"chosenValue":"Alpha.cs","status":"Answered"}
+[18:13:06] {"type":"tool_use","part":{"tool":"question","state":{"status":"completed",
+            "output":"User has answered your questions: \"Which of these two files should I
+            edit?\"=\"Alpha.cs\". You can now continue with the user's answers in mind."}}}
+[18:13:07] {"type":"text","part":{"text":"You chose Alpha.cs."}}
+[18:13:07] ===== Completed =====
+```
+
+**Settled by this turn**
+
+- A served run's `question` tool call becomes a real `form.created` on the shared child, and
+  the channel attaches: no `[questions unavailable: …]` line, no `non-interactive` copy, no
+  `cancelled · no answer sent`.
+- The row's title is the field `description` (the complete question), not the form title
+  `Questions` — the `FieldDisplay` precedence works against a real payload.
+- A UI answer reaches opencode: `204`, then the authoritative `form.replied`, then the tool
+  result the model sees, then the run continues and completes instead of cancelling.
+- The model names the chosen file, so the answer that crossed the wire is the one the reader
+  clicked (`Alpha.cs`, the first option).
+
+**How the answer was given, exactly.** A click in the headed dev window, 35 s after the row
+appeared. The headless probe that was supposed to click it never observed a `pending` row: its
+`[data-slot="question"][data-state="pending"]` wait timed out even though the row was live (the
+host log proves the state) and the same row rendered answered on that page once the run ended.
+The probe is therefore **not** evidence for the click, and its timeout is not evidence of a
+product defect — but it is unexplained, so it is recorded rather than dismissed. The screenshot
+in this folder of the completed run (`%TEMP%\climb-ui\form-proof-shots\99-failure.png`) shows
+`answered: Alpha.cs`, no pending-form copy, and `You chose Alpha.cs.`; the live *pending* row's
+appearance is the seeded capture listed in `evidence.md`, not a live screenshot.
+
+**What the first attempt found (and fixed).** The same turn run before these fixes failed: the
+first form list returned `404` for a session the server had not surfaced yet, the channel threw,
+and the transcript said `[questions unavailable: the question channel did not attach
+(HttpRequestException)]` while the form sat unanswerable. Two fixes followed, each with a free
+test: `OpenCodeFormClient.ListAsync` treats `404` as an empty list
+(`ListOfASessionThatDoesNotExistYetIsEmpty`), and `QuestionChannel` reconciles again when the
+event stream opens, closing the list/open race (`TheLiveStreamListsFormsCreatedBeforeItOpened`).
+
+**Still open**
+
+- A channel that fails to attach *after* the child started leaves a form unanswerable and the
+  run waiting; by spec the run is not failed. Not observed live, not fixed.
+- The probe's pending-state blindness above. The next automated attempt should poll on a timer
+  (`waitForFunction(…, { polling: 250 })`) and assert on the row element it captured, instead of
+  relying on default `raf` polling and a fresh `querySelector`.
 
 ## After the first gate (7/10)
 
