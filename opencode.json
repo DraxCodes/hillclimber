@@ -65,11 +65,11 @@
       "permissions": [{ "action": "edit", "resource": "*", "effect": "deny" }]
     },
     "quality-gatekeeper": {
-      "model": "surplus/deepseek-v4.1-flash-1017#medium",
+      "model": "surplus/glm-5.3-flash#medium",
       "permissions": [{ "action": "edit", "resource": "*", "effect": "deny" }]
     },
     "security-auditor": {
-      "model": "surplus/deepseek-v4.1-flash-1017#medium",
+      "model": "surplus/claude-sonnet-5#medium",
       "permissions": [{ "action": "edit", "resource": "*", "effect": "deny" }]
     }
   },
