@@ -175,6 +175,36 @@ public class QuestionContractTests
     }
 
     [Fact]
+    public void QuestionToolFormShowsTheCompleteQuestion()
+    {
+        // The installed server's question tool titles every form "Questions" and sends the real
+        // ask in the field description, with a 30-char header as the field title. The row must
+        // show the complete question, not the container's title.
+        var state = QuestionSupport.FromForm(Form("""
+            {"id":"frm_3","sessionID":"ses_1","title":"Questions","fields":[
+              {"key":"q0","type":"string","title":"Which file?",
+               "description":"Which of these two files should I edit?","custom":true,
+               "options":[{"value":"Alpha.cs","label":"Alpha.cs"},{"value":"Beta.cs","label":"Beta.cs"}]}]}
+            """));
+
+        Assert.Equal("Which of these two files should I edit?", state.Title);
+        Assert.Equal("q0", state.FieldKey);
+        Assert.Equal(QuestionKind.Choice, state.Kind);
+        Assert.Equal(QuestionStatus.Pending, state.Status);
+        Assert.Equal(2, state.Options.Count);
+    }
+
+    [Fact]
+    public void FormTitleStillBeatsTheFieldHeaderWhenThereIsNoDescription()
+    {
+        var spec = QuestionSupport.Classify("Keep the live dot?", Fields("""
+            [{"key":"q0","type":"boolean","title":"band"}]
+            """));
+
+        Assert.Equal("Keep the live dot?", spec.Title);
+    }
+
+    [Fact]
     public void FromFormMarksUnsupportedShapesTerminal()
     {
         var state = QuestionSupport.FromForm(Form("""

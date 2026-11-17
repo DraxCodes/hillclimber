@@ -107,6 +107,7 @@ public static class QuestionSupport
     /// Classifies <paramref name="fields"/> for a form titled <paramref name="formTitle"/>.
     /// Exactly one <c>string</c> field with options is a choice; exactly one <c>boolean</c> is
     /// a boolean; everything else is unsupported and carries the kind label the notice uses.
+    /// The row's line for a single field is chosen by <see cref="FieldDisplay"/>.
     /// </summary>
     public static QuestionSpec Classify(string? formTitle, JsonElement fields)
     {
@@ -137,8 +138,7 @@ public static class QuestionSupport
 
         var field = list[0];
         var fieldKey = ReadKey(field);
-        var fieldTitle = ReadString(field, "title");
-        var display = title ?? (string.IsNullOrWhiteSpace(fieldTitle) ? fieldKey : fieldTitle);
+        var display = FieldDisplay(field, fieldKey, title);
         var type = ReadString(field, "type") ?? string.Empty;
 
         // A hidden field, or one whose visibility depends on another field, is not answerable
@@ -189,6 +189,25 @@ public static class QuestionSupport
             spec.Kind == QuestionKind.Unsupported ? QuestionStatus.Unsupported : QuestionStatus.Pending,
             null,
             spec.KindLabel);
+    }
+
+    /// <summary>
+    /// The one line the row shows for a form's single field. The field's own description wins
+    /// because the installed server's question tool titles every form <c>Questions</c> and puts
+    /// the real ask there; with no description the form's title stays the question, as it was
+    /// before, and only then does the field's short title or key stand in.
+    /// </summary>
+    private static string FieldDisplay(JsonElement field, string key, string? formTitle)
+    {
+        foreach (var candidate in new[] { ReadString(field, "description"), formTitle, ReadString(field, "title") })
+        {
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return key;
     }
 
     private static QuestionSpec StringSpec(JsonElement field, string key, string title)

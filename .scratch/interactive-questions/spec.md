@@ -118,8 +118,10 @@ and `DismissQuestionAsync(formId)`, plus the read-only `CheckQuestionAsync(formI
 **Support matrix (`QuestionSupport.Classify`, enforced where the reply is sent):** one field,
 `type == "string" && options.Count > 0` → `Choice`; `type == "boolean"` → `Boolean`; anything
 else → `Unsupported` + kind label. A choice reply sends the option **`value`**, never the label
-— even when `custom: true`, because free text stays the composer's job. An empty field title
-falls back to `key`.
+— even when `custom: true`, because free text stays the composer's job. The row's line is the
+field's own `description` when it has one (the installed server's `question` tool titles every
+form `Questions` and puts the complete question there), else the form title, else the field
+title, else `key`.
 
 ## Transport supervision
 
