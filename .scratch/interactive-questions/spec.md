@@ -128,8 +128,10 @@ falls back to `key`.
 - Read stdout until the URL line parses; 10 s budget, then kill the tree.
 - `HttpClient` per child with `Authorization: Basic base64("opencode:" + password)`.
 - `GET /api/event` with `ResponseHeadersRead` and an infinite timeout; parse `data:` frames.
-  Dispatch an **allowlist**: `form.created`, `form.replied`, `form.cancelled`. Everything else,
-  including `permission.asked`, is dropped before any state or line.
+  Every frame's JSON carries `type` and `data` (opencode leaves the SSE `event:` field empty),
+  and every REST payload is wrapped in `{"data":…}`. Dispatch an **allowlist**:
+  `form.created`, `form.replied`, `form.cancelled`. Everything else, including
+  `permission.asked`, is dropped before any state or line.
 - On every connect, `GET /api/session/{id}/form` and render pending forms `Stale`.
 - Reconnect 250 ms → 2 s → 5 s cap; five failures in 60 s → `Unavailable`; a silent 60 s stream
   reconnects silently.

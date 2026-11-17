@@ -158,3 +158,18 @@ than a model turn.
   settled state, and `409`/`400` as terminal failure of that submit — never as "still pending".
 - Restored pending forms must render closed: the list endpoint is the restore path and it
   carries no "this was live a moment ago" signal.
+
+### Addendum — wire envelopes observed (2026-11-17)
+
+A second probe, still without model tokens, captured the exact JSON shapes the client parses:
+
+1. **No `event:` field.** Every SSE line is `data: {…}`; the event name is the JSON's `type`
+   (`server.connected`, `form.created`, `form.cancelled`, …), and its payload is `data`.
+   A parser that waits for `event:` frames would never fire.
+2. **REST replies are enveloped.** `POST /api/session` answers `{"data":{…session…}}`,
+   `POST /api/session/{id}/form` answers `{"data":{…form…}}`, so the client unwraps one
+   `data` layer before reading a form.
+3. `form.created` carries `data.form` (the same `Form.Info` the create call returned);
+   `form.cancelled` carries only `{"id","sessionID"}`.
+4. `DELETE` of a pending form makes `GET .../form/{id}` report
+   `state: {"status":"cancelled"}`, so a recheck can settle a dismissed row.

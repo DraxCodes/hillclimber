@@ -177,6 +177,7 @@ public class OpenCodeServeTests
     /// Returns early when <c>opencode</c> is not on this machine's PATH.
     /// </summary>
     [Fact]
+    [Trait("Live", "true")]
     public async Task LiveChildBindsLoopbackAndRequiresItsPassword()
     {
         if (ProcessCommandRunner.FindOnPath("opencode") is null)
