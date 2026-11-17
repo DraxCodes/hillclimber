@@ -15,7 +15,7 @@ import {
   readManifest,
   renderBlock,
 } from "./manifest.mjs";
-import { planCheck, planEject, planInit, planUpdate } from "./plan.mjs";
+import { planCheck, planEject, planInit, planUpdate, listExtraFiles } from "./plan.mjs";
 import { SEAM_REL, defaultSeam, loadSeam, validateSeam } from "./seam.mjs";
 
 const REPEATABLE = new Set(["free", "paid", "pack"]);
@@ -117,15 +117,15 @@ function initCommand(flags) {
   const project = flags.project ?? basename(target);
 
   const seam = defaultSeam({ project, baseVersion: version });
-  if (flags.build) seam.checks.build = { command: flags.build, cwd: flags.buildCwd ?? "." };
-  if (flags.test) seam.checks.test = { command: flags.test, cwd: flags.testCwd ?? "." };
+  if (flags.build) seam.checks.build = { command: flags.build, cwd: "." };
+  if (flags.test) seam.checks.test = { command: flags.test, cwd: "." };
   seam.checks.free = toArray(flags.free).map((command) => ({
     command,
-    cwd: flags.freeCwd ?? ".",
+    cwd: ".",
   }));
   seam.checks.paid = toArray(flags.paid).map((command) => ({
     command,
-    cwd: flags.paidCwd ?? ".",
+    cwd: ".",
   }));
   if (flags.surface) seam.verify.surface = flags.surface;
   if (flags.seed) seam.verify.seed = flags.seed;
@@ -135,8 +135,6 @@ function initCommand(flags) {
   if (flags.glossary) seam.docs.glossary = flags.glossary;
   if (flags.adr) seam.docs.adr = flags.adr;
   if (flags.rubricAddendum) seam.docs.rubricAddendum = flags.rubricAddendum;
-  if (flags.contract) seam.docs.contract = flags.contract;
-  if (flags.artDirection) seam.docs.artDirection = flags.artDirection;
   seam.packs = packs;
 
   const { errors } = validateSeam(seam);
@@ -183,6 +181,7 @@ function initCommand(flags) {
     `Initialized ${project} at ${target} with opencode-workflows ${version}.`,
   );
   console.log(`  files: ${result.written.length} written, ${result.deleted.length} removed`);
+  console.log(`  diff: +${result.written.length} -${result.deleted.length}`);
   if (result.backupDir) console.log(`  backup: ${result.backupDir}`);
   console.log("\nNext:");
   console.log(`  1. Fill .opencode/workflow.json (checks, verify, docs).`);
@@ -256,6 +255,9 @@ function checkCommand(flags) {
   if (result.clean.length > 0) console.log(`  clean: ${result.clean.length} files`);
   for (const file of result.changed) console.log(`  changed: ${file}`);
   for (const file of result.missing) console.log(`  missing: ${file}`);
+  for (const file of result.extra) {
+    console.log(`  extra: ${file} (not owned; project addition or stale)`);
+  }
   for (const problem of problems) console.log(`  ✗ ${problem}`);
 
   const bad =
@@ -321,11 +323,15 @@ function ejectCommand(flags) {
     printReport("Refusing to eject:", { errors: plan.conflicts });
     return 1;
   }
+  const extra = listExtraFiles(target, manifest);
   const result = applyPlan(target, plan, { dryRun: Boolean(flags.dryRun) });
   if (flags.dryRun) return 0;
   console.log(`Ejected opencode-workflows ${manifest.version}.`);
   console.log(`  removed: ${result.deleted.length} files`);
   console.log(`  left in place: ${SEAM_REL} (the project seam)`);
+  for (const file of extra) {
+    console.log(`  left in place: ${file} (not owned by the base)`);
+  }
   return 0;
 }
 
@@ -422,8 +428,17 @@ export function run(argv = process.argv.slice(2)) {
       case "--version":
       case "-v": {
         const root = sourceRoot(flags);
-        console.log(root ? readVersion(root) : "unknown (vendored)");
-        return 0;
+        if (root) {
+          console.log(readVersion(root));
+          return 0;
+        }
+        const manifest = readManifest(resolve(flags._[0] ?? "."));
+        if (manifest) {
+          console.log(manifest.version);
+          return 0;
+        }
+        console.log("unknown (no base checkout and no manifest)");
+        return 1;
       }
       case undefined:
       case "help":

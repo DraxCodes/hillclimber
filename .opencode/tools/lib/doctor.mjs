@@ -35,11 +35,14 @@ function readJson(file) {
 
 function checkDocs(seam, projectDir, errors, warnings, notes) {
   if (!seam.docs) return;
+  const required = ["issues", "adr"];
   const optional = ["glossary", "rubricAddendum", "contract", "artDirection"];
   for (const [key, rel] of Object.entries(seam.docs)) {
     const abs = join(projectDir, rel);
     if (existsSync(abs)) {
       notes.push(`docs.${key}: ${rel}`);
+    } else if (required.includes(key)) {
+      errors.push(`docs.${key}: ${rel} does not exist (required by the seam)`);
     } else if (optional.includes(key)) {
       warnings.push(`docs.${key}: ${rel} does not exist (optional)`);
     } else {
@@ -91,15 +94,17 @@ function checkConfig(projectDir, agentIds, errors, warnings, notes) {
 
 function checkGlobalShadowing(home, agentIds, errors, notes) {
   const agentsDir = join(home, ".config", "opencode", "agents");
+  let found = 0;
   for (const id of agentIds) {
     const file = join(agentsDir, `${id}.md`);
     if (existsSync(file)) {
       errors.push(
         `global agent ${id} at ${toPosix(file)} shadows the vendored agent (move it aside)`,
       );
+      found += 1;
     }
   }
-  if (errors.length === 0) notes.push("global agents: no same-ID shadowing");
+  if (found === 0) notes.push("global agents: no same-ID shadowing");
 }
 
 const SECRET_PATTERNS = [

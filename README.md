@@ -233,7 +233,7 @@ throttling, tool-output logging, filesystem scope, and the OpenRouter base-URL o
 
 ```
 ClimberWeb/            Blazor Server app (pages, services, auth, command runner)
-ClimberWeb.Tests/      xUnit tests
+ClimberWeb.Tests/      xUnit tests (550 passing)
 scripts/               status/coverage, fixture, and Playwright UI checks
 status/                committed coverage/test artifact read by /status
 fixtures/              throwaway sample project for climb proofs

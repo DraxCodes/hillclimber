@@ -96,8 +96,8 @@ Project-relative paths the skills read. Optional.
 - `contract` and `artDirection`: the design contract the provenance and
   art-direction probes read.
 
-A missing optional doc is a `doctor` warning; a missing `issues` or `adr` is a
-warning too, so a fresh project is never blocked at setup.
+A missing optional doc is a `doctor` warning; a missing `issues` or `adr` is an
+error, so create those before the first `doctor` run.
 
 ### `neverCommit`
 

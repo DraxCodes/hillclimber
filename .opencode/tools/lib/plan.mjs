@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import {
   MANIFEST_REL,
   manifestContent,
@@ -7,10 +8,38 @@ import {
   removeBlock,
   renderBlock,
   seamFile,
+  toPosix,
   upsertBlock,
 } from "./manifest.mjs";
 import { sha256 } from "./hash.mjs";
 import { SEAM_REL } from "./seam.mjs";
+
+const BASE_DIRS = ["agents", "commands", "skills", "tools", "packs"];
+
+function walkFiles(root, dir = root) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const abs = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkFiles(root, abs));
+    else if (entry.isFile()) out.push(toPosix(relative(root, abs)));
+  }
+  return out.sort();
+}
+
+/** Files under the base-owned directories that the manifest does not own. */
+export function listExtraFiles(projectDir, manifest) {
+  const owned = new Set(Object.keys(manifest.files ?? {}));
+  const extra = [];
+  for (const dir of BASE_DIRS) {
+    const abs = join(projectDir, ".opencode", dir);
+    if (!existsSync(abs)) continue;
+    for (const rel of walkFiles(abs)) {
+      const dest = `.opencode/${dir}/${rel}`;
+      if (!owned.has(dest)) extra.push(dest);
+    }
+  }
+  return extra;
+}
 
 function sameText(a, b) {
   return sha256(a) === sha256(b);
@@ -186,6 +215,7 @@ export function planCheck({ projectDir, oldManifest, seamVersion }) {
     else changed.push(dest);
   }
 
+  const extra = listExtraFiles(projectDir, oldManifest);
   const problems = [];
   if (seamVersion && oldManifest.version !== seamVersion) {
     problems.push(
@@ -193,7 +223,7 @@ export function planCheck({ projectDir, oldManifest, seamVersion }) {
     );
   }
 
-  return { changed, missing, clean, problems };
+  return { changed, missing, extra, clean, problems };
 }
 
 export function planEject({ projectDir, manifest, force }) {
