@@ -23,7 +23,7 @@ free UI harnesses against the live host.
   stamp present; newest watched write wins; foreign extensions and generated/vendored directories
   are ignored; a missing tree has no stamp; the serialized payload contains no path.
 - [x] **1.2** `wwwroot/js/dev-refresh.js`: poll `/__dev/stamp` every 1 s (plus one immediate tick),
-  reload once per change after a 1.2 s settle, hold while an `input`/`textarea`/`select` is focused
+  reload once per change after a 3 s settle, hold while an `input`/`textarea`/`select` is focused
   or a dialog is open, ignore non-200 and failed fetches (a restarting host), and remember the last
   stamp in `sessionStorage` so a save right after a reload is not missed.
   *Verified live:* idle → reload in 2.9 s; focused in the PIN field → held for 5 s; blur → reload in
@@ -68,7 +68,7 @@ free UI harnesses against the live host.
   `security`, `providers`. `security.mjs` passing unchanged is the proof of D1.
   *Result:* build 0/0; **722 passed** with the app live; theme-nav 0; security 0; providers 15/15.
   `polish.mjs` and `surfaces.mjs` not run.
-- [ ] **4.3** Gate at **8** on the live-loop experience (`docs/agents/hillclimb-rubric.md`), with
+- [x] **4.3** Gate at **8** on the live-loop experience (`docs/agents/hillclimb-rubric.md`), with
   the user's seat as the judge: app never dark, tab follows, screenshot on demand.
   *First gate:* **6/10 (`REVERT`)** — build-triggered restart with a bind failure and a locked tab;
   `/status` lost the repo root under the temp output; `host.mjs status` said "up" with a dead watch
@@ -87,7 +87,14 @@ free UI harnesses against the live host.
   `go()` and a logged failure line as the backstop); `shot` and `/shot` reject unknown flags, bad
   themes, non-numeric sizes and wrong paths with exit 2 / HTTP 400 and a one-line next action; the
   before/after pair was retaken on `/activity` at 900×1200 light and the focus claim replaced with
-  "this lane adds no focusable element". Re-gate pending.
+  "this lane adds no focusable element".
+  *Third gate:* **8/10 (`SHIP`)** at `c262988` — all three flaws independently reproduced as fixed;
+  floor green with the host and tab untouched; no required flaw remains. Non-blocking nits carried
+  forward: `text` can print a page's loading copy (`shot` waits it out), `drive.mjs status` with no
+  state file names no next action, `shot --help` is refused instead of printing help, a dead
+  SIGINT/SIGTERM block sits after the keep-alive promise in `serve()`, and this plan had a stale
+  "1.2 s settle" (now corrected to 3 s). The gate also saw the host killed silently several times
+  by something outside the loop; see the evidence's observation — recovery is `host.mjs restart`.
 
 ## Lane 5 — deferred to the next pass
 

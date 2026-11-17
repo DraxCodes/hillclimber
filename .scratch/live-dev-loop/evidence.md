@@ -25,8 +25,10 @@ three narrower flaws:
 7. `loop-before.png` was `/` mid-load with no copy line, so the pair did not show the edit; and the
    read-through credited `theme-nav.mjs` with a focus pass it does not perform.
 
-This revision fixes 5–7 and records the proof below. The scorecard is not self-scored: the result
-belongs in plan **4.3**.
+This revision fixes 5–7 and records the proof below. The third gate scored **8/10 (`SHIP`)** at
+`c262988`: all three flaws reproduced as fixed, floor green with host and tab untouched, no
+required flaw left. Its non-blocking nits and the silent process losses it observed are recorded
+under "Next pass" and "One observation" below.
 
 ## Seed
 
@@ -85,14 +87,22 @@ introduced, so there is nothing new to tab through.
 server's memory and a restart clears it. That is the app's existing behaviour, unchanged by this
 lane, and it is the named edge below.
 
-**One observation, not scored.** The re-gate saw the watch and the driver both disappear around
-05:59 with no log line on either side, minutes after its floor probe had already passed with both
-pids unchanged — consistent with an external kill of the process trees, not a crash. The same
-detached processes were observed again after their launching shells had exited (both parents gone,
-watch 32856 and driver 21464 still serving), so `host.mjs`'s detach is doing its job on this machine
-and the loss is not reproducible from the loop's own commands. If it recurs, `host.mjs status`
-exits 1 and names `restart`; `drive.mjs status` says to start it again. The loop is per-session
-tooling, not a service, and the evidence does not claim it survives an external job-object teardown.
+**One observation, not scored — the host is sometimes killed from outside.** Across the second and
+third gates the watch and/or driver disappeared with no log line five times: once around 05:59, at
+06:19:56 (the watch already dead while the app still served, the app gone at 06:20:17), before
+06:32:5x, 06:33:5x, and 06:36–06:38 (the driver, twice, with no `browser closed` line). What was
+ruled out: the Windows Application log has **no process-fault entry** — its only event in the window
+is the known Kestrel `BrowserToolsForwarder` WebSocket disconnect, which the app logs as `fail:` and
+survives — and the System log has no error; there was 12 GB free, so not memory pressure. What was
+ruled in: the same detached trees have repeatedly outlived their launching shells (both parents
+gone, watch and driver still serving), so `host.mjs`'s detach works on this machine; and every
+`killTree` call in the scripts is behind an explicit `stop`, `start --force`, a watch that answers
+nothing, or a start that timed out — none of which ran in those windows. The likely cause is an
+external job-object or process-tree cleanup, which the loop cannot prevent. It detects it honestly
+(`host.mjs status` exits 1 and names `restart`; `drive.mjs status` names a restart) and the target
+"app never goes dark" is therefore only observed for the stretches between those kills, not for a
+whole sitting. The loop is per-session tooling, not a service, and this evidence makes no claim that
+it survives an external teardown.
 
 ## Fixed for the gate
 
@@ -167,7 +177,7 @@ credits `theme-nav.mjs` with a focus pass; it states that the lane adds no focus
 | Strong: the tab | reloads itself on a save and holds while typing | 900 and 375, both themes |
 | Strong: floor | build and test leave the host and the tab untouched | host live |
 | Edge: after a restart | the tab shows the PIN form and needs one re-entry | only when a change cannot hot-apply |
-| Edge: external teardown | watch and driver vanished together once with no log line, unreproduced; recovery is `restart` | outside the loop's own commands |
+| Edge: external teardown | watch and/or driver vanished with no log line (five times across two gates), unreproduced by any loop command; recovery is `restart` | outside the loop's own commands |
 | Limit: watch | a *forced* full rebuild overflows the OS watcher: "Too many changes at once"; it recovers and the next save applies (verified), but a save during the burst can be missed | `dotnet build --no-incremental` while the host is up |
 | Limit: watch | dropped a `Program.cs` change in an earlier probe, and did not pick up a new `.razor` file in one test | rare; `host.mjs restart` is the recovery |
 | Limit: a rebuild | a save that cannot hot-patch still costs a few seconds; the tab waits for the new pid instead of reloading into the gap | any structural change |
@@ -193,8 +203,27 @@ needs no entry.
 | `node scripts/ui/polish.mjs` | 100, 0 defects in 560 checks (supporting only) |
 | `node scripts/ui/surfaces.mjs` | not run (needs approval) |
 
+The third gate re-ran the same floor on a host it started itself (watch 37040 / app 12760) with the
+same result: build 0/0, 722 passed, both pids unchanged, watch log delta **0**, tab unlocked with 0
+errors, theme-nav 0, security 0, providers 15/15, polish 100. The pids in the table above are from
+the run recorded here; pids change when a host is restarted.
+
+## Next pass — non-blocking nits from the 8/10 gate
+
+1. `drive.mjs text` can print a page's loading copy (`Checking providers…`, `Reading the
+   repository…`) right after `reload` or a cold `goto`; `shot` waits those out, `text` does not.
+2. `drive.mjs status` with no state file prints "not running" and exits 1 with no `next:` line —
+   the one empty state that does not literally name an action.
+3. `drive.mjs shot --help` is refused (`unknown option "--help"`) instead of printing help.
+4. `scripts/dev/drive.mjs` has a dead SIGINT/SIGTERM block after the keep-alive promise in
+   `serve()`; remove it or move it before the promise. Only reachable by running `__serve` in a
+   foreground shell.
+
+All four are in tools the serve-producer lane will touch, so they belong there rather than in a
+re-gate of this one.
+
 ## Scorecard
 
-Not self-scored. The independent gates scored **6/10 (`REVERT`)** and then **7/10 (`KEEP`)**, naming
-seven flaws in total; the first four and the second gate's three are fixed and verified above. The
-next gate result belongs in plan 4.3.
+Not self-scored. The independent gates scored **6/10 (`REVERT`)**, **7/10 (`KEEP`)** and
+**8/10 (`SHIP`)** at `c262988`, naming seven flaws that were then fixed and reproduced as fixed.
+The 8 is the gate's number; the nits above are explicitly non-blocking.

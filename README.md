@@ -125,6 +125,12 @@ things the loop deliberately does not do:
   `BaseIntermediateOutputPath` stays in the repo, because the old `obj` is still globbed into the
   build and duplicates `AssemblyInfo` attributes.
 
+Both scripts detach, so the app and window outlive the shell that started them. Something outside
+the loop (a job object or an external process-tree cleanup) has nevertheless killed the watch and
+the window silently on this machine, with no crash in the Application log. `host.mjs status` and
+`drive.mjs status` detect exactly that and name the recovery — `node scripts/dev/host.mjs restart`,
+then `node scripts/dev/drive.mjs start`.
+
 ## Configuration
 
 Settings live in `ClimberWeb/appsettings.json`, with local overrides in the gitignored
