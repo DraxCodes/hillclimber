@@ -93,6 +93,30 @@ $env:Climber__Pin = "your-real-pin"
 
 Then open `http://<your-machine>:5179` from the phone.
 
+### Working on the UI live
+
+For UI work, run the app under watch with its output in a temp directory, so `dotnet test`, a plain
+build and the browser checks can use the repo's `bin` while the app keeps running:
+
+```sh
+node scripts/dev/host.mjs start      # http://localhost:5179; also stop, restart, status
+node scripts/dev/drive.mjs start     # one persistent window, already unlocked
+```
+
+`drive.mjs` types the PIN like a person would — there is no bypass — then stays logged in and takes
+commands: `goto /activity`, `text`, `errors`, `shot [path]`, `reload`, `stop`.
+
+The open tab reloads itself when the running host changes, and never while a field has focus. Two
+things the loop deliberately does not do:
+
+- **It does not trust hot reload.** `dotnet watch` can report "applied" while the served page is
+  stale, and hot-patching a layout that owns a `SectionOutlet` throws on every new circuit while
+  watch still says success. `GET /__dev/stamp` (Development only) reports what is actually running,
+  and the tab reloads from that.
+- **It does not move the intermediate output.** Only `BaseOutputPath` goes to the temp directory;
+  `BaseIntermediateOutputPath` stays in the repo, because the old `obj` is still globbed into the
+  build and duplicates `AssemblyInfo` attributes.
+
 ## Configuration
 
 Settings live in `ClimberWeb/appsettings.json`, with local overrides in the gitignored

@@ -37,25 +37,26 @@ free UI harnesses against the live host.
   with `ASPNETCORE_ENVIRONMENT=Development`, `ASPNETCORE_URLS=http://localhost:5179`, and
   `--no-launch-profile` (D2). Logs to a pinned temp file, waits for 200 on 5179, and refuses to
   adopt a foreign listener unless `--force`.
-  *Tests (free, no host):* argument parsing; port-holder detection with a fake listener; the
-  command it would run; restart is stop-then-start and exits non-zero when the port never comes up.
-  *Live:* start it once, edit a component, confirm the page reflects the change and the PID is
-  unchanged; then `dotnet test` with the app up.
-- [x] **2.2** Record the two traps in `README` dev notes (or `docs/`): hot reload is not trusted,
-  and `BaseIntermediateOutputPath` must not move.
+  *Verified live:* start is idempotent; stop frees the port and reports down; restart comes back in
+  ~15 s; `status` reports the stamp, the watch pid, the app pid and render exceptions in the log.
+  *Fixed on the way:* the first `--force` killed its own caller — `netstat` matching also counts
+  established client connections, so the owner list is now a listener-only query.
+- [x] **2.2** README "Working on the UI live": the two traps (hot reload is not trusted; the
+  intermediate output must not move) and the three commands.
 
 ## Lane 3 — the driver
 
 - [x] **3.1** `scripts/dev/drive.mjs`: loopback control server over one persistent Playwright
-  context. Commands: `goto <route>`, `text`, `errors`, `shot <path>`, `reload`, `unlock`. Auto-fills
+  context. Commands: `goto <route>`, `text`, `errors`, `shot <path>`, `reload`, `stop`. Auto-fills
   the PIN when `#pin` is present (D1); headed by default, `--headless` for scripted runs; token in
-  a temp file with a 0600-equivalent ACL, never in the repo.
-  *Tests (free):* command routing against a fake page; token required; the driver never writes
-  outside its temp shot directory; a second instance refuses to start on the same port.
-  *Live:* open `/`, unlock, screenshot; navigate to `/activity` and `/status`; confirm `errors` is
-  empty on all three.
-- [x] **3.2** Park it: one long-lived driver on `/` while the work happens, so the user can watch
-  the same window.
+  a temp file, never in the repo.
+  *Verified live:* one headed window, unlocked, parked on `/`; `goto` reaches `/`, `/activity` and
+  `/status` and unlocks each; `errors` empty on all three; `shot` writes a PNG; a save reloaded the
+  window (loads 1 → 2) and it stayed unlocked.
+  *Fixed on the way:* `/` renders its own gate button, so the driver clicks by accessible name
+  rather than a CSS class; the gate resolves after the first render, so `goto` waits for the
+  decision instead of a fixed delay.
+- [x] **3.2** Parked: one long-lived headed driver on `/` for the session.
 
 ## Lane 4 — evidence and gate
 
