@@ -3,15 +3,41 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
+  rmdirSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { projectFile } from "./manifest.mjs";
 
 function stamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+/**
+ * Remove the emptied ancestor directories of deleted files, stopping at the
+ * project root. This keeps a `--no-copilot` update from leaving a skeleton
+ * `.github/skills/` tree behind.
+ */
+function pruneEmptyParents(projectDir, deleted) {
+  for (const rel of deleted) {
+    let dir = dirname(projectFile(projectDir, rel));
+    while (true) {
+      const inside = relative(projectDir, dir);
+      if (!inside || inside.startsWith("..")) break;
+      try {
+        // A directory that is empty now may gain a sibling's deletion later, so
+        // this is not memoized: stop only when the directory is non-empty.
+        if (readdirSync(dir).length > 0) break;
+        rmdirSync(dir);
+      } catch {
+        break;
+      }
+      dir = dirname(dir);
+    }
+  }
 }
 
 /**
@@ -88,6 +114,8 @@ export function applyPlan(projectDir, plan, { dryRun = false, log = console.log 
   }
 
   // Keep the backup only when something was actually replaced or deleted.
+  pruneEmptyParents(projectDir, deleted);
+
   if (backups.size > 0) {
     for (const [rel, content] of backups) {
       const dest = join(backupDir, ...rel.split("/"));

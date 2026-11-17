@@ -12,6 +12,11 @@ under `.opencode/`. The base provides the agents (`task-orchestrator`,
 `hillclimb`, `grilling`, `handoff`, `workflow-base`, `find-skills`,
 `context-engineering`) and the `base` CLI.
 
+For VS Code Copilot Chat, the base also generates a bridge under `.github/`:
+Agent Skills in `.github/skills/<id>/SKILL.md` and custom agents in
+`.github/agents/<id>.agent.md`. Copilot reads `AGENTS.md` directly, so there is no
+second instruction file.
+
 Everything the base owns is generated. Do not edit it in a project — edit the base
 repo and update. Everything else in the project is the project's own.
 
@@ -29,6 +34,7 @@ guessing at a project's checks or docs.
 | Owner | Paths |
 | --- | --- |
 | Base | `.opencode/agents/`, `.opencode/commands/`, `.opencode/skills/`, `.opencode/tools/`, `.opencode/packs/` |
+| Base (Copilot bridge) | `.github/skills/`, `.github/agents/` |
 | Project | `.opencode/workflow.json`, `.opencode/.workflow-manifest.json`, `AGENTS.md` outside the managed block, `opencode.json`, app, tests, docs, `.scratch/` |
 
 - The base **never writes `opencode.json`**. The project owns provider, model,
@@ -61,6 +67,11 @@ is the one-paste version. `--config` fills `opencode.json` from the machine-loca
 then the first session runs `/start-project <idea>` to get an approved spec.
 `base doctor --fix .` performs the mechanical fixes (required doc dirs, same-ID
 global agents).
+
+The same prompt works in VS Code Copilot Chat: `new`/`init`/`update` also generate
+`.github/skills/` and `.github/agents/` from the same source, Copilot reads
+`AGENTS.md` directly, and `--no-copilot` omits the bridge. The bridge is never
+hand-edited; `doctor` validates each skill's `name` against its directory.
 
 `update` refuses locally modified files unless `--force`. `eject` leaves the seam
 in place for the project.

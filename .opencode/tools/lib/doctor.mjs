@@ -9,6 +9,7 @@ import {
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { sha256 } from "./hash.mjs";
+import { parseDocument } from "./frontmatter.mjs";
 import {
   MANIFEST_REL,
   extractBlock,
@@ -170,6 +171,7 @@ function checkSecrets(projectDir, errors, warnings, notes) {
   const roots = ["agents", "commands", "skills", "packs", "tools"].map((dir) =>
     join(projectDir, ".opencode", dir),
   );
+  roots.push(join(projectDir, ".github", "skills"), join(projectDir, ".github", "agents"));
   const files = roots.flatMap((root) => walk(root));
   const config = join(projectDir, "opencode.json");
   if (existsSync(config)) files.push(config);
@@ -188,6 +190,61 @@ function checkSecrets(projectDir, errors, warnings, notes) {
     }
   }
   notes.push(`secrets: scanned ${scanned} project text files`);
+}
+
+function checkCopilot(projectDir, owned, errors, warnings, notes) {
+  const skillFiles = [...owned].filter((rel) =>
+    /^\.github\/skills\/[^/]+\/SKILL\.md$/.test(rel),
+  );
+  const agentFiles = [...owned].filter((rel) =>
+    /^\.github\/agents\/[^/]+\.agent\.md$/.test(rel),
+  );
+
+  if (skillFiles.length === 0 && agentFiles.length === 0) {
+    notes.push("copilot: bridge not installed (--no-copilot)");
+    return;
+  }
+
+  for (const rel of skillFiles.sort()) {
+    const abs = projectFile(projectDir, rel);
+    if (!existsSync(abs)) {
+      errors.push(`${rel}: missing`);
+      continue;
+    }
+    const id = rel.split("/")[2];
+    const { data, body } = parseDocument(readFileSync(abs, "utf8"));
+    if (data.name !== id) {
+      errors.push(`${rel}: name must be "${id}" (got "${data.name ?? ""}")`);
+    }
+    if (!data.description) errors.push(`${rel}: description is missing`);
+    if (body.includes("$ARGUMENTS")) errors.push(`${rel}: $ARGUMENTS is not substituted`);
+  }
+  notes.push(`copilot: ${skillFiles.length} skills`);
+
+  for (const rel of agentFiles.sort()) {
+    const abs = projectFile(projectDir, rel);
+    if (!existsSync(abs)) {
+      errors.push(`${rel}: missing`);
+      continue;
+    }
+    const { data } = parseDocument(readFileSync(abs, "utf8"));
+    const expected = rel.slice(rel.lastIndexOf("/") + 1, -".agent.md".length);
+    if (!data.name) errors.push(`${rel}: name is missing`);
+    if (!data.description) errors.push(`${rel}: description is missing`);
+    if (data.name && data.name !== expected) {
+      warnings.push(`${rel}: name "${data.name}" does not match the file "${expected}"`);
+    }
+  }
+  notes.push(`copilot: ${agentFiles.length} agents`);
+
+  // A project may add its own Copilot files; report them like any other
+  // unowned file instead of failing the bridge's own validation on them.
+  for (const dir of [".github/skills", ".github/agents"]) {
+    for (const abs of walk(join(projectDir, ...dir.split("/")))) {
+      const rel = toPosix(abs.slice(projectDir.length + 1));
+      if (!owned.has(rel)) warnings.push(`${rel}: not owned by the workflow base`);
+    }
+  }
 }
 
 function checkPacks(seam, projectDir, errors, warnings, notes) {
@@ -260,6 +317,8 @@ export function doctor(projectDir, { home = homedir() } = {}) {
   checkSecrets(projectDir, errors, warnings, notes);
 
   const owned = new Set(Object.keys(manifest.files));
+  checkCopilot(projectDir, owned, errors, warnings, notes);
+
   for (const dir of ["agents", "commands", "skills"]) {
     for (const abs of walk(join(projectDir, ".opencode", dir))) {
       const rel = toPosix(abs.slice(projectDir.length + 1));

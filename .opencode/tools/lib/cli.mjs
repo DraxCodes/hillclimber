@@ -16,6 +16,7 @@ import {
   renderBlock,
 } from "./manifest.mjs";
 import { planCheck, planEject, planInit, planUpdate, listExtraFiles } from "./plan.mjs";
+import { copilotFiles } from "./copilot.mjs";
 import { DEFAULT_PROFILE, loadProfile } from "./profile.mjs";
 import { PRESETS, applyPreset } from "./presets.mjs";
 import { SEAM_REL, defaultSeam, loadSeam, validateSeam } from "./seam.mjs";
@@ -160,6 +161,7 @@ function installProject({ baseRoot, target, seam, flags }) {
 
   const packs = seam.packs ?? [];
   const files = readBaseFiles(baseRoot, listBaseFiles(baseRoot, packs));
+  if (!flags.noCopilot) files.push(...copilotFiles(baseRoot));
   const block = renderBaseBlock(baseRoot, version);
   const plan = planInit({
     projectDir: target,
@@ -400,6 +402,7 @@ function updateCommand(flags) {
   const { seam } = loadSeam(target);
   const packs = flags.pack ? toArray(flags.pack) : (manifest.packs ?? []);
   const files = readBaseFiles(source, listBaseFiles(source, packs));
+  if (!flags.noCopilot) files.push(...copilotFiles(source));
   const block = renderBaseBlock(source, version);
 
   const plan = planUpdate({
@@ -618,6 +621,7 @@ Flags:
   --config             write opencode.json once when absent (new)
   --profile <file>     bootstrap profile for --config (default ~/.config/drax/bootstrap.json)
   --no-profile         ignore the bootstrap profile and write placeholders
+  --no-copilot         skip the generated .github Copilot bridge (new, init, update)
   --no-verify          skip the post-install check and doctor (new)
   --fix                apply the mechanical doctor fixes
   --pack <name>        repeatable pack selection

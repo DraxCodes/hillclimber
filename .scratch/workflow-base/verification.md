@@ -3,7 +3,7 @@
 Date: 2026-11-17. Fixed point: `1d84821`. Base: `drax-ai-workflow` v0.1.0 at
 `d4eb552` (tag `v0.1.0`), published at
 <https://github.com/DraxCodes/drax-ai-workflow>; re-vendored to v0.2.2 at
-`7245da3` (see the 0.2.x sections below).
+`7245da3` and to v0.3.0 at `5448a0b` (see the 0.2.x and 0.3.0 sections below).
 
 > Renamed from `opencode-workflows` to `drax-ai-workflow` on 2026-11-17. The
 > internal skill id, AGENTS markers, `WORKFLOW_BASE` env and `base` CLI are
@@ -213,3 +213,87 @@ providers.mjs: 15 checks, 0 failures
 - The token-spending `scripts/ui/surfaces.mjs` (`paid`; needs explicit approval).
 - No `dotnet test` result is claimed beyond the runs above.
 - The base's `paid` harness was not run.
+
+## 0.3.0 — VS Code Copilot Chat bridge
+
+Base: `drax-ai-workflow` v0.3.0 at `5448a0b` (tag `v0.3.0`), pushed to `main`.
+
+Format evidence (VS Code docs, checked 2026-11-17):
+
+- Copilot reads `AGENTS.md` directly
+  (<https://code.visualstudio.com/docs/agent-customization/custom-instructions>).
+- Project skills live in `.github/skills/<id>/SKILL.md`; the frontmatter `name`
+  must match the directory and be lowercase; skills appear as `/` commands and
+  auto-load by description
+  (<https://code.visualstudio.com/docs/agent-customization/agent-skills>).
+- Custom agents live in `.github/agents/<name>.agent.md` with `name`,
+  `description`, `tools` and `user-invocable`
+  (<https://code.visualstudio.com/docs/agents/reference/custom-agent-file-reference>).
+- Copilot `tools` accepts the aliases `execute`, `read`, `edit`, `search`,
+  `agent`, `web`, `todo`
+  (<https://code.visualstudio.com/docs/agents/reference/tools-reference>).
+
+Base `node --test`:
+
+```
+# tests 49
+# pass 49
+# fail 0
+```
+
+New coverage: the generated bridge validates as Agent Skills (name equals
+directory, description present, no `$ARGUMENTS`, no literal placeholder in the
+preamble); lens agents carry `read`/`search`, with `execute` on the gatekeeper
+and `execute` + `web` on the security auditor; a command/skill id collision
+appends the canonical skill body; `new` installs the bridge and `doctor`
+reports `copilot: N skills` / `copilot: N agents`; `--no-copilot` on `new` writes
+no `.github`; `--no-copilot` on `update` removes the generated tree, prunes the
+emptied directories and keeps a project-owned `.github/workflows/ci.yml`; a
+project-owned `.github` skill warns instead of failing.
+
+Cold start from the working base with the real machine profile:
+
+```
+files: 51 written, 0 removed
+check: clean (48 files)
+doctor: no errors (optional GLOSSARY.md warning only)
+```
+
+Cold start from the **published tag** (`git clone --depth 1 --branch v0.3.0`
+from GitHub, `VERSION` = `0.3.0`): the same `51 written`, `check: clean (48
+files)`, `doctor: no errors`, and 16 generated bridge files with the three lens
+agents. The published artifact, not just the working tree, carries the bridge.
+
+Generated bridge inventory (16 files):
+
+```
+.github/agents/plan-architect.agent.md
+.github/agents/quality-gatekeeper.agent.md      tools: read, search, execute
+.github/agents/security-auditor.agent.md        tools: read, search, execute, web
+.github/skills/{start-project,council,hillclimb,grill-me,handoff}/SKILL.md
+.github/skills/{context-engineering,find-skills,grilling,workflow-base}/SKILL.md
+.github/skills/hillclimb/references/hillclimb-rubric.md
+.github/skills/workflow-base/references/{domain,issue-tracker,seam}.md
+```
+
+`update --no-copilot` on that project: `files: 1 written, 16 removed`; `.github`
+no longer exists; `doctor` reports `copilot: bridge not installed (--no-copilot)`.
+
+This repo, re-vendored from v0.3.0 (the 0.2.2 CLI cannot generate the bridge, so
+the update ran the base checkout's `tools/base.mjs`):
+
+```
+files: 25 written, 0 removed
+check: clean: 53 files
+doctor: no errors; copilot: 9 skills; copilot: 3 agents
+dotnet build: 0 Warning(s), 0 Error(s)
+dotnet test: Failed 0, Passed 764, Skipped 0, Total 764
+theme-nav.mjs: crawled 3 pages, FAILURES 0
+security.mjs: FAILURES 0
+providers.mjs: 15 checks, 0 failures
+```
+
+Free-check note: the three `scripts/ui` checks need the dev host, so it was
+started with `node scripts/dev/host.mjs start`, the checks ran, and it was
+stopped before the commit. `dotnet test` ran with the host stopped, as the
+Windows note requires.
