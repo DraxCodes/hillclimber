@@ -118,7 +118,7 @@ public class QuestionViewTests
     }
 
     [Fact]
-    public void ARestoredTerminalRowKeepsItsCopyButOffersNoAction()
+    public void ARestoredTerminalRowKeepsItsCopyButDropsTheLiveMarkerAndActions()
     {
         var unsupported = QuestionView.For(State(
             QuestionStatus.Unsupported,
@@ -136,6 +136,9 @@ public class QuestionViewTests
             view =>
             {
                 Assert.False(view.Interactive);
+
+                // `asks:` marks a live ask; archive rows keep the settled glyph.
+                Assert.False(view.ShowPrefix);
                 Assert.Equal(QuestionAction.None, view.Action);
             });
     }

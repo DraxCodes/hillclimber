@@ -379,8 +379,10 @@ Post-score refinements, scored against the 8 already on the board.
 - **A settled question keeps the glyph.** `answered:` folds into a `TraceLine` with
   the `message` icon; `cancelled`, `no answer sent` and `questions unavailable` keep
   that same glyph and a micro line, so a question that ended still reads as a
-  question instead of a stray sentence of prose. An unsupported answer keeps `asks:`
-  and offers `dismiss`, because it is still a live ask that cannot be answered here.
+  question instead of a stray sentence of prose. A live unsupported answer keeps
+  `asks:` and offers `dismiss`, because it is still a live ask that cannot be
+  answered here. `asks:` is live-only: a row restored from a stored session is
+  history, so it keeps the glyph, its kind or refusal notice, and no action.
 - **`dismiss` is a micro chip, not the outline keycap.** The port's `outline` variant
   draws a bare `border`, and preflight is off, so `border` resolves to `currentColor`
   and renders near-black. In a row of micro mono lines that box would outrank the

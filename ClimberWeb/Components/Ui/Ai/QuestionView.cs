@@ -92,12 +92,14 @@ public sealed record QuestionView(
 
         // Nothing in an archived session can be answered, dismissed or checked: a restored row
         // is a record, not a control. QuestionRestore has already folded a pending or mid-submit
-        // status to Stale; this drops the actions the other terminal states still carry.
+        // status to Stale; this drops the actions the other terminal states still carry, and the
+        // live `asks:` marker with them, so an archived ask reads as history.
         if (state.Restored)
         {
             interactive = false;
             busy = false;
             action = QuestionAction.None;
+            showPrefix = false;
         }
 
         var notice = state.Status == QuestionStatus.Unsupported

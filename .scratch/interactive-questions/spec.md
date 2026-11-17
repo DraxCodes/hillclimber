@@ -187,8 +187,10 @@ the future live-app harness. This pass built the second half only:
   options, chosen value, notice). Only display data is persisted — never the URL, password,
   header or raw frame.
 - Restore: `Answered` renders closed; a restored pending or `Stale` renders `no answer sent`,
-  closed and non-interactive. A pending and a settled line both persist; the grouper collapses
-  to the last line per form id so a transcript never shows the same question twice.
+  closed and non-interactive. A restored row never wears the live `asks:` marker: it keeps the
+  settled glyph, its notice and no action. A pending and a settled line both persist; the
+  grouper collapses to the last line per form id so a transcript never shows the same question
+  twice.
 
 ## Floor and target
 
