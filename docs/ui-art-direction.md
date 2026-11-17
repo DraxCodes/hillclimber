@@ -1,7 +1,7 @@
 # Art direction
 
 Status: **in force (2026-11-16)**. Scored by probe 13 of
-[`agents/hillclimb-rubric.md`](agents/hillclimb-rubric.md). Provenance
+[`agents/hillclimb-addendum.md`](agents/hillclimb-addendum.md). Provenance
 requirements live in [`ui-contract.md`](ui-contract.md).
 
 The contract says the screen is made of the right parts. This file says the parts

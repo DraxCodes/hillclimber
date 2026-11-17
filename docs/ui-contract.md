@@ -23,7 +23,7 @@ Every visible AI surface is the documented AI Element, or a composition of
 Every non-AI surface is a shadcn base component, or a named exception.
 
 **Checked by:** the provenance probe in
-[`docs/agents/hillclimb-rubric.md`](agents/hillclimb-rubric.md).
+[`docs/agents/hillclimb-addendum.md`](agents/hillclimb-addendum.md).
 **Fails when:** a bespoke row, panel or chip stands where a documented element
 exists, and no exception names it.
 

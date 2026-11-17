@@ -247,6 +247,25 @@ function checkCopilot(projectDir, owned, errors, warnings, notes) {
   }
 }
 
+function checkRubrics(seam, projectDir, errors, notes) {
+  const name = seam.rubrics?.default ?? "perception";
+  const skillsDir = join(projectDir, ".opencode", "skills", "hillclimb");
+  if (!existsSync(skillsDir)) {
+    notes.push("hillclimb: skill not vendored; rubric check skipped");
+    return;
+  }
+  const bare = /^[a-z0-9-]+$/.test(name);
+  const rel = bare ? `.opencode/skills/hillclimb/references/rubrics/${name}.md` : name;
+  const abs = projectFile(projectDir, rel);
+  if (!existsSync(abs)) {
+    errors.push(
+      `rubrics.default: "${name}" does not resolve to a rubric file (looked for ${rel})`,
+    );
+    return;
+  }
+  notes.push(`hillclimb: rubric ${name}`);
+}
+
 function checkPacks(seam, projectDir, errors, warnings, notes) {
   for (const pack of seam.packs ?? []) {
     const manifest = join(projectDir, ".opencode", "packs", pack, "pack.json");
@@ -308,6 +327,7 @@ export function doctor(projectDir, { home = homedir() } = {}) {
 
   if (seam) {
     checkDocs(seam, projectDir, errors, warnings, notes);
+    checkRubrics(seam, projectDir, errors, notes);
     checkPacks(seam, projectDir, errors, warnings, notes);
   }
   const agentIds = agentIdsFromManifest(manifest);

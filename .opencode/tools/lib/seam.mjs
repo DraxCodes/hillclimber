@@ -6,6 +6,7 @@ export const BASE_NAME = "drax-ai-workflow";
 export const WORKFLOWS = ["council", "hillclimb", "grilling", "handoff", "security"];
 export const SURFACES = ["web", "cli", "api", "docs", "none"];
 export const THEMES = ["light", "dark"];
+export const RUBRICS = ["perception", "usability", "performance", "completeness"];
 export const DOC_KEYS = [
   "issues",
   "glossary",
@@ -61,6 +62,7 @@ export function validateSeam(seam) {
       "workflows",
       "checks",
       "verify",
+      "rubrics",
       "docs",
       "neverCommit",
       "packs",
@@ -171,6 +173,17 @@ export function validateSeam(seam) {
     }
   }
 
+  if (seam.rubrics !== undefined) {
+    if (!isObject(seam.rubrics)) {
+      errors.push("rubrics: expected an object with a default rubric");
+    } else {
+      checkKeys(seam.rubrics, ["default"], "rubrics", errors);
+      if (!isNonEmptyString(seam.rubrics.default)) {
+        errors.push("rubrics.default: expected a non-empty string");
+      }
+    }
+  }
+
   if (seam.docs !== undefined) {
     if (!isObject(seam.docs)) {
       errors.push("docs: expected an object");
@@ -225,6 +238,7 @@ export function defaultSeam({ project, baseVersion }) {
       themes: [],
       notes: "",
     },
+    rubrics: { default: "perception" },
     docs: {
       issues: ".scratch",
       glossary: "GLOSSARY.md",

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "base": {
     "name": "drax-ai-workflow",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "project": "HillClimberUI",
   "workflows": [
@@ -56,6 +56,9 @@
       "dark"
     ],
     "notes": "First-run and keyboard read-through; stop the dev host before dotnet test on Windows; token-spending surfaces.mjs only with explicit approval."
+  },
+  "rubrics": {
+    "default": "perception"
   },
   "docs": {
     "issues": ".scratch",

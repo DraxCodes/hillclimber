@@ -297,3 +297,78 @@ Free-check note: the three `scripts/ui` checks need the dev host, so it was
 started with `node scripts/dev/host.mjs start`, the checks ran, and it was
 stopped before the commit. `dotnet test` ran with the host stopped, as the
 Windows note requires.
+
+## 0.4.0 — named rubrics, narrower presets
+
+Base: `drax-ai-workflow` v0.4.0 at `7436726` (tag `v0.4.0`), pushed to `main`.
+
+The hillclimb gate is now one named rubric chosen before the first score:
+`perception` (default), `usability`, `performance` or `completeness`. Selection is
+an explicit `Rubric: <name>`, then the seam's `rubrics.default`, then `perception`.
+The floor, the stop condition and the anti-inflation rules are shared; the probes,
+level anchors and required evidence are per rubric. `references/hillclimb-rubric.md`
+is now a compatibility pointer to `rubrics/perception.md`.
+
+Budget and inventory rules that matter for this repo:
+
+- `performance` requires the budget table (metric, baseline, target, method,
+  environment) to be declared before the first measurement; a target chosen after
+  seeing the number is void.
+- `completeness` scores a filled obligation inventory; a deferral counts as closed
+  only with a reason and a cost.
+
+Presets are renamed to `checks-none` / `checks-web` / `checks-cli` / `checks-docs`;
+`bare` / `web` / `cli` / `docs` remain aliases. A preset fills only
+`checks.build`, `checks.test`, `verify.surface`, `verify.widths` and
+`verify.themes`, and `base new` prints that scope. It never writes a stack,
+layout, dependency or `package.json`.
+
+Base `node --test`:
+
+```
+# tests 53
+# pass 53
+# fail 0
+```
+
+New coverage: a valid rubric default and an unknown `rubrics` key; all four rubric
+files exist and each names itself, defines the level-8 anchor and carries
+anti-inflation rules; `doctor` resolves a shipped rubric and a project-path rubric
+and fails an unresolved name; the preset alias prints its canonical name; a preset
+writes no `package.json`, `src`, `app` or `node_modules`.
+
+Cold start from the working base with the real profile:
+
+```
+files: 59 written, 0 removed
+preset: checks-web — fills checks.build, checks.test, verify.surface/widths/themes
+        only; no stack, layout or dependency
+check: clean (56 files)
+doctor: no errors; hillclimb: rubric perception; copilot: 9 skills; copilot: 3 agents
+```
+
+The four rubric files are vendored to both `.opencode/skills/hillclimb/references/
+rubrics/` and `.github/skills/hillclimb/references/rubrics/`. Setting
+`rubrics.default` to `usability` in a real project made `doctor` print
+`hillclimb: rubric usability`; `--preset web` printed
+`preset: checks-web (alias web)`.
+
+This repo, re-vendored from v0.4.0:
+
+```
+files: 22 written, 0 removed
+check: clean: 61 files
+doctor: no errors; hillclimb: rubric perception; copilot: 9 skills, 3 agents
+dotnet build: 0 Warning(s), 0 Error(s)
+dotnet test: Failed 0, Passed 764, Skipped 0, Total 764
+theme-nav.mjs: crawled 3 pages, FAILURES 0
+security.mjs: FAILURES 0
+providers.mjs: 15 checks, 0 failures
+```
+
+Project-owned docs updated by hand (not vendored): the addendum now says it extends
+the *selected* rubric and that this project's default is `perception`, and the
+dangling links in `docs/ui-contract.md` and `docs/ui-art-direction.md` now point at
+`docs/agents/hillclimb-addendum.md` (probes 8 and 13) instead of a file that never
+existed. `.opencode/workflow.json` gained `"rubrics": { "default": "perception" }`
+so the choice is visible.

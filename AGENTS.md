@@ -3,7 +3,7 @@
 <!-- workflow-base:begin -->
 ## Workflow base
 
-This project uses the vendored workflow base **drax-ai-workflow** v0.3.0. The seam is
+This project uses the vendored workflow base **drax-ai-workflow** v0.4.0. The seam is
 `.opencode/workflow.json`; validate it with `node .opencode/tools/base.mjs doctor .`. If the
 seam is missing, these workflows are dormant: say so and stop.
 
@@ -26,13 +26,23 @@ hold it asks for `/council` first.
 ### Hillclimb
 
 When a task is quality-sensitive — UI, UX, visual, copy or docs — or has a clear,
-measurable objective (coverage, warnings, build/test time, bundle size, response time), ask
+measurable objective (coverage, warnings, build/test time, bundle size, response time),
+or is a decision that may be missing an obligation (a spec, a proposal, a feature), ask
 whether to run the hillclimb workflow before implementing it directly. It is opt-in.
 
-The gate is the 1–10 perception rubric in the `hillclimb` skill
-(`references/hillclimb-rubric.md`), plus the project addendum named by the seam.
+The gate is **one named rubric** in the `hillclimb` skill
+(`references/rubrics/<name>.md`), plus the project addendum named by the seam.
+Selection: an explicit `Rubric: <name>` wins, then the seam's `rubrics.default`, then
+`perception`.
 
-- **Below 8:** name the specific subjective flaws holding it back, fix those, and iterate.
+| Rubric | Use for |
+| --- | --- |
+| `perception` | UI, UX, visual surfaces, copy (the default) |
+| `usability` | API, CLI, errors, logs, docs |
+| `performance` | latency, throughput, size, build time, cost |
+| `completeness` | a spec, proposal or feature: what did we not decide? |
+
+- **Below 8:** name the specific flaws holding it back, fix those, and iterate.
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two iterations, then
   stop and report the ceiling if the score does not move.

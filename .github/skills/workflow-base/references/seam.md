@@ -27,6 +27,7 @@ keys are rejected so a typo cannot silently disable a check.
     "themes": ["light", "dark"],
     "notes": "Stop the dev host before the test run."
   },
+  "rubrics": { "default": "perception" },
   "docs": {
     "issues": ".scratch",
     "glossary": "GLOSSARY.md",
@@ -85,6 +86,17 @@ How a visual artifact is seeded and captured. Optional.
 - `themes`: required for `web`; a subset of `light`, `dark`.
 - `notes`: the project's read-through nuance (a host to stop, a server to start).
 
+### `rubrics`
+
+The hillclimb gate's default rubric. Optional; omit for `perception`.
+
+- `default`: a shipped rubric name (`perception`, `usability`, `performance`,
+  `completeness`) or a project-relative path to a `.md` file.
+- The run can override it with an explicit `Rubric: <name>` in the task or spec.
+- `doctor` resolves the name to the file the gatekeeper will read and fails when it
+  is missing.
+- `docs.rubricAddendum` still extends the selected rubric; it never replaces it.
+
 ### `docs`
 
 Project-relative paths the skills read. Optional.
@@ -92,7 +104,7 @@ Project-relative paths the skills read. Optional.
 - `issues`: the issue-tracker directory (default `.scratch`).
 - `glossary`: the glossary path (default `GLOSSARY.md`).
 - `adr`: the ADR directory (default `docs/adr`).
-- `rubricAddendum`: project probes and caps added to the universal rubric.
+- `rubricAddendum`: project probes and caps added to the selected hillclimb rubric.
 - `contract` and `artDirection`: the design contract the provenance and
   art-direction probes read.
 

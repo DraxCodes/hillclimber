@@ -18,7 +18,7 @@ import {
 import { planCheck, planEject, planInit, planUpdate, listExtraFiles } from "./plan.mjs";
 import { copilotFiles } from "./copilot.mjs";
 import { DEFAULT_PROFILE, loadProfile } from "./profile.mjs";
-import { PRESETS, applyPreset } from "./presets.mjs";
+import { PRESETS, PRESET_ALIASES, applyPreset, resolvePresetName } from "./presets.mjs";
 import { SEAM_REL, defaultSeam, loadSeam, validateSeam } from "./seam.mjs";
 
 const REPEATABLE = new Set(["free", "paid", "pack"]);
@@ -276,16 +276,17 @@ function newCommand(flags) {
   const target = resolve(flags._[0] ?? ".");
   const version = readVersion(baseRoot);
   const project = flags.project ?? basename(target);
-  const presetName = flags.preset ?? "bare";
-  if (!PRESETS[presetName]) {
+  const presetName = flags.preset ?? "checks-none";
+  if (!resolvePresetName(presetName)) {
     console.error(
-      `unknown preset: ${presetName} (use ${Object.keys(PRESETS).join(", ")})`,
+      `unknown preset: ${presetName} (use ${Object.keys(PRESETS).join(", ")}; ` +
+        `${Object.keys(PRESET_ALIASES).join(", ")} are aliases)`,
     );
     return 2;
   }
 
   const seam = defaultSeam({ project, baseVersion: version });
-  applyPreset(seam, presetName);
+  const preset = applyPreset(seam, presetName);
   applySeamFlags(seam, flags, { extended: true });
 
   if (!flags.config && (flags.profile || flags.noProfile)) {
@@ -314,6 +315,9 @@ function newCommand(flags) {
   const parts = [surface];
   if (seam.verify.widths?.length) parts.push(seam.verify.widths.join("/"));
   if (seam.verify.themes?.length) parts.push(seam.verify.themes.join("/"));
+  console.log(
+    `  preset: ${preset?.name ?? presetName}${preset?.alias ? ` (alias ${preset.alias})` : ""} — fills checks.build, checks.test, verify.surface/widths/themes only; no stack, layout or dependency`,
+  );
   console.log(`  seam: ${SEAM_REL} (${parts.join("; ")})`);
   console.log(
     `  checks: build ${seam.checks.build?.command ?? "none"}; test ${seam.checks.test?.command ?? "none"}; ${seam.checks.free.length} free, ${seam.checks.paid.length} paid`,
@@ -612,7 +616,9 @@ Flags:
   --force              overwrite modified or differing files
   --dry-run            print the plan, write nothing
   --project <name>     seam project name
-  --preset <name>      bare | web | cli | docs (new)
+  --preset <name>      checks-none | checks-web | checks-cli | checks-docs (new;
+                       bare/web/cli/docs are aliases; fills checks and the
+                       verify surface only, never a stack or layout)
   --build/--test       seam check commands
   --free/--paid        repeatable seam check commands
   --surface <kind>     web | cli | api | docs | none

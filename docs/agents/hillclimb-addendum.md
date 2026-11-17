@@ -1,13 +1,20 @@
 # Hillclimb rubric addendum — HillclimberUI
 
 This is the project addendum named by `docs.rubricAddendum` in
-`.opencode/workflow.json`. It extends the universal 1–10 rubric in the `hillclimb`
-skill (`references/hillclimb-rubric.md`); it never lowers the floor or weakens a
-level. When the two disagree, the stricter reading wins.
+`.opencode/workflow.json`. It extends whichever hillclimb rubric is selected
+(`references/rubrics/<name>.md` in the `hillclimb` skill); it never lowers the
+floor or weakens a level. When the two disagree, the stricter reading wins.
 
-The universal rubric's probes 1–7 apply here unchanged. This file adds the probes
-that only make sense for this app's AI surfaces, the caps they imply, and the exact
-floor.
+This project's default is `perception`, because the app's primary surface is
+visual. The UI probes below apply only when `perception` is the selected rubric. A
+run that selects `performance` (for example, build or test time) or `completeness`
+(for example, a spec review) uses that rubric's own probes; this addendum then
+contributes only the floor, the caps that name a UI contract, and the recorded
+exceptions.
+
+With `perception`, the rubric's probes 1–7 apply here unchanged. This file adds the
+probes that only make sense for this app's AI surfaces, the caps they imply, and
+the exact floor.
 
 ## Additional probes
 

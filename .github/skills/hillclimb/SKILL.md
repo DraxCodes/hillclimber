@@ -1,6 +1,6 @@
 ---
 name: hillclimb
-description: "Run the hillclimb loop against the 1–10 perception rubric and a test/build floor"
+description: "Run the hillclimb loop against a named 1–10 rubric and a test/build floor"
 argument-hint: "[artifact or objective]"
 ---
 
@@ -12,29 +12,42 @@ argument-hint: "[artifact or objective]"
 > project rules are in `AGENTS.md`; the seam is `.opencode/workflow.json`.
 
 Start a hillclimbing run for the objective below. Follow the `hillclimb` skill
-exactly and score against the `hillclimb` skill's `references/hillclimb-rubric.md` plus the
-project addendum named by the seam.
+exactly. Read its "Choosing the rubric" section, then pick **one** rubric and
+record it before the first score:
+
+1. `Rubric: <name>` in the objective or spec wins.
+2. Otherwise the seam's `rubrics.default`.
+3. Otherwise `perception`.
+
+The rubrics are `perception` (UI/UX and visual), `usability` (API, CLI, errors,
+docs), `performance` (latency, size, cost budgets) and `completeness` (a spec,
+proposal or feature that may be missing an obligation). Read the selected file at
+the `hillclimb` skill's `references/rubrics/<name>.md`, plus the project addendum
+named by the seam.
 
 Objective: the text the user typed after `/hillclimb`
 
 If the objective is vague, first use the `grilling` skill to sharpen it into
 settled decisions (skip this when the target and flaws are already clear, to keep
-costs down). Then use the `plan-architect` subagent to produce the target score,
-the evidence plan, the ordered flaws, the floor and the stop conditions. The
+costs down). Then use the `plan-architect` subagent to produce the rubric, the
+target score, the evidence plan, the ordered flaws, the floor and the stop
+conditions — and, for `performance`, the budget table before any measurement. The
 target is 8 unless the objective says `Target score: 10`.
 
-Score every candidate with the `quality-gatekeeper` subagent, from the evidence the seam's
-`verify` block declares (seed, capture, widths and themes) plus a first-run/keyboard
-read-through. Apply the gate as written:
+Score every candidate with the `quality-gatekeeper` subagent, from the evidence the
+selected rubric requires: the seam's `verify` block for a visual artifact, the
+attempt transcript for `usability`, the declared budget and measurements for
+`performance`, the obligation inventory for `completeness`. Apply the gate as
+written:
 
-- **Below 8:** name the specific subjective flaws holding it back (for example
-  clunky transitions, visual clutter, unclear hierarchy), fix those flaws, and
-  iterate.
+- **Below 8:** name the specific flaws holding it back (for example clunky
+  transitions, a budget missed at p95, or an undecided failure path), fix those
+  flaws, and iterate.
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
   iterations, then stop and report the ceiling if the score does not move.
 - **Floor:** the seam's `checks` (build, test and free) pass. A red floor cannot score 8
-  and cannot ship.
+  and cannot ship. A rubric that needs no seed does not get one.
 
 Keep each accepted iteration as its own atomic commit, and revert any iteration the
 score does not improve.
@@ -46,36 +59,65 @@ score does not improve.
 # Hillclimbing
 
 Use this skill when asked to improve something a person will experience — UI, UX,
-copy, docs, an output panel — or to improve a measurable objective (coverage,
-latency, size) with a `plan-architect` agent and a read-only
-`quality-gatekeeper` gate. The loop only keeps a change if the gate passes.
+copy, docs, an output panel — a measurable objective (coverage, latency, size), or
+a decision that may be missing an obligation (a spec, a proposal, a feature). The
+loop names a rubric, plans with a `plan-architect`, and keeps a change only when
+the read-only `quality-gatekeeper` gate passes.
+
+## Choosing the rubric
+
+The gate is **one** named rubric in `references/rubrics/`, plus the project
+addendum named by the seam. Choose it once, before the first score, and record
+the choice. The selection order:
+
+1. An explicit `Rubric: <name>` in the task or spec wins.
+2. Otherwise the seam's `rubrics.default` (for example
+   `"rubrics": { "default": "performance" }`).
+3. Otherwise `perception`.
+
+| Rubric | Artifact | Question |
+| --- | --- | --- |
+| `perception` | UI, UX, a visual surface, copy, a rendered document | Does it land well with a person looking at it? |
+| `usability` | API, CLI, errors, logs, config, docs, notifications | Can a first-time user get value without guessing? |
+| `performance` | Latency, throughput, memory, size, build time, cost | Does it meet a budget declared before measuring? |
+| `completeness` | A spec, proposal, architecture choice, or a built feature | Is every obligation decided, including the ones nobody named? |
+
+Pick the rubric for the artifact, not for the project. A UI project can run a
+`performance` hillclimb on its build; a backend project can run `completeness` on
+a spec. If none fits, say so, state why, and use the closest one rather than
+inventing a silent scale. A project may add its own rubric file and name it in
+`rubrics.default`.
+
+Read the chosen rubric and the addendum before the first score; quote them, don't
+paraphrase them.
 
 ## The decision
 
-The gate is the 1–10 rubric in this skill's `references/hillclimb-rubric.md`, plus the
-project addendum named by the seam. Read both before the first score; quote them, don't
-paraphrase them.
+Every rubric uses the same gate:
 
-- **Below 8:** name the specific subjective flaws holding it back (for example
-  clunky transitions, visual clutter, unclear hierarchy), fix those flaws, and
+- **Below 8:** name the specific flaws holding it back (for a UI, clunky
+  transitions; for a spec, an undecided failure path), fix those flaws, and
   iterate.
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
   iterations, then stop and report the ceiling if the score does not move.
-- **Floor:** the seam's `checks` (build, test and free) pass. A red floor cannot score 8
-  and cannot ship.
+- **Floor:** the seam's `checks` (build, test and free) pass. A red floor cannot
+  score 8 and cannot ship. A paid check runs only with explicit approval and is
+  supporting evidence, not a threshold, unless the seam says otherwise.
 
-The score is the only iterate/stop signal. A green floor does not earn a ship; a number
-moving does not earn a ship. A paid check runs only with explicit approval, and is
-supporting evidence rather than a threshold unless the seam says otherwise.
+The score is the only iterate/stop signal. A green floor does not earn a ship; a
+number moving does not earn a ship.
 
 ## Roles
 
-- `plan-architect` (subagent): declares the target score, the evidence plan, the
-  ordered flaws to fix, the floor and the stop conditions. It does not edit code.
-- `quality-gatekeeper` (subagent): read-only scorer. Reviews the captured evidence,
-  assigns the 1–10 score, names why not the next level, and checks the floor. It
-  does not edit code and does not negotiate the score.
+- `plan-architect` (subagent): declares the rubric, the target score, the evidence
+  plan, the ordered flaws to fix, the floor and the stop conditions. For
+  `performance` it also declares the budget table before any measurement. It does
+  not edit code.
+- `quality-gatekeeper` (subagent): read-only scorer. Reads the selected rubric,
+  reviews the evidence, assigns the 1–10 score, names why not the next level, and
+  checks the floor and the rubric's anti-inflation rules. It does not edit code and
+  does not negotiate the score.
 - `task-orchestrator` (primary): runs the loop, seeds and captures the evidence,
   makes the changes, applies the gate and commits. It cannot raise a score.
 
@@ -84,17 +126,20 @@ supporting evidence rather than a threshold unless the seam says otherwise.
 0. **Sharpen (optional).** If "better" is genuinely unclear, load the `grilling`
    skill and interview the user until the target and the flaws are settled. Skip it
    when the task already names what is wrong — grilling costs real tokens.
-1. **Frame.** Name the artifact and the target score. The default is 8; only
-   `Target score: 10` in the task or spec raises it. Record the target; do not ask.
-2. **Plan.** Launch `plan-architect`. Capture the target, evidence plan, ordered
-   flaws, floor and stop conditions. Do not proceed without a baseline score.
-3. **Baseline.** Capture the evidence the seam's `verify` block declares — seed, capture
-   command, widths and themes — or the measurable command for a non-visual target. Have
-   `quality-gatekeeper` score the current artifact. Ensure the working tree is clean before
-   the first change.
+1. **Frame.** Name the artifact, the rubric (see above) and the target score. The
+   default is 8; only `Target score: 10` in the task or spec raises it. Record the
+   rubric and the target; do not ask.
+2. **Plan.** Launch `plan-architect`. Capture the rubric, target, evidence plan,
+   ordered flaws, floor and stop conditions. Do not proceed without a baseline
+   score.
+3. **Baseline.** Capture the evidence the chosen rubric requires. For a visual
+   artifact that is the seam's `verify` block (seed, capture, widths, themes); for a
+   non-visual one it is the attempt transcript, the budget measurement or the
+   obligation inventory. Have `quality-gatekeeper` score the current artifact.
+   Ensure the working tree is clean before the first change.
 4. **Iterate.** For each step in the plan:
    1. Make the smallest change that targets the top named flaw.
-   2. Re-capture the evidence for the affected screens and states.
+   2. Re-capture the evidence the rubric requires for the affected artifact.
    3. Launch `quality-gatekeeper` to score the change and check the floor.
    4. On a higher score and a green floor, stage and commit exactly this change as
       one atomic commit.
@@ -102,8 +147,9 @@ supporting evidence rather than a threshold unless the seam says otherwise.
       why.
 5. **Stop.** Stop at the target score, after two consecutive iterations without a
    higher score, when a 10 was demanded and the ceiling is reached, or when the
-   budget is exhausted. Report the baseline score, the final score with its named
-   remaining flaws, the floor results, and the kept commits. Remove the seed.
+   budget is exhausted. Report the rubric, the baseline score, the final score with
+   its named remaining flaws, the floor results, and the kept commits. Remove the
+   seed.
 
 ## The floor
 
@@ -116,7 +162,10 @@ stopped first, a check that needs a live server); it may not weaken the floor.
 
 - One logical change per iteration, one atomic commit per accepted iteration.
 - Never commit the seed sample data. Keep it in one clearly marked throwaway file
-  plus a single hook, and delete it before the final report.
+  plus a single hook, and delete it before the final report. Non-visual rubrics
+  have no seed; do not invent one.
+- Record the rubric and the target before the first score; neither moves during a
+  run. A rubric chosen after seeing the result is not a gate.
 - Never let `quality-gatekeeper` or `plan-architect` modify files; both are
   read-only.
 - No score without named evidence. A score without evidence is treated as below 8.
@@ -133,8 +182,10 @@ stopped first, a check that needs a live server); it may not weaken the floor.
 - `grilling`: sharpen a fuzzy objective into settled decisions before planning.
   Optional and token-heavy — use it only when the goal is genuinely unclear, to
   keep costs down. Invoke it with `/grill-me`.
-- `webapp-testing`: seed the app and capture the screenshots a score must cite.
-- `code-review`: review the kept commits against a fixed point after the run.
+- `webapp-testing`: seed the app and capture the screenshots `perception` scores
+  must cite.
+- `code-review`: review the kept commits against a fixed point after the run; it
+  complements `completeness` without replacing it.
 - `find-skills`: discover and install more skills when the loop needs a
   capability this project does not have yet.
 
