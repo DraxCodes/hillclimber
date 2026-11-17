@@ -105,7 +105,9 @@ node scripts/dev/drive.mjs start     # one persistent window, already unlocked
 
 `drive.mjs` types the PIN like a person would — there is no bypass — then stays logged in and takes
 commands: `goto /activity`, `text`, `errors`, `shot`, `reload`, `stop`. `shot` takes
-`--width`, `--height` and `--theme light|dark`, and `help` lists everything.
+`--width`, `--height` and `--theme light|dark`, and `help` lists everything. Bad flags are refused
+with the nearest valid one (exit 2), and `start` with the app down names `host.mjs start` instead of
+opening a browser on an error page.
 
 A plain `dotnet build` or `dotnet test` is expected to leave the app alone, and does: the project
 excludes the repo `bin` from watch and hides the generated `obj` AssemblyInfo from its design-time

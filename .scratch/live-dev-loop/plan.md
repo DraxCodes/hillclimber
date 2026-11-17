@@ -78,7 +78,16 @@ free UI harnesses against the live host.
   `Climber__RepoRoot` gives `/status` its branch and history; `status` exits 1 with a next action
   when unmanaged or down; `help`/`--help` on both scripts, glossed stamps, and
   `shot --width/--height/--theme`. Two stale watches from before the wrapper were also found and
-  killed — they were the source of the earlier port fights. Re-gate pending.
+  killed — they were the source of the earlier port fights.
+  *Second gate:* **7/10 (`KEEP`)** — floor green, main path clean, three narrower flaws:
+  `drive.mjs start` lost the Playwright cause when the host was down; `shot` accepted or raw-500'd
+  bad flags instead of refusing them; and `loop-before.png` was `/` mid-load, with a keyboard claim
+  credited to `theme-nav.mjs` that it does not make.
+  *Fixed and verified:* `start` probes the base first and names `host.mjs start` (plus a caught
+  `go()` and a logged failure line as the backstop); `shot` and `/shot` reject unknown flags, bad
+  themes, non-numeric sizes and wrong paths with exit 2 / HTTP 400 and a one-line next action; the
+  before/after pair was retaken on `/activity` at 900×1200 light and the focus claim replaced with
+  "this lane adds no focusable element". Re-gate pending.
 
 ## Lane 5 — deferred to the next pass
 
