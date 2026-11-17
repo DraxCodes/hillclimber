@@ -70,6 +70,15 @@ free UI harnesses against the live host.
   `polish.mjs` and `surfaces.mjs` not run.
 - [ ] **4.3** Gate at **8** on the live-loop experience (`docs/agents/hillclimb-rubric.md`), with
   the user's seat as the judge: app never dark, tab follows, screenshot on demand.
+  *First gate:* **6/10 (`REVERT`)** — build-triggered restart with a bind failure and a locked tab;
+  `/status` lost the repo root under the temp output; `host.mjs status` said "up" with a dead watch
+  pid; no help text and no reproducible 900/375 shots.
+  *Fixed and verified:* repo `bin` excluded from watch and the generated `obj` AssemblyInfo dropped
+  from the design-time `Compile` list (build + `dotnet test` now leave the host and tab untouched);
+  `Climber__RepoRoot` gives `/status` its branch and history; `status` exits 1 with a next action
+  when unmanaged or down; `help`/`--help` on both scripts, glossed stamps, and
+  `shot --width/--height/--theme`. Two stale watches from before the wrapper were also found and
+  killed — they were the source of the earlier port fights. Re-gate pending.
 
 ## Lane 5 — deferred to the next pass
 

@@ -3,28 +3,44 @@
 **Date:** 2026-11-17. **Spec:** [spec.md](spec.md). **Plan:** [plan.md](plan.md).
 **Target:** 8. **Surface:** the loop's own commands and the tab it keeps alive.
 
+## Gate history
+
+The first independent gate scored this lane **6/10 (`REVERT`)** and named four flaws:
+
+1. A plain build while the host was up restarted the app, lost the port race, and left the tab on
+   `ERR_CONNECTION_REFUSED` until the next file change.
+2. `/status` rendered "Could not locate the repository root" under the dev host.
+3. `host.mjs status` printed "up" beside a dead watch pid, with no next action and exit 0.
+4. No help text in `drive.mjs`, unglossed build/source stamps, and no way to reproduce the
+   900/375 screenshots through the loop itself.
+
+The 8 that had been self-scored in this file was therefore wrong and is withdrawn. This revision
+fixes all four and records the proof below; the re-gate result belongs in plan **4.3**.
+
 ## Seed
 
 None. This lane does not exercise transcript or session state, so there is no sample data and
 nothing to remove. The state used is the app's own: three routes (`/`, `/activity`, `/status`), a
-restart, and a temporary one-line copy edit on `ActivityPage.razor` that was reverted before the
+restart, and temporary one-line copy edits on `ActivityPage.razor` that were reverted before the
 commit.
 
 ## Shots
 
-All under `%TEMP%\climb-ui-shots\`.
+All under `%TEMP%\climb-ui-shots\`, and all produced by the loop's own command — e.g.
+`node scripts/dev/drive.mjs shot --width 900 --height 1200 --theme dark <path>` — so every one is
+reproducible without a second script.
 
 | Shot | What it shows |
 | --- | --- |
-| `loop/activity-900-light.png` | `/activity` at 900, light, after the loop has reloaded it |
+| `loop/activity-900-light.png` | `/activity` at 900, light, after the loop reloaded it |
 | `loop/activity-900-dark.png` | same, dark |
 | `loop/activity-375-light.png` | same, 375 |
 | `loop/activity-375-dark.png` | same, 375, dark |
 | `loop-before.png`, `loop-after.png` | the probe edit: `Read-only.` → `Read-only · loop probe.` |
 | `driver-home-headed.png`, `driver-status-headed.png` | the persistent headed window on `/` and `/status` |
 
-The app's own screens are unchanged by this lane; the 900/375 × light/dark pass is there to show
-that the added script tag and endpoint did not alter them.
+The shots wait out the page's "Checking providers…" placeholder, so they show the loaded page, not
+a spinner. The app's own screens are unchanged by this lane.
 
 ## Read-through
 
@@ -32,13 +48,14 @@ that the added script tag and endpoint did not alter them.
 
 1. `node scripts/dev/host.mjs start` → one line naming the URL, the watch pid and the log. Nothing
    opens; the app is at 5179.
-2. `node scripts/dev/drive.mjs start` → one window, already unlocked, parked on `/`. `status` names
-   the URL, title, unlock state, console-error count, load count and pid. No guess needed.
-3. A save → the window reloads itself. Measured **2.9 s** idle; **held** while the PIN field had
-   focus; **1.0 s** after focus left.
-4. `drive.mjs goto /activity` → unlocked and readable; `text` returns the page; `shot` writes a PNG.
-5. `drive.mjs stop` → "stopped"; `host.mjs stop` → port free. No command dead-ends: every failure
-   names the next action ("the driver is not running. Start it with: …").
+2. `node scripts/dev/drive.mjs start` → one window, already unlocked, parked on the route named by
+   `--route`. `status` names the URL, title, unlock state, console-error count, load count and pid.
+3. A save → watch applies it (hot patch in **170–850 ms**) and the window reloads itself. The
+   refresh waits for a restart's new pid and holds while a field has focus.
+4. `drive.mjs goto /activity` → unlocked and readable; `text` returns the page; `shot` writes a PNG
+   at any width/height and either theme.
+5. A floor build or test while the host runs → nothing happens to the app (see below).
+6. `drive.mjs stop` → "stopped"; `host.mjs stop` → port free. Every failure names the next action.
 
 **Keyboard pass.** The loop adds no focusable UI. The only new bytes in the page are a script tag
 and the Development-only refresh loop; the keyboard path is the app's own and is covered by
@@ -48,34 +65,55 @@ and the Development-only refresh loop; the keyboard path is the app's own and is
 server's memory and a restart clears it. That is the app's existing behaviour, unchanged by this
 lane, and it is the named edge below.
 
-## Flaws found and fixed during the lane
+## Fixed for the gate
 
-1. **A reload could land in a restart window** — `/activity`, after reverting the probe edit. The
-   tab reloaded 1.2 s after the save, the host restarted to apply it, and the page landed on
-   `ERR_CONNECTION_REFUSED` for `_blazor/negotiate`: 262 console errors and a locked page. Fixed by
-   making the refresh wait for a changed pid (a restart that has already answered), and by giving a
-   source-only change a 3 s quiet period. Re-verified after the fix: no errors, still unlocked.
-2. **The refresh baseline reset on its own reload** — a save within the first second after a reload
-   was missed. Fixed by remembering the stamp in `sessionStorage`.
-3. **`host.mjs --force` killed its own caller** — the owner list came from `netstat`, which also
-   matches established client connections, so the script saw itself. Fixed with a listener-only
-   query.
-4. **The driver clicked a class that only two of three pages render** — `/` has its own gate button.
-   Fixed by clicking by accessible name.
-5. **`goto` reported "locked" while it was unlocking** — the gate resolves after the first render.
-   Fixed by waiting for the decision instead of a fixed delay.
+**1. A build must not restart or darken the host.** Two causes, both in `ClimberWeb.csproj`:
+
+- Moving `BaseOutputPath` to the temp directory took the repo `bin` out of the SDK's
+  `DefaultItemExcludes`, so watch treated the writes of a plain build as source changes. The repo
+  `bin` is now excluded explicitly, whichever output path is in use.
+- A design-time build lists the generated `obj/.../ClimberWeb.AssemblyInfo.cs` as a `Compile` item,
+  and watch accepts a change to *any* `Compile` item before it consults the excludes. Every build
+  rewrites that file, so every build restarted the host. A design-time-only target drops exactly
+  that file from the item list. `GlobalUsings.g.cs` must stay — hot reload compiles against this
+  item list and loses implicit usings without it (found by testing, not assumed).
+
+*Verified with the host live:* `dotnet build HillClimberUI.slnx --no-incremental` (0 warnings,
+0 errors) and `dotnet test` (**722 passed**) left the watch pid and app pid **unchanged**, wrote
+**0 bytes** to the watch log, and the open tab stayed unlocked with **0 console errors**.
+
+While doing this the real cause of the earlier bind failures surfaced: **two `dotnet watch` runs
+from before the wrapper** were still alive and fighting over 5179 and the temp output. They are
+gone; `host.mjs status` now reports exactly that state instead of calling it up.
+
+**2. `/status` must resolve the repository.** `host.mjs` now passes `Climber__RepoRoot=<repo>`,
+which `ProjectStatusService` already honours. Verified live: BRANCH `feat/interactive-questions`,
+HEAD `a4ed364`, TREE `dirty`, COMMITS 200, and the changelog list render instead of the warning.
+
+**3. `host.mjs status` must not contradict itself.** It now exits non-zero and names the next
+command when the watch pid is dead, when the port is held by something that answers nothing, and
+when the log's current run ends in a bind failure (the failure line is printed). Verified by running
+the app alone with a state file pointing at a dead pid: `up`, `watch: pid 999999 — not running`,
+`note: nothing is watching for changes; edits will not be applied`,
+`next: node scripts/dev/host.mjs restart`, exit **1**. `build`/`source`/`started` are glossed as a
+local clock time plus an age.
+
+**4. The CLI must explain itself.** `help` / `--help` / `-h` on both scripts, and a typo prints the
+same help and exits 2. `drive.mjs shot` takes `--width`, `--height` and `--theme light|dark`, and
+waits out the page's loading placeholder.
 
 ## Flaws and strengths
 
 | Where | What | Condition |
 | --- | --- | --- |
 | Strong: `drive.mjs start` | one window, already unlocked, parked on the route under work | first run |
-| Strong: `host.mjs status` | names what is running (pid, build, source, render errors) instead of assuming | any time |
+| Strong: `host.mjs status` | names what is running and refuses to call an unmanaged app "up" | any time |
 | Strong: the tab | reloads itself on a save and holds while typing | 900 and 375, both themes |
+| Strong: floor | build and test leave the host and the tab untouched | host live |
 | Edge: after a restart | the tab shows the PIN form and needs one re-entry | only when a change cannot hot-apply |
-| Edge: `host.mjs status` | `build`/`source` are ISO stamps with no gloss | a reader who has not read the spec |
-| Limit: watch | also notices the repo `bin`/`obj` writes of a `dotnet test` and logs "No managed code changes" | running tests while the host is up |
+| Limit: watch | a *forced* full rebuild overflows the OS watcher: "Too many changes at once"; it recovers and the next save applies (verified), but a save during the burst can be missed | `dotnet build --no-incremental` while the host is up |
 | Limit: watch | dropped a `Program.cs` change in an earlier probe, and did not pick up a new `.razor` file in one test | rare; `host.mjs restart` is the recovery |
+| Limit: a rebuild | a save that cannot hot-patch still costs a few seconds; the tab waits for the new pid instead of reloading into the gap | any structural change |
 
 ## Contract
 
@@ -88,8 +126,10 @@ needs no entry.
 | Command | Result |
 | --- | --- |
 | `dotnet build HillClimberUI.slnx --nologo` | 0 warnings, 0 errors |
-| `dotnet test --nologo -v minimal` | **Passed 722**, Failed 0, Skipped 0 — run while the app was live |
-| `node scripts/dev/host.mjs status` after the tests | still up, 200 |
+| `dotnet build HillClimberUI.slnx --no-incremental` | 0 warnings, 0 errors; host pid and tab unchanged |
+| `dotnet test --nologo -v minimal` | **Passed 722**, Failed 0, Skipped 0 — run while the app was live; 0 bytes added to the watch log |
+| `node scripts/dev/host.mjs status` after the tests | still up, watch + app pids unchanged, exit 0 |
+| `node scripts/dev/drive.mjs status` / `errors` after the tests | same pid, unlocked, 0 console errors |
 | `node scripts/ui/theme-nav.mjs` | crawled 3 pages, FAILURES: 0 |
 | `node scripts/ui/security.mjs` | FAILURES: 0 (unchanged; the PIN gate is real) |
 | `node scripts/ui/providers.mjs` | 15 checks, 0 failures |
@@ -98,19 +138,5 @@ needs no entry.
 
 ## Scorecard
 
-```text
-Score: 8/10 — Clean & Clear
-Target: 8
-Evidence: no seed (no transcript state); shots loop/*.png, loop-before/after.png,
-  driver-*-headed.png; read-through: two commands to a live unlocked window, one pause
-  (PIN after a restart)
-Flaws holding it at 8:
-  1. A restart re-locks the tab (one PIN re-entry) — after any non-hot-patchable change.
-  2. `build`/`source` are unglossed ISO stamps — `host.mjs status`, for a reader without the spec.
-Why not 9: the PIN re-entry is a visible pause on the watch path, not a nit.
-Why not 7: every command completes without a guess; failures name the next action; no dead ends;
-  the app stayed up for the whole floor, including a full `dotnet test` run.
-Contract: no violations (no UI surface changed)
-Floor: build 0/0; dotnet test 722 passed / 0 failed; theme-nav 0; security 0; providers 15/15;
-  polish not run; surfaces not run
-```
+Not self-scored. The previous independent gate scored **6/10 (`REVERT`)** and named four flaws; all
+four are fixed and verified above. The re-gate result belongs in plan 4.3.
