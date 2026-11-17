@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "base": "drax-ai-workflow",
-  "version": "0.2.0",
-  "commit": "e961dc7",
-  "installedAt": "2026-11-17T20:30:38.651Z",
+  "version": "0.2.1",
+  "commit": "d397a20",
+  "installedAt": "2026-11-17T20:43:49.158Z",
   "files": {
     ".opencode/agents/plan-architect.md": "sha256:4db73dfe74987ec131f968e918e12408c5d45612633c858849b4f7f4ed70528a",
     ".opencode/agents/quality-gatekeeper.md": "sha256:63341e67b592ef6ef2611c94c45ca1564f57895334b1acce45d6ddbd4b649020",
@@ -33,15 +33,15 @@
     ".opencode/tools/base.mjs": "sha256:2b3c2d3be0f63e4ea9555d760cbd3effd8d465bae738d920806d328a0e230829",
     ".opencode/tools/lib/apply.mjs": "sha256:d69e1bb0128c739f872e114d05c1aa410f5fd54a9d742473c26dc0f744d1a171",
     ".opencode/tools/lib/cli.mjs": "sha256:a5823acae8d573cc4a403ccc30aaff5fd8361dfbd13a13273760865aec83d928",
-    ".opencode/tools/lib/doctor.mjs": "sha256:a8ab67d847810e2db22cb091d48fe6cf41b8154368dea99fdc91493ced06e927",
+    ".opencode/tools/lib/doctor.mjs": "sha256:f55465e794ebb0da0d6a2e21ef95c68bedef6caed818035c3dafe961ca442ce6",
     ".opencode/tools/lib/hash.mjs": "sha256:8de6962d191d008679d12912e029a46df75fa483cbbfdb64e64b5d3ba80f4c7a",
     ".opencode/tools/lib/manifest.mjs": "sha256:8f232231f3f0d0e3baa7b7702e827298068640a7f229f75a6458fe9a41dd5859",
     ".opencode/tools/lib/plan.mjs": "sha256:e2b25ca0047e4e7ea6f9a1becb05bbb13fa707574fcd55a750ae489b6c4aa500",
     ".opencode/tools/lib/presets.mjs": "sha256:ce9abb0709fbcf7ebbd51cb5fa9bce60c35caf8f9fba54e49db028a6faef8997",
-    ".opencode/tools/lib/profile.mjs": "sha256:17f743fd1fabcb944651937348ad3046607aa2ddfc686355c4e095c91e2b34e4",
+    ".opencode/tools/lib/profile.mjs": "sha256:23b0f9a60cb8dccbeb96e562458e4185f1e9c9f07ba9b547fadb70bd9077c21a",
     ".opencode/tools/lib/seam.mjs": "sha256:9438ce049656c5b1add4e8911a560390b8d5d28acf28669e57b105e623c07854"
   },
-  "agentsBlockHash": "sha256:bef78f9be8fbbcf6d0ad78b9f87b6ee98bc8d9a9a497354805db397083def4ab",
+  "agentsBlockHash": "sha256:ce0bbae5ae99622c040a7ba52988766783eacc77b81fadff5338d15e64ab61a9",
   "packs": [
     "engineering"
   ]

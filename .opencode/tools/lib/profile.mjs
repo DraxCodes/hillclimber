@@ -5,16 +5,28 @@ import { join } from "node:path";
 /** The machine-local defaults `base new --config` uses when present. */
 export const DEFAULT_PROFILE = join(homedir(), ".config", "drax", "bootstrap.json");
 
-const SECRET_REF = /^\{[a-z][a-z0-9]*:[^}]+\}$/i;
+/** OpenCode substitutes `{env:NAME}` and `{file:path}`; nothing else is a reference. */
+const SECRET_REF = /^\{(?:env|file):[^}]+\}$/i;
 const PLACEHOLDER = /^<.*>$/;
+const CREDENTIAL_KEY =
+  /(?:api[-_]?key|token|secret|password|credential|authorization)/i;
 
-function collectApiKeys(node, path, out) {
+function looksLikeReference(value) {
+  return SECRET_REF.test(value) || PLACEHOLDER.test(value);
+}
+
+function collectCredentials(node, path, out) {
   if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    node.forEach((item, index) => collectCredentials(item, [...path, index], out));
+    return;
+  }
   for (const [key, value] of Object.entries(node)) {
-    if (key === "apiKey" && typeof value === "string") {
-      out.push({ path: [...path, key].join("."), value });
+    const next = [...path, key];
+    if (typeof value === "string" && CREDENTIAL_KEY.test(key)) {
+      out.push({ path: next.join("."), value });
     } else {
-      collectApiKeys(value, [...path, key], out);
+      collectCredentials(value, next, out);
     }
   }
 }
@@ -22,7 +34,9 @@ function collectApiKeys(node, path, out) {
 /**
  * Load a bootstrap profile. The profile is machine-local and never shipped:
  * `opencode` is written as the project's config, `agentsMd` is appended to
- * AGENTS.md outside the managed block.
+ * AGENTS.md outside the managed block. Any credential-named field must be a
+ * `{env:NAME}`/`{file:path}` reference or a `<placeholder>`; a literal is
+ * rejected before anything is written.
  */
 export function loadProfile(file, { required = false } = {}) {
   if (!file) return { profile: null, errors: [] };
@@ -51,12 +65,12 @@ export function loadProfile(file, { required = false } = {}) {
     errors.push("profile.agentsMd: expected a string");
   }
 
-  const keys = [];
-  collectApiKeys(value.opencode, ["opencode"], keys);
-  for (const { path, value: keyValue } of keys) {
-    if (!SECRET_REF.test(keyValue) && !PLACEHOLDER.test(keyValue)) {
+  const credentials = [];
+  collectCredentials(value.opencode, ["opencode"], credentials);
+  for (const { path, value: credential } of credentials) {
+    if (!looksLikeReference(credential)) {
       errors.push(
-        `profile.${path}: use a {env:NAME} reference, not a literal API key`,
+        `profile.${path}: use a {env:NAME} or {file:path} reference, not a literal secret`,
       );
     }
   }

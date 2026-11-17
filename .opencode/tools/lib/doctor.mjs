@@ -152,8 +152,11 @@ const SECRET_PATTERNS = [
     label: "connection string with credentials",
   },
   { re: /AccountKey=[A-Za-z0-9+/=]{20,}/, kind: "error", label: "Azure account key" },
-  { re: /["']?api[_-]?key["']?\s*:\s*"(?!\{env:)/i, kind: "warning", label: "inline apiKey" },
-  { re: /["']?password["']?\s*[:=]\s*"[^"]+"/i, kind: "warning", label: "inline password" },
+  {
+    re: /["']?(?:api[-_]?key|token|secret|password|credential|authorization)["']?\s*:\s*"(?!\{env:|\{file:|<)/i,
+    kind: "warning",
+    label: "inline credential",
+  },
 ];
 
 const SECRET_EXTENSIONS = /\.(md|json|ya?ml|txt|mjs|cjs|js|ts)$/i;

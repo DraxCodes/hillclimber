@@ -2,8 +2,8 @@
 
 Date: 2026-11-17. Fixed point: `1d84821`. Base: `drax-ai-workflow` v0.1.0 at
 `d4eb552` (tag `v0.1.0`), published at
-<https://github.com/DraxCodes/drax-ai-workflow>; re-vendored to v0.2.0 at
-`e961dc7` (see the 0.2.0 section below).
+<https://github.com/DraxCodes/drax-ai-workflow>; re-vendored to v0.2.1 at
+`d397a20` (see the 0.2.x sections below).
 
 > Renamed from `opencode-workflows` to `drax-ai-workflow` on 2026-11-17. The
 > internal skill id, AGENTS markers, `WORKFLOW_BASE` env and `base` CLI are
@@ -138,6 +138,25 @@ Published-artifact cold start — shallow clone of `v0.2.0` from GitHub, then
   `deepseek#low`, `deepseek#medium`, `glm-5.3-flash#medium`,
   `claude-sonnet-5#medium`; `apiKey` is `{env:SURPLUS_API_KEY}`.
 
+### 0.2.1 — strict credential validation
+
+A read-only security audit of the 0.2.0 diff found two bypasses in
+`tools/lib/profile.mjs`: the reference pattern accepted any `{word:anything}`
+shape, and only a field literally named `apiKey` was inspected. Both were
+reproduced. Fixed in `d397a20` (tag `v0.2.1`): references are now only
+`{env:NAME}` or `{file:path}`, and every credential-named field anywhere under
+`profile.opencode` is checked. Doctor's backstop uses the same field names.
+
+Base `node --test`: `# tests 41 / # pass 41 / # fail 0`, including both bypasses
+and an acceptance case for `{env:}` and `{file:}`.
+
+Live CLI repro against the fixed base:
+
+- `apiKey: "{literal:...}"` → exit 2, `use a {env:NAME} or {file:path}
+  reference, not a literal secret`;
+- `options.token: "myOpaque..."` → exit 2, same message;
+- `apiKey: "{file:./k.txt}"` → exit 0, written as-is.
+
 ## Council seats
 
 Surplus catalog checked this session: `deepseek-v4.1-flash-1017`,
@@ -150,7 +169,7 @@ This repo's `opencode.json` now implements the mix the seat table claims:
 `security-auditor → surplus/claude-sonnet-5#medium`, chair and shape still on
 `surplus/deepseek-v4.1-flash-1017`.
 
-After re-vendoring to 0.2.0:
+After re-vendoring to 0.2.1:
 
 ```
 check: clean: 35 files
