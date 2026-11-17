@@ -36,7 +36,10 @@ throwaway script. It runs on the LAN so a phone can drive it, behind a PIN.
 - **Sessions** — every run and climb is saved as a conversation in the rail, titled by its
   first prompt. Switching back restores the transcript and continues the same OpenCode
   session (`--session`), and `+` starts a fresh one. One JSON file per session under
-  `Climber:SessionsPath`; deleting from the rail is the only pruning.
+  `Climber:SessionsPath`; deleting from the rail is the only pruning. A model question keeps
+  only its display data (title, kind, options, chosen answer, status) — never the transport's
+  URL, password or raw frame — and restores inert: an answered row folds to `answered: …`,
+  a pending or stale row reads `no answer sent`.
 - **Prompt handoff** — the instruction leaves the prompt box as soon as a run or climb takes
   it (so the same text can't be fired twice), and an idle box offers the last prompt back
   with one click.
