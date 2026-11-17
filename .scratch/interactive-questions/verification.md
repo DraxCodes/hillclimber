@@ -77,3 +77,84 @@ closed after the test. No prompts were sent and no model tokens were spent.
 The captured OpenAPI document is not committed: it is 896 KB of generated schema and it changes
 with the server version. Re-capture it with
 `opencode api get /openapi.json --server <url> > openapi.json` when the contract matters.
+
+## Addendum — `--stdio` experiment (2026-11-16)
+
+Run after the gate against the same v2.3.0 binary. No model tokens were spent. This does not
+re-open the gate; it settles the one experiment the gate left open.
+
+### Result
+
+1. **`--stdio` is not a stdio protocol.** It starts the same loopback HTTP API and writes one
+   line to stdout: `{"url":"http://127.0.0.1:<port>"}`. Nothing is read from stdin or framed
+   on stdout; sending it a JSON-RPC line or an HTTP request produced no response.
+2. **It honours `--port 0`.** An ephemeral port is chosen and reported in that JSON line, so
+   the supervisor does not probe for a free port or race another server.
+3. **It binds loopback.** The reported socket was `127.0.0.1:<port>`, and an unauthenticated
+   `GET /api/info` still returned `401`.
+4. **Its lifetime is the parent's pipe.** Closing the child's stdin exited it with code `0`
+   and the listener died with it.
+5. **`/api/event` works** as `text/event-stream` once authenticated, opening with
+   `server.connected`.
+
+### Credential
+
+The pairing handshake is removable, but `--stdio` is not what removes it. In non-`--service`
+mode `serve` takes its password from `OPENCODE_PASSWORD` (then `OPENCODE_SERVER_PASSWORD`,
+then a random per-process value), and the transport is HTTP Basic with username `opencode`
+— not the bearer token the pair flow returns.
+
+Verified end to end: a child spawned with an app-generated `OPENCODE_PASSWORD` returned `200`
+to `Basic opencode:<secret>`, and `GET /api/event` opened as SSE. The secret lived only in
+the child's environment; it was not written to disk, shown to the user, or logged. It
+supersedes the pair flow for a spawned child: no pairing code, no `service.json`, no global
+credential.
+
+### Consequences
+
+- **The listener is not removed.** `--stdio` removes the fixed port, the port-probing race and
+  the orphan child, not the second network surface. That surface is now a loopback listener
+  owned by the app's own child and authenticated with a per-run secret.
+- **The pairing credential is removed.** That was the expensive half of the "second
+  process + credential" cost the gate confirmed.
+- The transport row still resolves to `serve`; this only makes the supervisor and the
+  credential cheaper and safer. The surface decision is unchanged.
+
+## Addendum — live form round-trip (2026-11-16)
+
+The gate could not observe a `form.created` because that needs a turn that asks a question.
+This closes that gap **without model tokens** by creating forms through the server's own API on
+a real `serve --stdio` child (create session, then `session.form.create`), while listening on
+`GET /api/event`. The payload is server-generated and real; only the asker is the probe rather
+than a model turn.
+
+### Observed
+
+1. `POST /api/session` with `{"title": "form probe"}` returns `200` and a session id; no prompt
+   is needed.
+2. `POST /api/session/{id}/form` with one `string` field carrying three options returns `200`
+   with the same `Form.Info` shape the contract declares. `form.created` arrives on the event
+   stream carrying exactly `{"form": Form.Info}`.
+3. `POST .../reply` with `{"answer":{"colour":"violet"}}` returns `204`; `form.replied` arrives
+   carrying `{"id","sessionID","answer":{"colour":"violet"}}`. `GET .../form/{id}` then reports
+   `state: {"status":"answered","answer":{"colour":"violet"}}`.
+4. A second reply returns `409 FormAlreadySettledError` with
+   `"Form already settled: <formID>"`. The race is refused, not applied.
+5. A boolean field given a string returns `400 FormInvalidAnswerError` with
+   `"Expected boolean for form field: ok"`. The error names the field key.
+6. `DELETE .../form/{id}?message=...` returns `204`; `form.cancelled` arrives carrying only
+   `{"id","sessionID"}`. The message is not echoed in the event.
+7. A pending form is returned by `GET /api/session/{id}/form` after the event stream is
+   reconnected, so a missed `form.created` is recoverable by listing.
+8. Field titles are optional and are not synthesised by the server; a field sent without
+   `title` comes back without one. The row must fall back to the field `key`.
+
+### Consequences for the row
+
+- The **notice** for an unsupported form can name the required kind from `field.type` alone;
+  nothing else is needed.
+- A submitted answer can be confirmed from either the `204` or the subsequent `form.replied`.
+  The adapter should treat `204` as acknowledgement, `form.replied` as the authoritative
+  settled state, and `409`/`400` as terminal failure of that submit — never as "still pending".
+- Restored pending forms must render closed: the list endpoint is the restore path and it
+  carries no "this was live a moment ago" signal.
