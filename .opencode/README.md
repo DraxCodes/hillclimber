@@ -1,8 +1,8 @@
 # Workflow base (vendored)
 
-This directory is a **pinned, vendored copy** of the
-[opencode-workflows](../../opencode-workflows) base at **v0.1.0**.
-It is committed, reviewable and hash-checked. Do not edit the generated files here.
+This directory is a **pinned, vendored copy** of the `opencode-workflows` base at
+**v0.1.0**. It is committed, reviewable and hash-checked. Do not edit the generated
+files here.
 
 ## What is generated
 

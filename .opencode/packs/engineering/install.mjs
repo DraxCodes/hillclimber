@@ -3,7 +3,8 @@
 // file, using the skills CLI (https://skills.sh).
 //
 // Project scope: the skills land in this project (.agents/skills/, which
-// OpenCode reads), so they travel with the repo and never touch ~/.config.
+// OpenCode reads) and never touch ~/.config. Commit them or ignore them; that
+// is the project's choice.
 //
 // Usage:  node .opencode/tools/base.mjs pack install engineering .
 //   or:   node .opencode/packs/engineering/install.mjs

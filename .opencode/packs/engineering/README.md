@@ -20,8 +20,9 @@ node .opencode/tools/base.mjs pack install engineering .
 ```
 
 The installer reads `pack.json` beside itself and runs the `skills` CLI in project
-scope, so the skills land in `.agents/skills/` (which OpenCode reads) and travel
-with the repo. It never writes `~/.config`.
+scope, so the skills land in `.agents/skills/`, which OpenCode reads. Whether they
+are committed is the project's choice; a project's `.gitignore` may ignore them.
+It never writes `~/.config`.
 
 The pack's own files (this README, `pack.json`, `install.mjs`) are vendored and
 hash-checked like the rest of the base; the third-party skills are not. Re-run the

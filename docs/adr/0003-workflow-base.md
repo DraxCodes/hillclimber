@@ -7,8 +7,8 @@ hand into `.opencode/` and partly into `~/.config/opencode`, which drifted.
 
 ## Decision
 
-This repo becomes a **consumer** of the `opencode-workflows` base
-(`C:\Users\joelp\code\opencode-workflows`), pinned at v0.1.0.
+This repo becomes a **consumer** of the `opencode-workflows` base, pinned at
+v0.1.0.
 
 - The base owns `.opencode/agents/`, `.opencode/commands/`, `.opencode/skills/`,
   `.opencode/tools/`, `.opencode/packs/` and the managed block in `AGENTS.md`.

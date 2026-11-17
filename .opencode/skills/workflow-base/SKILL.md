@@ -59,8 +59,8 @@ in place for the project.
 
 ## Updating the base
 
-1. Check out the target tag in the base repo (`C:\Users\joelp\code\opencode-workflows`
-   by default, or `--from <dir>` / `WORKFLOW_BASE`).
+1. Check out the target tag in a base checkout (pass `--from <dir>`, set
+   `WORKFLOW_BASE`, or run from the checkout).
 2. From the project: `node .opencode/tools/base.mjs update .`.
 3. Review the diff, run the floor (the seam's `checks`), commit the vendored tree,
    the manifest, the seam's version and the `AGENTS.md` block together.

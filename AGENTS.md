@@ -83,13 +83,13 @@ behind a PIN. The app, its tests and its dev scripts are described in the root
 
 ### Dev loop
 
-- Build: `dotnet build --nologo`.
-- Tests: `dotnet test --nologo` (the full suite; `README.md` has the current count).
-  Stop the dev host first on Windows.
-- Free UI assertions: `node theme-nav.mjs`, `node security.mjs`, `node providers.mjs`
-  from `scripts/ui`.
-- Token-spending: `node surfaces.mjs` from `scripts/ui` drives real `opencode` runs.
-  Run it only with explicit approval; otherwise report it as **not run**.
+- The commands are the seam's `checks`: `build`, `test`, `free` and the opt-in
+  `paid` in `.opencode/workflow.json`. Read them from there; do not restate them
+  here.
+- Stop the dev host before `dotnet test` on Windows.
+- The token-spending harness (`scripts/ui`, the seam's paid check) drives real
+  `opencode` runs. Run it only with explicit approval; otherwise report it as
+  **not run**.
 - No app change means no UI harness; say so rather than implying it passed.
 
 ### Visual verification
@@ -100,7 +100,7 @@ behind a PIN. The app, its tests and its dev scripts are described in the root
 - Page-local state the fixture cannot reach uses a throwaway seed: clearly marked,
   uncommitted, confined to one throwaway file plus a single hook.
 - Capture screenshots with the Playwright harness in the temp `climb-ui` folder at
-  375 and 900, light and dark.
+  the seam's `verify.widths` and `verify.themes`.
 - Remove the seed before the final report.
 
 ### UI quality
