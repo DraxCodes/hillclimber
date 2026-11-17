@@ -45,6 +45,12 @@ public enum LogKind
     Unrecognized,
 
     /// <summary>
+    /// A question asked by the run, written by <see cref="QuestionLine"/>. The row renders
+    /// <see cref="LogEntry.Question"/>; the raw line is display data, never a wire frame.
+    /// </summary>
+    Question,
+
+    /// <summary>
     /// The prompt that opened a turn. Never produced by parsing: the session coordinator
     /// synthesizes one when a stored session is restored, so the reader's own question is
     /// part of the transcript and not only the model's answer.
@@ -66,6 +72,7 @@ public enum LogKind
 /// <param name="ToolTitle">opencode's human description of the call (<c>state.title</c>); may be null.</param>
 /// <param name="Command">The full shell command when the tool is a shell; may be null.</param>
 /// <param name="ExitCode">The command's exit code (<c>state.metadata.exit</c>); may be null.</param>
+/// <param name="Question">The question state for <see cref="LogKind.Question"/>; null otherwise.</param>
 public sealed record LogEntry(
     string Raw,
     string Timestamp,
@@ -76,7 +83,8 @@ public sealed record LogEntry(
     StepStatus Status = StepStatus.None,
     string? ToolTitle = null,
     string? Command = null,
-    int? ExitCode = null);
+    int? ExitCode = null,
+    QuestionState? Question = null);
 
 /// <summary>
 /// Turns the run's log feed into display-ready <see cref="LogEntry"/> rows. Lines the
@@ -177,6 +185,15 @@ public sealed class LogFormatter
                     ? candidate
                     : default;
                 return plain with { Kind = LogKind.Error, Text = SummarizeError(root, errorPart) };
+            }
+
+            // A question row is our own display event, not an opencode one: it has no `part`.
+            if (string.Equals(type, QuestionLine.Type, StringComparison.Ordinal))
+            {
+                var question = QuestionLine.Parse(payload);
+                return question is null
+                    ? plain
+                    : plain with { Kind = LogKind.Question, Text = question.Title, Question = question };
             }
 
             if (!root.TryGetProperty("part", out var part) || part.ValueKind != JsonValueKind.Object)
@@ -543,7 +560,7 @@ public sealed class LogFormatter
     /// text. Razor escapes the result; this stops bidi overrides ("Trojan Source") and
     /// zero-width characters from spoofing the reading order of a transcript.
     /// </summary>
-    private static string Clean(string value)
+    internal static string Clean(string value)
     {
         if (string.IsNullOrEmpty(value))
         {
