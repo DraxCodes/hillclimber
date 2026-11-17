@@ -84,6 +84,39 @@ public class ServeRunRunnerTests
         Assert.Equal(ServeTurnEnd.Interrupted, runner.End);
     }
 
+    private static string Interrupted(string reason) => Own(
+        """{"id":"e4","created":4,"type":"session.execution.interrupted","data":{"sessionID":"{session}","reason":"REASON"}}""")
+        .Replace("REASON", reason, StringComparison.Ordinal);
+
+    [Fact]
+    public async Task AServerSideInterruptFailsTheRunAndKeepsTheReason()
+    {
+        var handler = new ScriptedHandler(_ => Response(HttpStatusCode.OK));
+        var (runner, _) = Build(handler, [Started, Interrupted("shutdown")]);
+
+        var failure = await Assert.ThrowsAsync<ServeInterruptedException>(
+            () => runner.RunAsync(null, CancellationToken.None));
+
+        Assert.Equal("shutdown", failure.Reason);
+        Assert.Equal("the run was interrupted (shutdown)", failure.Message);
+        Assert.Equal(ServeTurnEnd.Interrupted, runner.End);
+        Assert.Equal("shutdown", runner.InterruptReason);
+        // The reader never pressed stop, so the runner must not post one.
+        Assert.DoesNotContain(handler.Calls, call => call.Path.Contains("interrupt", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AUserInterruptIsAStopNotAServeFailure()
+    {
+        var handler = new ScriptedHandler(_ => Response(HttpStatusCode.OK));
+        var (runner, _) = Build(handler, [Started, Interrupted("user")]);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runner.RunAsync(null, CancellationToken.None));
+
+        Assert.Equal(ServeTurnEnd.Interrupted, runner.End);
+        Assert.Equal("user", runner.InterruptReason);
+    }
+
     [Fact]
     public async Task AStreamThatEndsWithoutATerminalFailsTheRun()
     {

@@ -60,7 +60,7 @@ public class QuestionRunServiceTests
 
         Assert.Contains(
             service.State.Logs,
-            line => line.Contains("[questions unavailable: the run's server did not start]", StringComparison.Ordinal));
+            line => line.Contains("[questions unavailable: the question channel did not attach", StringComparison.Ordinal));
         Assert.Equal(RunStatus.Completed, service.State.Status);
     }
 
@@ -74,6 +74,7 @@ public class QuestionRunServiceTests
         await service.StartAsync(Options(sessionId: null));
 
         Assert.Equal(0, factory.Created);
+        Assert.Equal(0, factory.Starts);
         Assert.Equal(RunStatus.Completed, service.State.Status);
     }
 
@@ -87,6 +88,36 @@ public class QuestionRunServiceTests
         await service.StartAsync(Options());
 
         Assert.Equal(0, factory.Created);
+        Assert.Equal(0, factory.Starts);
+    }
+
+    [Fact]
+    public async Task TheProducerAndTheChannelShareTheRunsOneChild()
+    {
+        var factory = new FakeFactory();
+        var (service, runner) = Create(factory);
+        runner.Release.TrySetResult(true);
+
+        await service.StartAsync(Options());
+
+        Assert.Equal(1, factory.Starts);
+        Assert.Same(factory.Server, factory.Channel.StartedWith);
+        Assert.Equal(RunStatus.Completed, service.State.Status);
+    }
+
+    [Fact]
+    public async Task AChildThatNeverStartedGetsNoChannelAndOneLine()
+    {
+        var factory = new FakeFactory { StartFailure = new ServeStartException("the run's server did not start") };
+        var (service, runner) = Create(factory);
+        runner.Release.TrySetResult(true);
+
+        await service.StartAsync(Options());
+
+        Assert.Equal(0, factory.Created);
+        Assert.Single(service.State.Logs, line => line.Contains("[questions unavailable:", StringComparison.Ordinal));
+        // The run still happens, on the plain CLI producer.
+        Assert.Equal(RunStatus.Completed, service.State.Status);
     }
 
     [Fact]
@@ -190,7 +221,10 @@ public class QuestionRunServiceTests
     private static (RunService Service, GatedRunner Runner) Create(IQuestionChannelFactory? factory)
     {
         var runner = new GatedRunner();
-        return (new RunService(runner, questions: factory), runner);
+
+        // Serve mode now owns the child, so the gated runner stands in for the producer that
+        // would have spoken the child's HTTP API.
+        return (new RunService(runner, questions: factory, serveRunner: (_, _) => runner), runner);
     }
 
     private static RunOptions Options(string? sessionId = "ses_1") =>
@@ -252,11 +286,56 @@ public class QuestionRunServiceTests
 
         public int Created { get; private set; }
 
+        public int Starts { get; private set; }
+
+        /// <summary>Set to make the run's one child fail to start.</summary>
+        public Exception? StartFailure { get; set; }
+
+        /// <summary>The run's one child; the channel borrows it, as it does in production.</summary>
+        public ServeChild Server { get; } = new(
+            "http://127.0.0.1:4099",
+            "not-a-real-password",
+            new IdleServeProcess());
+
+        public Task<ServeChild?> StartServerAsync(string targetFolder, CancellationToken cancellationToken)
+        {
+            Starts++;
+            if (StartFailure is not null)
+            {
+                return Task.FromException<ServeChild?>(StartFailure);
+            }
+
+            return Task.FromResult<ServeChild?>(Enabled ? Server : null);
+        }
+
         public IQuestionChannel? Create()
         {
             Created++;
             return Channel;
         }
+    }
+
+    /// <summary>A serve process that never announces, exits or needs anything.</summary>
+    private sealed class IdleServeProcess : IServeProcess
+    {
+        private bool _exited;
+
+        public TextWriter Input { get; } = new StringWriter();
+
+        public TextReader Output { get; } = new StringReader(string.Empty);
+
+        public TextReader Error { get; } = new StringReader(string.Empty);
+
+        public bool HasExited => _exited;
+
+        public void CloseInput() => _exited = true;
+
+        public Task WaitForExitAsync(CancellationToken cancellationToken) =>
+            _exited ? Task.CompletedTask : Task.Delay(Timeout.Infinite, cancellationToken);
+
+        public void Kill() => _exited = true;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class FakeChannel : IQuestionChannel
@@ -275,6 +354,11 @@ public class QuestionRunServiceTests
 
         public List<string> Checks { get; } = new();
 
+        /// <summary>The server the run handed the channel; null when it started none.</summary>
+        public ServeChild? StartedWith { get; private set; }
+
+        public int Starts { get; private set; }
+
         public void Emit(QuestionState state) => Changed?.Invoke(state);
 
         public Task StartAsync(
@@ -283,6 +367,9 @@ public class QuestionRunServiceTests
             CancellationToken cancellationToken,
             ServeChild? server = null)
         {
+            Starts++;
+            StartedWith = server;
+
             if (ThrowOnStart)
             {
                 throw new ServeStartException("the run's server did not start");

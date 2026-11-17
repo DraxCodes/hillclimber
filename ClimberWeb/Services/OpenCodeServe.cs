@@ -21,6 +21,23 @@ public sealed class ServeStartException : Exception
 }
 
 /// <summary>
+/// The served turn ended itself for a reason the reader did not cause (the server shut down,
+/// another turn superseded it, or it timed out). Distinct from a reader's stop so the UI can
+/// report who ended the run instead of always saying "Stopped by user".
+/// </summary>
+public sealed class ServeInterruptedException : Exception
+{
+    public ServeInterruptedException(string reason)
+        : base($"the run was interrupted ({reason})")
+    {
+        Reason = reason;
+    }
+
+    /// <summary>The server's own <c>session.execution.interrupted.reason</c>.</summary>
+    public string Reason { get; }
+}
+
+/// <summary>
 /// A spawned <c>opencode serve</c> process. Abstracted so the supervisor's URL line, timeout
 /// and kill behaviour can be tested without a real child.
 /// </summary>

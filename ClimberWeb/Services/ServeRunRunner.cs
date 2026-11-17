@@ -63,6 +63,13 @@ public sealed class ServeRunRunner : ICommandRunner
     /// <summary>The server's own failure message when <see cref="End"/> is failed.</summary>
     public string? Failure { get; private set; }
 
+    /// <summary>
+    /// Why a served turn was interrupted, when <see cref="End"/> is
+    /// <see cref="ServeTurnEnd.Interrupted"/>: <c>user</c>, <c>shutdown</c>, <c>superseded</c> or
+    /// <c>inactivity</c>.
+    /// </summary>
+    public string? InterruptReason { get; private set; }
+
     /// <inheritdoc />
     public Task<CommandResult> RunAsync(
         CommandRequest request,
@@ -142,12 +149,22 @@ public sealed class ServeRunRunner : ICommandRunner
             var end = await terminal.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             End = end;
             Failure = reason.Task.IsCompletedSuccessfully ? reason.Task.Result : null;
+            InterruptReason = mapper.InterruptReason;
+
+            if (end == ServeTurnEnd.Interrupted)
+            {
+                // The server can end a turn for reasons the reader did not cause (shutdown,
+                // superseded, inactivity) or because somebody asked it to. Only "user" is a
+                // stop a reader pressed; calling the rest "Stopped by user" would be a lie.
+                throw InterruptReason is null or "user"
+                    ? new OperationCanceledException("The turn was interrupted.")
+                    : new ServeInterruptedException(InterruptReason);
+            }
 
             return end switch
             {
                 ServeTurnEnd.Succeeded => new CommandResult(0, string.Empty, string.Empty),
                 ServeTurnEnd.Failed => new CommandResult(StreamClosedExitCode, string.Empty, Failure ?? "the run failed"),
-                ServeTurnEnd.Interrupted => throw new OperationCanceledException("The server interrupted the run."),
                 _ => StreamClosed(emit),
             };
         }

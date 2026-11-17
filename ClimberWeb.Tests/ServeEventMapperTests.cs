@@ -244,6 +244,57 @@ public class ServeEventMapperTests
             Own("""{"sessionID":"{session}","reason":"user"}""")));
 
         Assert.Equal(ServeTurnEnd.Interrupted, mapper.End);
+        Assert.Equal("user", mapper.InterruptReason);
+    }
+
+    [Fact]
+    public void AServerSideInterruptKeepsItsReason()
+    {
+        var mapper = new ServeEventMapper(Session);
+
+        mapper.Map(Event("session.execution.started", Own("""{"sessionID":"{session}"}""")));
+        mapper.Map(Event("session.execution.interrupted",
+            Own("""{"sessionID":"{session}","reason":"shutdown"}""")));
+
+        Assert.Equal(ServeTurnEnd.Interrupted, mapper.End);
+        Assert.Equal("shutdown", mapper.InterruptReason);
+    }
+
+    [Fact]
+    public void AFailedStepWithADifferentMessageAndExecutionPrintBothRows()
+    {
+        var mapper = new ServeEventMapper(Session);
+
+        mapper.Map(Event("session.execution.started", Own("""{"sessionID":"{session}"}""")));
+        var step = mapper.Map(Event("session.step.failed",
+            Own("""{"sessionID":"{session}","assistantMessageID":"msg_1","error":{"type":"ProviderError","message":"the account has no credit"}}""")));
+        var execution = mapper.Map(Event("session.execution.failed",
+            Own("""{"sessionID":"{session}","error":{"type":"ProviderError","message":"retries exhausted"}}""")));
+
+        Assert.Equal("the account has no credit", LogFormatter.Parse(Assert.Single(step)).Text);
+        // Different words are new information; dropping them would hide the cause.
+        Assert.Equal("retries exhausted", LogFormatter.Parse(Assert.Single(execution)).Text);
+        Assert.Equal("retries exhausted", mapper.Failure);
+    }
+
+    [Fact]
+    public void AStepThatChangedFilesPrintsTheFilesRow()
+    {
+        var mapper = new ServeEventMapper(Session);
+        const string data =
+            """{"sessionID":"{session}","assistantMessageID":"msg_1","finish":"stop","cost":0,"tokens":{},"files":["src/a.ts","src/b.ts"]}""";
+
+        var lines = mapper.Map(Event("session.step.ended", Own(data)));
+
+        Assert.Equal(2, lines.Count);
+        var files = LogFormatter.Parse(lines[1]);
+        Assert.Equal(LogKind.Unrecognized, files.Kind);
+        Assert.Equal("session.diff", files.Text);
+        Assert.Contains("src/a.ts", files.ToolInput);
+        Assert.Contains("src/b.ts", files.ToolInput);
+
+        // A later step touching the same files is a separate change, so it prints again.
+        Assert.Equal(2, mapper.Map(Event("session.step.ended", Own(data))).Count);
     }
 
     [Fact]

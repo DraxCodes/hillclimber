@@ -280,3 +280,37 @@ The single-child invariant is covered by `ServeProducerWiringTests` (a borrowed 
 disposed), and form create/reply/cancel against a real child are already covered by the guarded
 live tests in `OpenCodeFormClient`/`QuestionChannel`. The end-to-end form path needs a run that
 happens to ask a question; it is not simulated.
+
+## After the first gate (7/10)
+
+The gate named four flaws and one minor. Each is fixed, and each now has a free test that fails if
+it regresses:
+
+1. **A server-side interrupt said "Stopped by user".** `ServeEventMapper` now keeps
+   `session.execution.interrupted.reason`; `ServeRunRunner` throws `ServeInterruptedException` for
+   `shutdown|superseded|inactivity` and leaves `user` as a stop; `RunService` fails the run with
+   `the run was interrupted (<reason>)` and no fallback offer. Tests:
+   `ServeEventMapperTests.AServerSideInterruptKeepsItsReason` and
+   `ServeRunServiceTests.AServerInterruptFailsTheRunAndNamesTheServer` /
+   `ServeRunRunnerTests.AServerSideInterruptFailsTheRunAndKeepsTheReason`.
+2. **A failed child start could start a second child.** `StartQuestionsAsync` now returns null when
+   the run has no server, so the only `ServeSupervisor.StartAsync` a serve run can reach is the
+   producer's. Tests: `ServeRunServiceTests.AChildThatNeverStartedGetsNoChannelAndOneLine` and
+   `QuestionRunServiceTests.AChildThatNeverStartedGetsNoChannelAndOneLine`.
+3. **A false attach line.** A channel that cannot attach now says
+   `[questions unavailable: the question channel did not attach (…)` — the server did start.
+   Test: `QuestionRunServiceTests.AFailingChannelIsOneLineAndTheRunStillCompletes`.
+4. **A different execution message could be swallowed.** The duplicate guard now compares the
+   message instead of remembering "a row was printed". Test:
+   `ServeEventMapperTests.AFailedStepWithADifferentMessageAndExecutionPrintBothRows`.
+   The run's band also repeats the server's own failure words in serve mode instead of
+   `opencode exited with code 1` (no process exited). Test:
+   `ServeRunServiceTests.AServeFailureBandsTheServersOwnWordsNotAnExitCode`.
+5. **Minor — `step.ended.files` was dropped.** The mapper now emits the CLI's `session.diff` row,
+   one per step that lists files. Test:
+   `ServeEventMapperTests.AStepThatChangedFilesPrintsTheFilesRow`.
+
+The run loop is also drivable in `serve` mode by tests now: `RunService` takes an injectable
+`Func<ServeChild, RunOptions, ICommandRunner>`, so `ServeRunServiceTests` exercises the real
+serve branch (one child, shared, disposed once) without spawning a process. The live turn above
+still stands as the only end-to-end evidence; none of these fixes needed another paid turn.

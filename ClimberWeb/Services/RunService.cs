@@ -123,14 +123,29 @@ public sealed class RunService : IRunService
     private ProviderPricing? _activePricing;
     private IQuestionChannel? _channel;
 
+    /// <summary>
+    /// Builds the producer for a serve run from the run's one child. Injectable so a test can
+    /// drive the serve branch of the run loop without spawning a process; the real one speaks
+    /// the child's HTTP API.
+    /// </summary>
+    private readonly Func<ServeChild, RunOptions, ICommandRunner> _serveRunner;
+
     public RunService(
         ICommandRunner runner,
         ILogger<RunService>? logger = null,
-        IQuestionChannelFactory? questions = null)
+        IQuestionChannelFactory? questions = null,
+        Func<ServeChild, RunOptions, ICommandRunner>? serveRunner = null)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _logger = logger;
         _questions = questions;
+        _serveRunner = serveRunner ?? ((child, options) => new ServeRunRunner(
+            child.Client,
+            new OpenCodeFormClient(child.Client),
+            options.SessionId!,
+            options.Prompt,
+            options.Agent,
+            options.Provider));
     }
 
     public RunState State
@@ -311,15 +326,12 @@ public sealed class RunService : IRunService
             // it is one line, and the run continues on the producer it already has.
             questions = await StartQuestionsAsync(options, server, cancellationToken).ConfigureAwait(false);
 
-            var result = server is not null && options.SessionId is { Length: > 0 } sessionId
-                ? await new ServeRunRunner(
-                        server.Client,
-                        new OpenCodeFormClient(server.Client),
-                        sessionId,
-                        options.Prompt,
-                        options.Agent,
-                        options.Provider)
-                    .RunAsync(OnOpenCodeLine, cancellationToken)
+            var result = server is not null
+                ? await _serveRunner(server, options)
+                    .RunAsync(
+                        OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
+                        OnOpenCodeLine,
+                        cancellationToken)
                     .ConfigureAwait(false)
                 : await _runner.RunAsync(
                     OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
@@ -335,11 +347,24 @@ public sealed class RunService : IRunService
             }
             else if (result.ExitCode != 0)
             {
-                Fail(
-                    $"[opencode exited with code {result.ExitCode}]",
-                    $"opencode exited with code {result.ExitCode}",
-                    options,
-                    offerFallback: CanFallBack(options));
+                if (server is not null)
+                {
+                    // The serve producer already wrote the server's own failure row; the band
+                    // repeats those words instead of inventing a process exit code for a
+                    // process this run never started.
+                    var detail = string.IsNullOrWhiteSpace(result.StandardError)
+                        ? "the run failed"
+                        : result.StandardError.Trim();
+                    Fail(null, detail, options, offerFallback: CanFallBack(options));
+                }
+                else
+                {
+                    Fail(
+                        $"[opencode exited with code {result.ExitCode}]",
+                        $"opencode exited with code {result.ExitCode}",
+                        options,
+                        offerFallback: CanFallBack(options));
+                }
             }
             else
             {
@@ -357,6 +382,21 @@ public sealed class RunService : IRunService
                 Log("===== Completed =====");
                 LogSpend();
             }
+        }
+        catch (ServeInterruptedException exception)
+        {
+            // The server ended the turn itself. That is not a provider failure either, and it
+            // is not the reader's stop, so the band says which one it was.
+            Log($"[serve: {exception.Message}]");
+            UpdateState(state => state with
+            {
+                Status = RunStatus.Failed,
+                FinishedAt = DateTimeOffset.Now,
+                Message = exception.Message,
+                FallbackAvailable = false,
+                FallbackMessage = null,
+                Fallback = null,
+            });
         }
         catch (OperationCanceledException)
         {
@@ -443,6 +483,14 @@ public sealed class RunService : IRunService
             return null;
         }
 
+        // Serve mode means the run already owns its one child. A channel that cannot attach to
+        // that child must not start a second one: forms are process-local to the server that
+        // raised them, so a second child could never see this run's questions anyway.
+        if (server is null)
+        {
+            return null;
+        }
+
         IQuestionChannel? channel = null;
         try
         {
@@ -461,7 +509,7 @@ public sealed class RunService : IRunService
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             _logger?.LogWarning(exception, "Question channel unavailable.");
-            Log("[questions unavailable: the run's server did not start]");
+            Log($"[questions unavailable: the question channel did not attach ({exception.Message})]");
             if (channel is not null)
             {
                 channel.Changed -= OnQuestionChanged;
@@ -500,14 +548,18 @@ public sealed class RunService : IRunService
         options.Provider is not null && options.FallbackList.Count > 0;
 
     /// <summary>
-    /// Logs <paramref name="logLine"/> and records the run as failed. A failure on a provider
-    /// with a configured fallback exposes the next provider, which only runs after approval.
+    /// Logs <paramref name="logLine"/> (when it is not null) and records the run as failed. A
+    /// failure on a provider with a configured fallback exposes the next provider, which only
+    /// runs after approval.
     /// </summary>
-    private void Fail(string logLine, string message, RunOptions options, bool offerFallback)
+    private void Fail(string? logLine, string message, RunOptions options, bool offerFallback)
     {
         var next = offerFallback ? options.FallbackList.FirstOrDefault() : null;
         var current = options.Provider?.DisplayName ?? "The run";
-        Log(logLine);
+        if (logLine is not null)
+        {
+            Log(logLine);
+        }
         UpdateState(state => state with
         {
             Status = RunStatus.Failed,

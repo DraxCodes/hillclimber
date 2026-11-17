@@ -171,28 +171,35 @@ taken later if serve becomes the default producer and grows CLI-less features.
   shapes `LogFormatter` parses, and return when `session.execution.*` lands for this session.
   Ignore every event whose `sessionID` is not ours, and every family not mapped (`permission.*`,
   `pty.*`, `shell.*`, `form.*` — the channel owns forms).
-  *Tests:* synthesized payloads in a new `ClimberWeb.Tests/Fixtures/serve-events.jsonl`; one test
-  per mapped line, asserting the emitted JSON parses through `LogFormatter.Parse` to the same
-  `LogEntry` the CLI fixture produces for that step; a foreign `sessionID` emits nothing; an
-  unknown family emits nothing.
-- [x] **7.2** One child, two users. `QuestionChannel.StartAsync` gains an overload that takes an
-  existing `ServeChild` and does not dispose it (`ownsChild: false`); `RunService` creates the
-  child once in `serve` mode and disposes it in the run's `finally`, after the channel.
+  *Tests:* synthesized payloads in `ServeEventMapperTests` (no fixture file, and no process); one
+  test per mapped line, asserting the emitted JSON parses through `LogFormatter.Parse` to the
+  `LogEntry` the renderer shows for that step; a foreign `sessionID` emits nothing; an unknown
+  family emits nothing.
+- [x] **7.2** One child, two users. `QuestionChannel.StartAsync` gains an optional `ServeChild`
+  it borrows and never disposes; `RunService` creates the child once in `serve` mode, hands it to
+  both, and disposes it in the run's `finally`, after the channel.
   *Tests:* the channel with a borrowed child never disposes it; the run's `finally` disposes
-  exactly once; `off` mode still takes the old path (no child at all).
+  exactly once; a failed child start starts no channel at all; `off` mode still takes the old
+  path (no child at all).
 - [x] **7.3** Stop = interrupt, then close. `Stop()` cancels the token; the serve path POSTs
-  `/interrupt`, waits briefly for `session.execution.interrupted`, then closes the child's stdin
-  and disposes. A child that does not answer the interrupt is killed by `ServeChild.DisposeAsync`
-  (already the behaviour).
-  *Tests:* interrupt is POSTed once on cancel; a child that never emits `interrupted` still
-  terminates within the grace period; exit status maps to `Stopped`, not `Failed`.
-- [x] **7.4** Failure lines, mirroring the spec's table: child did not start → the existing
-  `[questions unavailable: …]` line and the run continues on the CLI path; session create 4xx →
-  `[serve: session could not be created (status)]`; prompt 4xx → `[serve: prompt refused (status)]`;
-  a stream that ends before a terminal event → `[serve: the run's server closed the stream]` and
-  exit code 1 so the run reports failed with the normal fallback offer.
-  *Tests:* each status maps to its line and to `Failed`/`Stopped` as specified; no line carries the
-  password or the loopback URL.
+  `/interrupt?resume=false` and stops watching immediately, then the run's `finally` closes the
+  child's stdin and disposes it (a child that does not answer the interrupt is killed by
+  `ServeChild.DisposeAsync`, already the behaviour). It does **not** wait for
+  `session.execution.interrupted`: the reader pressed stop, so nothing is gained by holding the
+  UI open for the server's acknowledgement.
+  A `session.execution.interrupted` the *server* raises (reason `shutdown|superseded|inactivity`)
+  is not a reader's stop: the runner throws `ServeInterruptedException`, the run fails, and the
+  band says `the run was interrupted (<reason>)` with no fallback offer.
+  *Tests:* interrupt is POSTed once on cancel and maps to `Stopped`, not `Failed`; a server-side
+  interrupt throws with its reason and maps to `Failed` with that reason in the band.
+- [x] **7.4** Failure lines, mirroring the spec's table: child did not start → one
+  `[questions unavailable: …]` line, no channel is started at all, and the run continues on the
+  CLI path; session create 4xx → `[serve: the run's session could not be created (status)]`;
+  prompt 4xx → `[serve: the prompt was refused (status)]`; a stream that ends before a terminal
+  event → `[serve: the run's server closed the stream]` and exit code 1, so the band repeats the
+  server's own words instead of claiming a process exited.
+  *Tests:* each status maps to its line and to `Failed`/`Stopped` as specified; a serve failure
+  never prints `opencode exited with code`; no line carries the password or the loopback URL.
 - [x] **7.5** Flag. `Climber:Questions=serve` now selects *both* the child and the producer;
   `off` keeps `opencode run --format json` byte-for-byte. Default stays `off`.
   *Tests:* `off` builds the CLI request and never a child; `serve` builds no CLI request.

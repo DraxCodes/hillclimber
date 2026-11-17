@@ -15,7 +15,7 @@ public enum ServeTurnEnd
     /// <summary><c>session.execution.failed</c> landed; <see cref="ServeEventMapper.Failure"/> says why.</summary>
     Failed,
 
-    /// <summary><c>session.execution.interrupted</c> landed, usually because the reader stopped the run.</summary>
+    /// <summary><c>session.execution.interrupted</c> landed; <see cref="ServeEventMapper.InterruptReason"/> says why.</summary>
     Interrupted,
 }
 
@@ -34,7 +34,7 @@ public sealed class ServeEventMapper
     private readonly HashSet<string> _emitted = new(StringComparer.Ordinal);
     private bool _armed;
     private bool _terminal;
-    private bool _failureEmitted;
+    private string? _failurePrinted;
 
     public ServeEventMapper(string sessionId)
     {
@@ -47,6 +47,13 @@ public sealed class ServeEventMapper
 
     /// <summary>The server's failure message, when <see cref="End"/> is <see cref="ServeTurnEnd.Failed"/>.</summary>
     public string? Failure { get; private set; }
+
+    /// <summary>
+    /// Why the server ended the turn itself, when <see cref="End"/> is
+    /// <see cref="ServeTurnEnd.Interrupted"/>: <c>user</c>, <c>shutdown</c>, <c>superseded</c> or
+    /// <c>inactivity</c>. Null when the turn has not been interrupted.
+    /// </summary>
+    public string? InterruptReason { get; private set; }
 
     /// <summary>True once the server has bracketed this turn with <c>session.execution.started</c>.</summary>
     public bool Armed => _armed;
@@ -88,9 +95,10 @@ public sealed class ServeEventMapper
                     Failure = ReadError(value.Data) ?? "the run failed";
                     _terminal = true;
 
-                    // A failed step usually reports the same message a moment earlier; the row
-                    // it already printed is the one to keep.
-                    if (!_failureEmitted)
+                    // A failed step often reports the same message a moment earlier; the row
+                    // it already printed is the one to keep. A *different* message is new
+                    // information, and dropping it would hide the cause.
+                    if (!string.Equals(Failure, _failurePrinted, StringComparison.Ordinal))
                     {
                         lines.Add(ErrorLine(Failure));
                     }
@@ -102,6 +110,7 @@ public sealed class ServeEventMapper
                 if (_armed)
                 {
                     End = ServeTurnEnd.Interrupted;
+                    InterruptReason = ReadString(value.Data, "reason") ?? "user";
                     _terminal = true;
                 }
 
@@ -136,13 +145,23 @@ public sealed class ServeEventMapper
                     ["cost"] = ReadNumber(value.Data, "cost"),
                     ["tokens"] = ReadElement(value.Data, "tokens"),
                 }));
+
+                // A step that changed files gets the same files row the CLI prints. One row per
+                // step, even when the names repeat: each step is a separate change the reader
+                // asked for.
+                if (ReadFiles(value.Data) is { Length: > 0 } files)
+                {
+                    lines.Add(Line("session.diff", new Dictionary<string, object?> { ["files"] = files }));
+                }
+
                 break;
 
             case "session.step.failed":
                 // The step's error is worth one row, but only the execution's end decides
                 // whether the run failed: a retried step can fail and still succeed.
-                lines.Add(ErrorLine(ReadError(value.Data) ?? "the step failed"));
-                _failureEmitted = true;
+                var stepFailure = ReadError(value.Data) ?? "the step failed";
+                lines.Add(ErrorLine(stepFailure));
+                _failurePrinted = stepFailure;
                 break;
 
             case "session.text.ended":
@@ -308,6 +327,25 @@ public sealed class ServeEventMapper
         return error.ValueKind == JsonValueKind.Object
             ? ReadString(error, "message") ?? ReadString(error, "type")
             : null;
+    }
+
+    /// <summary>The relative paths a <c>step.ended</c> lists, or null when it names none.</summary>
+    private static string[]? ReadFiles(JsonElement data)
+    {
+        if (!data.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var names = files
+            .EnumerateArray()
+            .Where(file => file.ValueKind == JsonValueKind.String)
+            .Select(file => file.GetString())
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Select(name => name!)
+            .ToArray();
+
+        return names.Length == 0 ? null : names;
     }
 
     private static string? ReadString(JsonElement element, string name) =>
