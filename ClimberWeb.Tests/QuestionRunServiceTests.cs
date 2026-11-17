@@ -65,6 +65,29 @@ public class QuestionRunServiceTests
     }
 
     [Fact]
+    public async Task AChannelFailureLineNeverCarriesTheLoopbackAddress()
+    {
+        var factory = new FakeFactory
+        {
+            Channel = new FakeChannel
+            {
+                StartFailure = new HttpRequestException(
+                    "No connection could be made because the target machine actively refused it. (127.0.0.1:4099)"),
+            },
+        };
+        var (service, runner) = Create(factory);
+        runner.Release.TrySetResult(true);
+
+        await service.StartAsync(Options());
+
+        Assert.Contains(
+            service.State.Logs,
+            line => line.Contains("the question channel did not attach (HttpRequestException)", StringComparison.Ordinal));
+        Assert.DoesNotContain(service.State.Logs, line => line.Contains("127.0.0.1", StringComparison.Ordinal));
+        Assert.Equal(RunStatus.Completed, service.State.Status);
+    }
+
+    [Fact]
     public async Task ARunWithNoSessionGetsNoChannel()
     {
         var factory = new FakeFactory();
@@ -346,6 +369,9 @@ public class QuestionRunServiceTests
 
         public bool ThrowOnStart { get; set; }
 
+        /// <summary>A specific fault for <see cref="StartAsync"/>, overriding <see cref="ThrowOnStart"/>.</summary>
+        public Exception? StartFailure { get; set; }
+
         public bool ThrowOnAnswer { get; set; }
 
         public List<(string FormId, string Key, string Value)> Submits { get; } = new();
@@ -369,6 +395,11 @@ public class QuestionRunServiceTests
         {
             Starts++;
             StartedWith = server;
+
+            if (StartFailure is not null)
+            {
+                throw StartFailure;
+            }
 
             if (ThrowOnStart)
             {

@@ -295,11 +295,13 @@ it regresses:
    `ServeRunRunnerTests.AServerSideInterruptFailsTheRunAndKeepsTheReason`.
 2. **A failed child start could start a second child.** `StartQuestionsAsync` now returns null when
    the run has no server, so the only `ServeSupervisor.StartAsync` a serve run can reach is the
-   producer's. Tests: `ServeRunServiceTests.AChildThatNeverStartedGetsNoChannelAndOneLine` and
-   `QuestionRunServiceTests.AChildThatNeverStartedGetsNoChannelAndOneLine`.
+   producer's. Test: `QuestionRunServiceTests.AChildThatNeverStartedGetsNoChannelAndOneLine`
+   (the wiring half is `ServeProducerWiringTests`).
 3. **A false attach line.** A channel that cannot attach now says
-   `[questions unavailable: the question channel did not attach (…)` — the server did start.
-   Test: `QuestionRunServiceTests.AFailingChannelIsOneLineAndTheRunStillCompletes`.
+   `[questions unavailable: the question channel did not attach (<exception type>)` — the server
+   did start, and the loopback address is not repeated in the transcript. Tests:
+   `QuestionRunServiceTests.AFailingChannelIsOneLineAndTheRunStillCompletes` and
+   `QuestionRunServiceTests.AChannelFailureLineNeverCarriesTheLoopbackAddress`.
 4. **A different execution message could be swallowed.** The duplicate guard now compares the
    message instead of remembering "a row was printed". Test:
    `ServeEventMapperTests.AFailedStepWithADifferentMessageAndExecutionPrintBothRows`.

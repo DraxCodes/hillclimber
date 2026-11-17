@@ -509,7 +509,10 @@ public sealed class RunService : IRunService
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             _logger?.LogWarning(exception, "Question channel unavailable.");
-            Log($"[questions unavailable: the question channel did not attach ({exception.Message})]");
+            // The type, not the message: an HttpClient fault reads "… (127.0.0.1:4099)", and no
+            // line in the transcript may carry the run's loopback address. The full exception is
+            // in the host log for diagnosis.
+            Log($"[questions unavailable: the question channel did not attach ({exception.GetType().Name})]");
             if (channel is not null)
             {
                 channel.Changed -= OnQuestionChanged;
