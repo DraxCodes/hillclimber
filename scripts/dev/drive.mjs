@@ -339,8 +339,15 @@ async function call(method, path, body) {
   if ('text' in payload) {
     console.log(payload.text);
   } else if ('errors' in payload) {
-    if (payload.errors.length === 0) console.log('no console errors');
-    else for (const line of payload.errors) console.log(line);
+    if (payload.errors.length === 0) {
+      console.log('no console errors');
+    } else {
+      // A reconnect storm can produce hundreds of identical lines; show the shape, not the volume.
+      for (const line of payload.errors.slice(0, 15)) console.log(line);
+      if (payload.errors.length > 15) {
+        console.log(`…and ${payload.errors.length - 15} more`);
+      }
+    }
   } else {
     console.log(JSON.stringify(payload, null, 2));
   }

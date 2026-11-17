@@ -133,7 +133,10 @@ function tail(lines) {
 function renderErrors() {
   if (!existsSync(logPath)) return 0;
   const text = readFileSync(logPath, 'utf8');
-  return (text.match(/Unhandled exception rendering component/g) ?? []).length;
+  // Only the current run: the log is appended to across starts.
+  const marker = text.lastIndexOf('=== ');
+  const current = marker >= 0 ? text.slice(marker) : text;
+  return (current.match(/Unhandled exception rendering component/g) ?? []).length;
 }
 
 async function start({ force = false } = {}) {
