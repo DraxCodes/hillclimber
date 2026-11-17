@@ -230,6 +230,16 @@ public class OpenCodeFormClientTests
     }
 
     [Fact]
+    public async Task ListOfASessionThatDoesNotExistYetIsEmpty()
+    {
+        // The channel attaches before the producer creates the session; that first list is a
+        // 404, and treating it as a failure is what left a live run's question unreadable.
+        var client = Client((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)));
+
+        Assert.Empty(await client.ListAsync("ses_new"));
+    }
+
+    [Fact]
     public async Task GetReturnsNullWhenTheFormIsGone()
     {
         var client = Client((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)));

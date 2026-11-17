@@ -149,6 +149,14 @@ public sealed class OpenCodeFormClient : IFormWire
             .GetAsync($"api/session/{Uri.EscapeDataString(sessionId)}/form", timeout.Token)
             .ConfigureAwait(false);
 
+        // The channel attaches before the producer has created the session, so an unknown
+        // session is the normal first read, not a failure: it has no forms yet, and the event
+        // stream carries the ones the run raises afterwards.
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return Array.Empty<QuestionState>();
+        }
+
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
         return ParseForms(body);
