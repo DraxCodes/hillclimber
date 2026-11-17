@@ -2,7 +2,8 @@
 
 Date: 2026-11-17. Fixed point: `1d84821`. Base: `drax-ai-workflow` v0.1.0 at
 `d4eb552` (tag `v0.1.0`), published at
-<https://github.com/DraxCodes/drax-ai-workflow>.
+<https://github.com/DraxCodes/drax-ai-workflow>; re-vendored to v0.2.0 at
+`e961dc7` (see the 0.2.0 section below).
 
 > Renamed from `opencode-workflows` to `drax-ai-workflow` on 2026-11-17. The
 > internal skill id, AGENTS markers, `WORKFLOW_BASE` env and `base` CLI are
@@ -107,8 +108,61 @@ Before the first push:
   alert list is empty;
 - the project-term content test still passes.
 
+## 0.2.0 — prompt-first bootstrap
+
+Base: `drax-ai-workflow` v0.2.0 at `e961dc7` (tag `v0.2.0`), pushed to `main`.
+
+`node --test` in the base repo:
+
+```
+# tests 38
+# pass 38
+# fail 0
+```
+
+New coverage: `new --config` reads the default profile
+(`~/.config/drax/bootstrap.json`), writes its `opencode` object with no
+placeholders and appends its `agentsMd`; `--no-profile` writes placeholders;
+`--profile <file>` uses an explicit file; a literal API key exits 2 before
+writing; a missing explicit profile exits 2; `--profile`/`--no-profile` without
+`--config` exit 2.
+
+Published-artifact cold start — shallow clone of `v0.2.0` from GitHub, then
+`base new <temp> --project cold2 --preset web --config`:
+
+- `files: 33 written`; `config: opencode.json written from the bootstrap profile
+  (no placeholders)`; `agents: appended the profile's AGENTS.md section`;
+- `check: clean (30 files)`; `doctor: no errors` (only the optional
+  `GLOSSARY.md` warning);
+- generated config model `surplus/deepseek-v4.1-flash-1017`, agents
+  `deepseek#low`, `deepseek#medium`, `glm-5.3-flash#medium`,
+  `claude-sonnet-5#medium`; `apiKey` is `{env:SURPLUS_API_KEY}`.
+
+## Council seats
+
+Surplus catalog checked this session: `deepseek-v4.1-flash-1017`,
+`glm-5.3-flash`, `qwen3.8-flash`, `claude-haiku-4.5`, `claude-sonnet-4.6` and
+`claude-sonnet-5` are listed; `claude-opus-4.8` is no longer listed, so the seat
+table marks it unavailable as of 2026-11-17.
+
+This repo's `opencode.json` now implements the mix the seat table claims:
+`quality-gatekeeper → surplus/glm-5.3-flash#medium`,
+`security-auditor → surplus/claude-sonnet-5#medium`, chair and shape still on
+`surplus/deepseek-v4.1-flash-1017`.
+
+After re-vendoring to 0.2.0:
+
+```
+check: clean: 35 files
+doctor: no errors (optional GLOSSARY.md warning only)
+dotnet test: Failed 0, Passed 764, Skipped 0, Total 764
+theme-nav.mjs: FAILURES 0 (3 pages)
+security.mjs: FAILURES 0
+providers.mjs: 15 checks, 0 failures
+```
+
 ## Not run
 
-- The Playwright UI harnesses and the token-spending `scripts/ui/surfaces.mjs`
-  (no app change; `surfaces.mjs` spends tokens and needs explicit approval).
-- No `dotnet test` result is claimed beyond the run above.
+- The token-spending `scripts/ui/surfaces.mjs` (`paid`; needs explicit approval).
+- No `dotnet test` result is claimed beyond the runs above.
+- The base's `paid` harness was not run.

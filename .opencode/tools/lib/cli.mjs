@@ -16,6 +16,7 @@ import {
   renderBlock,
 } from "./manifest.mjs";
 import { planCheck, planEject, planInit, planUpdate, listExtraFiles } from "./plan.mjs";
+import { DEFAULT_PROFILE, loadProfile } from "./profile.mjs";
 import { PRESETS, applyPreset } from "./presets.mjs";
 import { SEAM_REL, defaultSeam, loadSeam, validateSeam } from "./seam.mjs";
 
@@ -217,8 +218,14 @@ function initCommand(flags) {
   return 0;
 }
 
-function configScaffold() {
+function configScaffold(profile) {
   const deny = [{ action: "edit", resource: "*", effect: "deny" }];
+  if (profile?.opencode) {
+    return {
+      $schema: "https://opencode.ai/config.json",
+      ...profile.opencode,
+    };
+  }
   return {
     $schema: "https://opencode.ai/config.json",
     model: "<provider/model>",
@@ -279,6 +286,24 @@ function newCommand(flags) {
   applyPreset(seam, presetName);
   applySeamFlags(seam, flags, { extended: true });
 
+  if (!flags.config && (flags.profile || flags.noProfile)) {
+    console.error("--profile and --no-profile only apply with --config");
+    return 2;
+  }
+
+  const profileFile = flags.noProfile
+    ? null
+    : flags.profile
+      ? resolve(flags.profile)
+      : DEFAULT_PROFILE;
+  const { profile, errors: profileErrors } = flags.config
+    ? loadProfile(profileFile, { required: Boolean(flags.profile) })
+    : { profile: null, errors: [] };
+  if (profileErrors.length > 0) {
+    printReport("The bootstrap profile is invalid:", { errors: profileErrors });
+    return 2;
+  }
+
   const install = installProject({ baseRoot, target, seam, flags });
   if (install.code !== 0) return install.code;
   if (install.dryRun) return 0;
@@ -306,14 +331,32 @@ function newCommand(flags) {
   );
 
   let configWritten = false;
+  let configFromProfile = false;
   if (flags.config) {
     const file = join(target, "opencode.json");
     if (existsSync(file)) {
       console.log("  config: opencode.json already exists; left as-is");
     } else {
-      writeFileSync(file, `${JSON.stringify(configScaffold(), null, 2)}\n`, "utf8");
+      writeFileSync(file, `${JSON.stringify(configScaffold(profile), null, 2)}\n`, "utf8");
       configWritten = true;
-      console.log("  config: opencode.json written (fill the <provider/model> placeholders)");
+      configFromProfile = Boolean(profile?.opencode);
+      console.log(
+        configFromProfile
+          ? "  config: opencode.json written from the bootstrap profile (no placeholders)"
+          : "  config: opencode.json written (fill the <provider/model> placeholders)",
+      );
+    }
+  }
+
+  if (profile?.agentsMd) {
+    const agentsFile = join(target, "AGENTS.md");
+    if (existsSync(agentsFile)) {
+      const text = readFileSync(agentsFile, "utf8");
+      const section = profile.agentsMd.trim();
+      if (section && !text.includes(section)) {
+        writeFileSync(agentsFile, `${text.trimEnd()}\n\n${section}\n`, "utf8");
+        console.log("  agents: appended the profile's AGENTS.md section");
+      }
     }
   }
 
@@ -321,9 +364,11 @@ function newCommand(flags) {
 
   console.log("\nNext:");
   console.log(
-    configWritten
-      ? "  1. Fill the <provider/model> placeholders in opencode.json."
-      : "  1. Merge the fragment from: node .opencode/tools/base.mjs print-config .",
+    configFromProfile
+      ? "  1. Review opencode.json and the council seats in AGENTS.md."
+      : configWritten
+        ? "  1. Fill the <provider/model> placeholders in opencode.json."
+        : "  1. Merge the fragment from: node .opencode/tools/base.mjs print-config .",
   );
   console.log(
     configWritten
@@ -334,7 +379,7 @@ function newCommand(flags) {
   if (!verified.ok) {
     console.log(`  ${next++}. Run: node .opencode/tools/base.mjs doctor --fix .`);
   }
-  console.log(`  ${next}. Open the project in OpenCode.`);
+  console.log(`  ${next}. Start the first session with /start-project.`);
   if (seam.packs.length > 0) {
     console.log(
       `  · pack: node .opencode/tools/base.mjs pack install ${seam.packs[0]} .`,
@@ -571,6 +616,8 @@ Flags:
   --seed/--capture     visual verification hints
   --widths/--themes    comma lists (new)
   --config             write opencode.json once when absent (new)
+  --profile <file>     bootstrap profile for --config (default ~/.config/drax/bootstrap.json)
+  --no-profile         ignore the bootstrap profile and write placeholders
   --no-verify          skip the post-install check and doctor (new)
   --fix                apply the mechanical doctor fixes
   --pack <name>        repeatable pack selection

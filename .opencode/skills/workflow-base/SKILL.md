@@ -8,7 +8,7 @@ description: How this project's vendored workflow base works — the seam, owner
 This project carries a pinned, vendored copy of the **drax-ai-workflow** base
 under `.opencode/`. The base provides the agents (`task-orchestrator`,
 `plan-architect`, `quality-gatekeeper`, `security-auditor`), the commands
-(`council`, `hillclimb`, `grill-me`, `handoff`), the skills (`council`,
+(`council`, `start-project`, `hillclimb`, `grill-me`, `handoff`), the skills (`council`,
 `hillclimb`, `grilling`, `handoff`, `workflow-base`, `find-skills`,
 `context-engineering`) and the `base` CLI.
 
@@ -54,9 +54,13 @@ node .opencode/tools/base.mjs update . --from <base>   # bump to the checkout's 
 node .opencode/tools/base.mjs eject .    # remove base-owned clean files and the AGENTS block
 ```
 
-A brand-new project starts from a base checkout with `base new <dir> --preset web`;
-see the base `README.md`. `base doctor --fix .` performs the mechanical fixes
-(required doc dirs, same-ID global agents).
+A brand-new project starts from a base checkout with
+`base new <dir> --preset web --config`; the README's "Start from a prompt" block
+is the one-paste version. `--config` fills `opencode.json` from the machine-local
+`~/.config/drax/bootstrap.json` when present (`--no-profile` ignores it),
+then the first session runs `/start-project <idea>` to get an approved spec.
+`base doctor --fix .` performs the mechanical fixes (required doc dirs, same-ID
+global agents).
 
 `update` refuses locally modified files unless `--force`. `eject` leaves the seam
 in place for the project.
