@@ -34,10 +34,11 @@ node .opencode/tools/base.mjs status .
 
 ## Update and eject
 
-From a base checkout (`C:\Users\joelp\code\drax-ai-workflow`, or `--from <dir>`):
+From the project root, point `update` at the base checkout
+(`C:\Users\joelp\code\drax-ai-workflow`, or `--from <dir>`):
 
 ```sh
-node .opencode/tools/base.mjs update .
+node .opencode/tools/base.mjs update . --from C:\Users\joelp\code\drax-ai-workflow
 node .opencode/tools/base.mjs eject .
 ```
 

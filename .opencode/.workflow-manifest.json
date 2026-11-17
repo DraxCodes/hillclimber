@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "base": "drax-ai-workflow",
   "version": "0.1.0",
-  "commit": "2e24fae",
-  "installedAt": "2026-11-17T20:01:36.762Z",
+  "commit": "0f6f32f",
+  "installedAt": "2026-11-17T20:04:51.386Z",
   "files": {
     ".opencode/agents/plan-architect.md": "sha256:4db73dfe74987ec131f968e918e12408c5d45612633c858849b4f7f4ed70528a",
     ".opencode/agents/quality-gatekeeper.md": "sha256:63341e67b592ef6ef2611c94c45ca1564f57895334b1acce45d6ddbd4b649020",
