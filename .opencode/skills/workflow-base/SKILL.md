@@ -50,7 +50,7 @@ Run these from the project root; the CLI is vendored:
 node .opencode/tools/base.mjs check .    # drift against the manifest
 node .opencode/tools/base.mjs doctor .   # seam, docs, config, global shadowing, secrets
 node .opencode/tools/base.mjs status .   # version, commit, per-file state
-node .opencode/tools/base.mjs update .   # bump to the base checkout's version
+node .opencode/tools/base.mjs update . --from <base>   # bump to the checkout's version
 node .opencode/tools/base.mjs eject .    # remove base-owned clean files and the AGENTS block
 ```
 
@@ -65,7 +65,7 @@ in place for the project.
 
 1. Check out the target tag in a base checkout (pass `--from <dir>`, set
    `WORKFLOW_BASE`, or run from the checkout).
-2. From the project: `node .opencode/tools/base.mjs update .`.
+2. From the project: `node .opencode/tools/base.mjs update . --from <base>`.
 3. Review the diff, run the floor (the seam's `checks`), commit the vendored tree,
    the manifest, the seam's version and the `AGENTS.md` block together.
 4. `node .opencode/tools/base.mjs check .` must be clean before the commit.

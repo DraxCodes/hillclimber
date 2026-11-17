@@ -135,32 +135,51 @@ function checkGlobalShadowing(home, agentIds, errors, notes) {
 
 const SECRET_PATTERNS = [
   { re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, kind: "error", label: "private key" },
-  { re: /sk-[A-Za-z0-9_-]{20,}/, kind: "error", label: "API key" },
-  { re: /AKIA[0-9A-Z]{16}/, kind: "error", label: "AWS access key" },
-  { re: /apiKey\s*:\s*"(?!\{env:)/, kind: "warning", label: "inline apiKey" },
-  { re: /password\s*[:=]\s*"[^"]+"/i, kind: "warning", label: "inline password" },
+  { re: /\bsk-[A-Za-z0-9_-]{20,}/, kind: "error", label: "API key" },
+  { re: /\bgh[pousr]_[A-Za-z0-9]{20,}/, kind: "error", label: "GitHub token" },
+  { re: /\bgithub_pat_[A-Za-z0-9_]{20,}/, kind: "error", label: "GitHub token" },
+  { re: /\bxox[baprs]-[A-Za-z0-9-]{10,}/, kind: "error", label: "Slack token" },
+  { re: /\bAKIA[0-9A-Z]{16}/, kind: "error", label: "AWS access key" },
+  { re: /\bAIza[0-9A-Za-z_-]{30,}/, kind: "error", label: "Google API key" },
+  {
+    re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
+    kind: "error",
+    label: "JWT",
+  },
+  {
+    re: /(?:postgres|postgresql|mysql|mongodb(?:\+srv)?|redis):\/\/[^\s:@/]+:[^\s@/]+@/,
+    kind: "error",
+    label: "connection string with credentials",
+  },
+  { re: /AccountKey=[A-Za-z0-9+/=]{20,}/, kind: "error", label: "Azure account key" },
+  { re: /["']?api[_-]?key["']?\s*:\s*"(?!\{env:)/i, kind: "warning", label: "inline apiKey" },
+  { re: /["']?password["']?\s*[:=]\s*"[^"]+"/i, kind: "warning", label: "inline password" },
 ];
 
+const SECRET_EXTENSIONS = /\.(md|json|ya?ml|txt|mjs|cjs|js|ts)$/i;
+
 function checkSecrets(projectDir, errors, warnings, notes) {
-  const roots = ["agents", "commands", "skills", "packs"].map((dir) =>
+  const roots = ["agents", "commands", "skills", "packs", "tools"].map((dir) =>
     join(projectDir, ".opencode", dir),
   );
+  const files = roots.flatMap((root) => walk(root));
+  const config = join(projectDir, "opencode.json");
+  if (existsSync(config)) files.push(config);
+
   let scanned = 0;
-  for (const root of roots) {
-    for (const abs of walk(root)) {
-      if (!/\.(md|json|ya?ml|txt)$/i.test(abs)) continue;
-      scanned += 1;
-      const text = readFileSync(abs, "utf8");
-      for (const { re, kind, label } of SECRET_PATTERNS) {
-        if (re.test(text)) {
-          const rel = toPosix(abs.slice(projectDir.length + 1));
-          if (kind === "error") errors.push(`${rel}: looks like a ${label}`);
-          else warnings.push(`${rel}: possible ${label} (verify it is an example)`);
-        }
+  for (const abs of files) {
+    if (!SECRET_EXTENSIONS.test(abs)) continue;
+    scanned += 1;
+    const text = readFileSync(abs, "utf8");
+    for (const { re, kind, label } of SECRET_PATTERNS) {
+      if (re.test(text)) {
+        const rel = toPosix(abs.slice(projectDir.length + 1));
+        if (kind === "error") errors.push(`${rel}: looks like a ${label}`);
+        else warnings.push(`${rel}: possible ${label} (verify it is an example)`);
       }
     }
   }
-  notes.push(`secrets: scanned ${scanned} vendored text files`);
+  notes.push(`secrets: scanned ${scanned} project text files`);
 }
 
 function checkPacks(seam, projectDir, errors, warnings, notes) {

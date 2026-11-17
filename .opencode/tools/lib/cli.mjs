@@ -325,10 +325,16 @@ function newCommand(flags) {
       ? "  1. Fill the <provider/model> placeholders in opencode.json."
       : "  1. Merge the fragment from: node .opencode/tools/base.mjs print-config .",
   );
-  console.log("  2. Commit the vendored tree, the manifest, the seam and the AGENTS block.");
-  if (seam.packs.length > 0 && !verified.ok) {
-    console.log("  3. Run: node .opencode/tools/base.mjs doctor --fix .");
+  console.log(
+    configWritten
+      ? "  2. Commit the vendored tree, the manifest, the seam, the AGENTS block and opencode.json."
+      : "  2. Commit the vendored tree, the manifest, the seam and the AGENTS block.",
+  );
+  let next = 3;
+  if (!verified.ok) {
+    console.log(`  ${next++}. Run: node .opencode/tools/base.mjs doctor --fix .`);
   }
+  console.log(`  ${next}. Open the project in OpenCode.`);
   if (seam.packs.length > 0) {
     console.log(
       `  · pack: node .opencode/tools/base.mjs pack install ${seam.packs[0]} .`,

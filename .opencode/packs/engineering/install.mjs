@@ -26,11 +26,24 @@ try {
 }
 
 const agent = manifest.agent ?? "opencode";
+const cli = manifest.cli ?? "skills@1.9.0";
 const isWindows = process.platform === "win32";
 let failed = false;
 
+const SAFE_NAME = /^[A-Za-z0-9_.-]+$/;
+const SAFE_REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+
 for (const { repo, skills = [] } of manifest.sources ?? []) {
-  const args = ["--yes", "skills@latest", "add", repo];
+  if (!SAFE_REPO.test(repo)) fail(`Refusing unsafe repo name: ${repo}`);
+  for (const skill of skills) {
+    if (!SAFE_NAME.test(skill)) fail(`Refusing unsafe skill name: ${skill}`);
+  }
+  const args = ["--yes", cli, "add", repo];
   for (const skill of skills) args.push("--skill", skill);
   args.push("--agent", agent, "--yes");
 

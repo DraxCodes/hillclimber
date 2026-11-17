@@ -1,6 +1,7 @@
 {
   "$comment": "Optional engineering skills, installed per project on demand. These are NOT part of the universal base. Install with: node .opencode/tools/base.mjs pack install engineering .",
   "agent": "opencode",
+  "cli": "skills@1.9.0",
   "sources": [
     {
       "repo": "mattpocock/skills",
