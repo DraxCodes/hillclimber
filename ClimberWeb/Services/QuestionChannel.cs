@@ -410,7 +410,32 @@ public sealed class QuestionChannel : IQuestionChannel
                 HandleFrame(frame);
                 return Task.CompletedTask;
             },
-            idle.Token).ConfigureAwait(false);
+            idle.Token,
+            () => OnStreamOpened(cancellationToken)).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The stream is live: list the session's forms once more. The list before the open cannot
+    /// see a form created in between, and a missed <c>form.created</c> would otherwise wait for
+    /// a reconnect. The read runs off the frame path so a slow list never delays an event.
+    /// </summary>
+    private void OnStreamOpened(CancellationToken cancellationToken) =>
+        _ = ReconcileQuietlyAsync(cancellationToken);
+
+    private async Task ReconcileQuietlyAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ReconcileAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // The channel is going away.
+        }
+        catch (Exception exception) when (IsTransportFailure(exception))
+        {
+            // The stream stays open; its next connect lists again.
+        }
     }
 
     private async Task ReconcileAsync(CancellationToken cancellationToken)

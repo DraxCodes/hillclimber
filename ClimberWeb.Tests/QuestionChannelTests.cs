@@ -130,6 +130,25 @@ public class QuestionChannelTests
     }
 
     [Fact]
+    public async Task TheLiveStreamListsFormsCreatedBeforeItOpened()
+    {
+        // The list taken before the stream opened was empty. A form that appears in the list the
+        // channel reads once the stream is live must still become a row, or a form the model
+        // raised in that gap would wait for a reconnect.
+        var run = await Started(configure: wire => wire.BeforeList = () =>
+        {
+            if (wire.ListCalls == 3)
+            {
+                wire.ListResult.Add(Choice());
+            }
+        });
+        await using var channel = run.Channel;
+
+        await WaitFor(() => run.Events().Any(state => state.Status == QuestionStatus.Stale));
+        Assert.True(run.Wire.ListCalls >= 3);
+    }
+
+    [Fact]
     public async Task AFormAlreadyOnScreenKeepsItsStateAcrossAReconnect()
     {
         var run = await Started(Choice());
@@ -491,6 +510,9 @@ public class QuestionChannelTests
 
         public Action? OnWatchFailed { get; set; }
 
+        /// <summary>Runs inside every list call, after it has been counted.</summary>
+        public Action? BeforeList { get; set; }
+
         public QuestionSubmitOutcome ReplyOutcome { get; set; } = QuestionSubmitOutcome.Accepted;
 
         public QuestionSubmitOutcome CancelOutcome { get; set; } = QuestionSubmitOutcome.Accepted;
@@ -512,6 +534,7 @@ public class QuestionChannelTests
         public Task<IReadOnlyList<QuestionState>> ListAsync(string sessionId, CancellationToken cancellationToken = default)
         {
             ListCalls++;
+            BeforeList?.Invoke();
             lock (ListResult)
             {
                 return Task.FromResult<IReadOnlyList<QuestionState>>(ListResult.ToArray());
@@ -556,6 +579,7 @@ public class QuestionChannelTests
             Interlocked.Increment(ref _watchCalls);
             Emit = onFrame;
             Watched.TrySetResult(true);
+            onOpen?.Invoke();
 
             if (FailOnWatch)
             {
