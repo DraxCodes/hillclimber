@@ -173,3 +173,59 @@ A second probe, still without model tokens, captured the exact JSON shapes the c
    `form.cancelled` carries only `{"id","sessionID"}`.
 4. `DELETE` of a pending form makes `GET .../form/{id}` report
    `state: {"status":"cancelled"}`, so a recheck can settle a dismissed row.
+
+## Addendum — serve producer probe (2026-11-17)
+
+The producer is the missing half: the transport can answer a form, but `opencode run`
+cancels the form before the app can see it. This probe settles whether the serve API can
+replace the producer without a session migration. It spent no model tokens: `resume:false`
+enqueues input without starting a turn.
+
+### Verified
+
+1. **The caller can choose the session id.** `POST /api/session` accepts
+   `{"id": "ses_…"}` (`Session.ID` is `^ses`). A created probe id was returned unchanged by
+   `GET /api/session/{id}` and appeared in `GET /api/session`. The app can therefore keep its
+   own ids, its session files and its `--session` identity.
+2. **The prompt endpoint exists and is complete.** `POST /api/session/{id}/prompt` requires
+   `text` and accepts `files`, `agents`, `skills`, `metadata`, `delivery` and `resume`. With
+   `resume:false` it returns `200` with a `Session.Inbox.User` item and starts no turn.
+3. **Agent and model are separate selectors.** `POST /api/session/{id}/agent` takes
+   `{"agent": …}` and `POST /api/session/{id}/model` takes
+   `{"model": {"providerID", "id", "variant"}}`; both return `204`. They are the server-side
+   equivalent of `run --agent` / `--model`.
+4. **The serve process sees CLI-created sessions.** `GET /api/session/{id}` and
+   `GET /api/session/{id}/message` returned the existing `ses_04e4…` run (13 messages), so a
+   producer switch does not split history or require importing transcripts.
+5. **The event contract is richer than `run --format json`.** It includes
+   `session.text.started/delta/ended`, `session.reasoning.*`, `session.tool.input.*`,
+   `session.tool.called/progress/success/failed`, `session.step.started/ended`,
+   `session.status`, `session.idle`, plus the already-used `form.*` and `permission.*`.
+   `session.idle` is an explicit terminal signal; the CLI path has to infer completion from
+   `step_finish` and process exit.
+6. **ACP is a different vocabulary.** The binary exposes `session/new`, `session/load`,
+   `session/prompt`, `session/update`, `session/request_permission`, `session/steering`,
+   `elicitation/create` and `elicitation/complete`. It has no native form vocabulary; generic
+   input is a JSON-Schema elicitation, not `Form.Info`.
+
+### Consequences
+
+- **No session migration.** The adapter can create or resume the app's existing `ses_…` id,
+  so `SessionCoordinator`, `JsonSessionStore` and the transcript stay authoritative.
+- **The producer is a prompt/stream mapping, not a new store.** `OpenCodeServe`,
+  `OpenCodeFormClient`, `QuestionChannel` and the form row are already the hard parts; the
+  adapter adds session creation, agent/model selection, prompt, interrupt and event mapping.
+- **Serve is the primary route; ACP is a later interoperability adapter.** ACP is attractive
+  for Zed/editor clients, but adopting it first would trade the app's typed form contract for
+  a lossy elicitation translation and still require an event adapter.
+- **`resume:false` is a free test hook.** The adapter can prove session creation, queueing and
+  error mapping in tests without spending tokens; a real turn is needed only for the final
+  end-to-end evidence.
+
+### Method
+
+`opencode serve --port 4102` with a generated per-process password held only in the child's
+environment; `opencode api` (which inherits it) for requests, so no credential was written to
+disk or echoed. `GET /openapi.json` (v2.3.0) supplied the endpoint and schema facts. The probe
+server was stopped after each check. No prompt was executed; the only prompt call used
+`resume:false`.
