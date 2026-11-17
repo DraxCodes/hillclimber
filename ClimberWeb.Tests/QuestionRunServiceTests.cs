@@ -277,7 +277,11 @@ public class QuestionRunServiceTests
 
         public void Emit(QuestionState state) => Changed?.Invoke(state);
 
-        public Task StartAsync(string sessionId, string targetFolder, CancellationToken cancellationToken)
+        public Task StartAsync(
+            string sessionId,
+            string targetFolder,
+            CancellationToken cancellationToken,
+            ServeChild? server = null)
         {
             if (ThrowOnStart)
             {

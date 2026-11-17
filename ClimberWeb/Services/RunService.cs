@@ -296,18 +296,35 @@ public sealed class RunService : IRunService
     private async Task RunLoopAsync(RunOptions options, CancellationToken cancellationToken)
     {
         IQuestionChannel? questions = null;
+        ServeChild? server = null;
         try
         {
-            Log($"$ {OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Provider?.Model, options.SessionId)}");
+            // The run owns one serve child in serve mode; the producer and the question
+            // channel both ride it, because a form is only visible to the server that made it.
+            server = await TryStartServerAsync(options, cancellationToken).ConfigureAwait(false);
+
+            Log($"$ {(server is null
+                ? OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Provider?.Model, options.SessionId)
+                : OpenCodeRun.ServeCommandLine(options.Prompt, options.SessionId))}");
 
             // The channel is optional and never changes the run's outcome: a failure to start
-            // it is one line, and the run continues on the plain producer.
-            questions = await StartQuestionsAsync(options, cancellationToken).ConfigureAwait(false);
+            // it is one line, and the run continues on the producer it already has.
+            questions = await StartQuestionsAsync(options, server, cancellationToken).ConfigureAwait(false);
 
-            var result = await _runner.RunAsync(
-                OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
-                OnOpenCodeLine,
-                cancellationToken).ConfigureAwait(false);
+            var result = server is not null && options.SessionId is { Length: > 0 } sessionId
+                ? await new ServeRunRunner(
+                        server.Client,
+                        new OpenCodeFormClient(server.Client),
+                        sessionId,
+                        options.Prompt,
+                        options.Agent,
+                        options.Provider)
+                    .RunAsync(OnOpenCodeLine, cancellationToken)
+                    .ConfigureAwait(false)
+                : await _runner.RunAsync(
+                    OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
+                    OnOpenCodeLine,
+                    cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -355,6 +372,21 @@ public sealed class RunService : IRunService
             });
             Log("===== Stopped by user =====");
         }
+        catch (ServeStartException exception)
+        {
+            // The serve transport failing is not a provider failing: one line, and no fallback
+            // offer, because retrying the same transport on another provider would fail alike.
+            Log($"[serve: {exception.Message}]");
+            UpdateState(state => state with
+            {
+                Status = RunStatus.Failed,
+                FinishedAt = DateTimeOffset.Now,
+                Message = exception.Message,
+                FallbackAvailable = false,
+                FallbackMessage = null,
+                Fallback = null,
+            });
+        }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "OpenCode run failed.");
@@ -363,6 +395,37 @@ public sealed class RunService : IRunService
         finally
         {
             await DisposeQuestionsAsync(questions).ConfigureAwait(false);
+
+            // Last, and after the channel: the channel borrows this child in serve mode.
+            if (server is not null)
+            {
+                await server.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Starts the run's serve child when the transport is enabled and the run has a session.
+    /// A child that will not start is one line and a null: the run falls back to the CLI
+    /// producer, which is exactly what it used before this lane existed.
+    /// </summary>
+    private async Task<ServeChild?> TryStartServerAsync(RunOptions options, CancellationToken cancellationToken)
+    {
+        if (_questions is not { Enabled: true } || string.IsNullOrWhiteSpace(options.SessionId))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _questions.StartServerAsync(options.TargetFolder, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question server unavailable.");
+            Log($"[questions unavailable: {exception.Message}]");
+            return null;
         }
     }
 
@@ -370,7 +433,10 @@ public sealed class RunService : IRunService
     /// Starts a question channel for this run when one is configured and the run has a
     /// session. Any failure is one quiet line and a null: the run continues without questions.
     /// </summary>
-    private async Task<IQuestionChannel?> StartQuestionsAsync(RunOptions options, CancellationToken cancellationToken)
+    private async Task<IQuestionChannel?> StartQuestionsAsync(
+        RunOptions options,
+        ServeChild? server,
+        CancellationToken cancellationToken)
     {
         if (_questions is not { Enabled: true } || string.IsNullOrWhiteSpace(options.SessionId))
         {
@@ -387,7 +453,7 @@ public sealed class RunService : IRunService
             }
 
             channel.Changed += OnQuestionChanged;
-            await channel.StartAsync(options.SessionId, options.TargetFolder, cancellationToken)
+            await channel.StartAsync(options.SessionId, options.TargetFolder, cancellationToken, server)
                 .ConfigureAwait(false);
             Volatile.Write(ref _channel, channel);
             return channel;

@@ -116,11 +116,12 @@ async function settle(page) {
 }
 
 async function settleContent(page) {
-  // A screenshot taken while the page is still fetching its first read shows a placeholder
-  // instead of the page. Wait out the two known placeholders; other pages pass immediately.
+  // A screenshot or a text read taken while the page is still fetching its first read shows a
+  // placeholder instead of the page. Wait out the known placeholders; other pages pass
+  // immediately.
   await page
     .waitForFunction(
-      () => !/Checking providers|Reading the repository/i.test(document.body.innerText),
+      () => !/Establishing session|Checking providers|Reading the repository/i.test(document.body.innerText),
       { timeout: 8000 })
     .catch(() => {});
 }
@@ -228,6 +229,9 @@ async function serve({ headless, route }) {
 
         case 'GET /text': {
           const limit = Number(url.searchParams.get('limit') || 20000);
+          // The same wait the screenshot makes: a read during the first fetch would return
+          // "Checking providers…" and look like the page had no content.
+          await settleContent(page);
           const text = await page.locator('body').innerText();
           send(200, { text: text.length > limit ? `${text.slice(0, limit)}\n…[cut]` : text });
           return;
@@ -337,9 +341,6 @@ async function serve({ headless, route }) {
 
   log(`listening on 127.0.0.1:${port} (headless=${headless})`);
 
-  // The control server is the process's whole reason to exist: hold it open.
-  await new Promise(() => { });
-
   const close = async () => {
     await context.close().catch(() => {});
     server.close();
@@ -348,6 +349,10 @@ async function serve({ headless, route }) {
   };
   process.on('SIGINT', close);
   process.on('SIGTERM', close);
+
+  // The control server is the process's whole reason to exist: hold it open. Registered *after*
+  // the signal handlers above, which would never install past this line.
+  await new Promise(() => { });
 }
 
 async function start({ headless, route }) {
@@ -513,6 +518,14 @@ function parseShot(args) {
   return { options, path, problems };
 }
 
+const SHOT_HELP = `node scripts/dev/drive.mjs shot [--full] [--width N] [--height N] [--theme light|dark] [path]
+
+  --full          capture the whole page, not the viewport
+  --width N       viewport width, 200-4000 (default 1440)
+  --height N      viewport height, 200-4000 (default 1000)
+  --theme VALUE   light or dark; leaves the stored theme as it was
+  path            where to write the .png; defaults to ${shotsDir}`;
+
 const HELP = `Keep one browser window on the live dev host, already unlocked.
 
 Usage: node scripts/dev/drive.mjs <command> [options]
@@ -524,7 +537,7 @@ Commands:
   text            print the page's visible text (--limit N)
   errors          print and clear the console errors seen so far (--keep to leave them)
   shot            save a PNG (--full, --width 200-4000, --height 200-4000,
-                  --theme light|dark, then an optional .png path)
+                  --theme light|dark, then an optional .png path; --help for details)
   reload          reload the page and unlock it again
   stop            close the window
   help            this text
@@ -621,12 +634,14 @@ const code = await (async () => {
     case 'status': {
       const state = readState();
       if (!state) {
-        console.log('not running');
+        console.error('the driver is not running.');
+        console.error('next: node scripts/dev/drive.mjs start');
         return 1;
       }
       const status = await probe(state);
       if (!status) {
-        console.log('not answering; start it again');
+        console.error('the driver is not answering.');
+        console.error('next: node scripts/dev/drive.mjs start');
         return 1;
       }
       console.log(JSON.stringify(status, null, 2));
@@ -642,6 +657,10 @@ const code = await (async () => {
     case 'errors':
       return call('GET', `/errors${rest.includes('--keep') ? '?keep=1' : ''}`);
     case 'shot': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        console.log(SHOT_HELP);
+        return 0;
+      }
       const { options, path, problems } = parseShot(rest);
       if (problems.length) {
         for (const problem of problems) console.error(problem);

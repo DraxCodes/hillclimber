@@ -11,8 +11,13 @@ public interface IQuestionChannel : IAsyncDisposable
 {
     event Action<QuestionState>? Changed;
 
-    /// <summary>Starts the transport and lists whatever is already pending for the session.</summary>
-    Task StartAsync(string sessionId, string targetFolder, CancellationToken cancellationToken);
+    /// <summary>
+    /// Starts the transport and lists whatever is already pending for the session.
+    /// <paramref name="server"/> is the run's one serve child, shared with the producer; when it
+    /// is given the channel never disposes it. Passing null keeps the older shape where the
+    /// channel starts (and owns) a child of its own.
+    /// </summary>
+    Task StartAsync(string sessionId, string targetFolder, CancellationToken cancellationToken, ServeChild? server = null);
 
     Task<QuestionSubmitOutcome> SubmitAsync(string formId, string fieldKey, string value);
 
@@ -32,6 +37,14 @@ public interface IQuestionChannelFactory
 
     /// <summary>A channel for one run, or null when the run should have none.</summary>
     IQuestionChannel? Create();
+
+    /// <summary>
+    /// Starts the run's one serve child, so the producer and the channel can share it. Returns
+    /// null when this run should use the plain CLI producer. A factory that does not implement
+    /// this (tests, the playback host) keeps every run on the CLI path.
+    /// </summary>
+    Task<ServeChild?> StartServerAsync(string targetFolder, CancellationToken cancellationToken) =>
+        Task.FromResult<ServeChild?>(null);
 }
 
 /// <summary>Reconnect policy for <see cref="QuestionChannel"/>. Defaults are the spec's numbers.</summary>
@@ -75,6 +88,7 @@ public sealed class QuestionChannel : IQuestionChannel
     private CancellationTokenSource? _lifetime;
     private Task? _loop;
     private ServeChild? _child;
+    private bool _borrowed;
     private int _started;
     private int _disposed;
 
@@ -91,16 +105,28 @@ public sealed class QuestionChannel : IQuestionChannel
     }
 
     /// <summary>Tests and the dev fake: a wire with no process behind it.</summary>
+    /// <param name="wire">The transport to speak through.</param>
+    /// <param name="borrowed">
+    /// A server the run owns: recorded as borrowed so <see cref="DisposeAsync"/> never closes it,
+    /// exactly as the production path records it when the run shares its child.
+    /// </param>
     internal QuestionChannel(
         IFormWire wire,
         QuestionChannelOptions? options = null,
         Func<TimeSpan, CancellationToken, Task>? delay = null,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        ServeChild? borrowed = null)
     {
         _wire = wire ?? throw new ArgumentNullException(nameof(wire));
         _options = options ?? QuestionChannelOptions.Default;
         _delay = delay ?? ((duration, token) => Task.Delay(duration, token));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
+
+        if (borrowed is not null)
+        {
+            _child = borrowed;
+            _borrowed = true;
+        }
     }
 
     public event Action<QuestionState>? Changed;
@@ -108,7 +134,11 @@ public sealed class QuestionChannel : IQuestionChannel
     /// <summary>The wire, once started. Null before <see cref="StartAsync"/>.</summary>
     private IFormWire Wire => _wire ?? throw new InvalidOperationException("The channel is not started.");
 
-    public async Task StartAsync(string sessionId, string targetFolder, CancellationToken cancellationToken)
+    public async Task StartAsync(
+        string sessionId,
+        string targetFolder,
+        CancellationToken cancellationToken,
+        ServeChild? server = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetFolder);
@@ -123,7 +153,18 @@ public sealed class QuestionChannel : IQuestionChannel
 
         if (_wire is null)
         {
-            _child = await _supervisor!.StartAsync(targetFolder, cancellationToken).ConfigureAwait(false);
+            if (server is not null)
+            {
+                // Borrowed, not owned: the run started it for the producer too, and disposing it
+                // here would take the producer's stream down with the channel.
+                _child = server;
+                _borrowed = true;
+            }
+            else
+            {
+                _child = await _supervisor!.StartAsync(targetFolder, cancellationToken).ConfigureAwait(false);
+            }
+
             _wire = new OpenCodeFormClient(_child.Client);
         }
 
@@ -284,7 +325,7 @@ public sealed class QuestionChannel : IQuestionChannel
             }
         }
 
-        if (_child is { } child)
+        if (_child is { } child && !_borrowed)
         {
             await child.DisposeAsync().ConfigureAwait(false);
         }

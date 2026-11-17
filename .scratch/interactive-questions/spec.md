@@ -26,12 +26,12 @@ on demand.
   run.
 - **Consent:** a form is not a permission. `permission.asked` never reaches the row. An answer is
   data to the model; no click executes a filesystem, tool or app action.
-- **Producer:** `opencode run --format json` remains the transcript producer for now. The serve
-  path is wired behind `Climber:Questions = off | serve`, default `off`. Why: the served event
-  vocabulary (`message.part.updated`, `message.updated`, `session.idle`) has no mapping in
-  `LogFormatter`; flipping every run onto it would turn every row of every transcript into raw
-  JSON to ship a rare row. The flag makes the producer migration a separate, reversible change
-  once the mapping is proved.
+- **Producer:** `opencode run --format json` stays the default. `Climber:Questions = serve` moves
+  *both* halves of a run onto one `opencode serve --stdio` child: the producer maps the served
+  events back into the same JSON lines, and the question channel subscribes to that same child.
+  One child is not a detail — a form is process-local to the server that created it, so a second
+  server could never see the run's forms. Why a flag: flipping every run onto serve is a producer
+  migration worth reverting on its own, and `off` keeps the CLI path byte-for-byte.
 - **Non-goals:** multiple simultaneous runs; a general permission UI; replacing or bypassing the
   composer; editing an answer after send.
 

@@ -37,6 +37,17 @@ public sealed class QuestionTransport : IQuestionChannelFactory
 
     public IQuestionChannel? Create() => Enabled ? new QuestionChannel(_supervisor) : null;
 
+    /// <summary>The run's one serve child; null (and no process) when the flag is off.</summary>
+    public async Task<ServeChild?> StartServerAsync(string targetFolder, CancellationToken cancellationToken)
+    {
+        if (!Enabled)
+        {
+            return null;
+        }
+
+        return await _supervisor.StartAsync(targetFolder, cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Parses the configured value; anything but <c>serve</c> is off.</summary>
     public static QuestionTransportMode Parse(string? value) =>
         string.Equals(value?.Trim(), "serve", StringComparison.OrdinalIgnoreCase)

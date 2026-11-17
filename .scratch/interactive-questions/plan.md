@@ -1,7 +1,9 @@
 # Thread plan — interactive model questions
 
 **Status:** lanes 0, 2, 3, 3.5, 4 and 5 done; the live row and its restored states each
-scored **8/10** and ship. Lane 6 (live-app harness) stays deferred. **Date:** 2026-11-17.
+scored **8/10** and ship. The live dev loop is **8/10 (`SHIP`)** at `c262988` (see
+[`../live-dev-loop/evidence.md`](../live-dev-loop/evidence.md)). Lane 7 (serve producer) is next;
+lane 6 (live-app harness) stays deferred. **Date:** 2026-11-17.
 **Spec:** [spec.md](spec.md). **Handoff:** [handoff.md](handoff.md).
 
 All of this work lives on the `feat/interactive-questions` branch; `master` is back at
@@ -112,6 +114,97 @@ sidecar listed below, unchanged in intent.
 - [ ] **6.2** MCP sidecar (`scripts/ui/`) exposing `emit_question`, `answer`, `read_transcript`,
   `screenshot`; `dotnet watch` keeps the app up.
 - [ ] **6.3** Optional activity feed so a run's tests/edits appear in the app live.
+
+## Lane 7 — serve producer (`[free]`, one `[live]` verification turn)
+
+**Why.** Today the run is `opencode run --format json` and the question channel is a *second*
+`opencode serve` child. Forms are process-local to the server that created them, so a form the run
+raises never reaches a channel attached to a different server: live questions are observably
+cancelled instead of answered. The producer and the channel must be the **same child**.
+
+**Contract facts** (from the server's own `openapi.json`, v2.3.0, captured free at
+`%TEMP%\climb-ui\serve-contract\openapi.json`):
+
+- `POST /api/session` accepts a caller-supplied `id` (`^ses`); `GET /api/session/{sessionID}`
+  returns `{data: Session.Info}` or 404. The app mints `ses_` + GUID, so: GET first, POST `{id}`
+  only if absent. Create returns 200 (no 409 documented), so a duplicate `id` is unproven — the
+  GET-first order makes it unreachable in practice.
+- `POST /api/session/{sessionID}/prompt` takes `{text, resume?}`; the summary is explicit —
+  "Durably admit one session input and schedule agent-loop execution **unless `resume` is false**",
+  so omitting `resume` starts the turn. The one live turn only confirms the *sequence*, not this.
+- `POST /api/session/{sessionID}/interrupt[?resume=true|false]` → `{interrupted: boolean}`;
+  `false` is the documented idle no-op.
+- Terminal: `session.execution.succeeded | failed | interrupted` (`interrupted.reason` is
+  `user|shutdown|superseded|inactivity`), with `session.idle` as the quieter marker.
+  `session.execution.started` brackets the turn.
+- Text and reasoning: `started{ordinal}` → `delta{ordinal,delta}` → `ended{ordinal,text}` where
+  `ended.text` is complete. **Emit one CLI-shaped line per block at `ended`**, not one per delta;
+  the same rule for reasoning.
+- Tools: `input.started{id,name}` (the tool name lives here) → `input.delta`/`input.ended` →
+  `called{id,input,executed}` → `progress{id,metadata}` → `success{id,content[],executed}` /
+  `failed{id,error{type,message,status},content[],executed}`. The CLI `tool_use` line carries
+  `tool` and `state.status`/`input`/`output`, so the mapper must remember `name` from
+  `input.started` and pair it with the outcome by `id`.
+- Steps: `step.started{sessionID,assistantMessageID,agent,model,started}` and
+  `step.ended{finish,cost,tokens{input,output,reasoning,cache{read,write}}}` — `RunMetrics.Add`
+  already reads the CLI `step_finish` shape, so the mapping must keep those field names.
+- Envelope on every frame: `{id, created, type, durable?, location?, data}`; SSE `event:` is empty
+  and the JSON lives in `data:`.
+
+**Open shape question for the user** — where the seam goes:
+
+- **(A) `ServeRunRunner : IRunProcessRunner`** — a second implementation of the seam that already
+  exists (`RunAsync(request, onLine, ct) → exit code`). `RunService` creates the child when the
+  flag says `serve`, hands it to the runner *and* to the channel, and otherwise does not change.
+  Smallest diff, existing runner tests keep meaning what they meant, and the whole migration stays
+  one revert. Cost: the child is created outside the runner, so `RunService` owns the lifetime.
+- **(B) `IRunProducer` with `CliRunProducer` + `ServeRunProducer`** — an explicit producer seam.
+  Cleaner to read and lets the serve path grow options the CLI has no equivalent for (steer,
+  interrupt reason). Cost: a new abstraction, a wider `RunService` diff, and the runner tests need
+  a parallel set.
+
+Recommendation: **(A)** for this lane — it is the reversible step the spec asked for; (B) can be
+taken later if serve becomes the default producer and grows CLI-less features.
+
+- [x] **7.1** `ServeRunRunner` (or `ServeRunProducer`): create the session if absent, POST the
+  prompt, subscribe `GET /api/event`, map the allowlisted families above to the exact CLI line
+  shapes `LogFormatter` parses, and return when `session.execution.*` lands for this session.
+  Ignore every event whose `sessionID` is not ours, and every family not mapped (`permission.*`,
+  `pty.*`, `shell.*`, `form.*` — the channel owns forms).
+  *Tests:* synthesized payloads in a new `ClimberWeb.Tests/Fixtures/serve-events.jsonl`; one test
+  per mapped line, asserting the emitted JSON parses through `LogFormatter.Parse` to the same
+  `LogEntry` the CLI fixture produces for that step; a foreign `sessionID` emits nothing; an
+  unknown family emits nothing.
+- [x] **7.2** One child, two users. `QuestionChannel.StartAsync` gains an overload that takes an
+  existing `ServeChild` and does not dispose it (`ownsChild: false`); `RunService` creates the
+  child once in `serve` mode and disposes it in the run's `finally`, after the channel.
+  *Tests:* the channel with a borrowed child never disposes it; the run's `finally` disposes
+  exactly once; `off` mode still takes the old path (no child at all).
+- [x] **7.3** Stop = interrupt, then close. `Stop()` cancels the token; the serve path POSTs
+  `/interrupt`, waits briefly for `session.execution.interrupted`, then closes the child's stdin
+  and disposes. A child that does not answer the interrupt is killed by `ServeChild.DisposeAsync`
+  (already the behaviour).
+  *Tests:* interrupt is POSTed once on cancel; a child that never emits `interrupted` still
+  terminates within the grace period; exit status maps to `Stopped`, not `Failed`.
+- [x] **7.4** Failure lines, mirroring the spec's table: child did not start → the existing
+  `[questions unavailable: …]` line and the run continues on the CLI path; session create 4xx →
+  `[serve: session could not be created (status)]`; prompt 4xx → `[serve: prompt refused (status)]`;
+  a stream that ends before a terminal event → `[serve: the run's server closed the stream]` and
+  exit code 1 so the run reports failed with the normal fallback offer.
+  *Tests:* each status maps to its line and to `Failed`/`Stopped` as specified; no line carries the
+  password or the loopback URL.
+- [x] **7.5** Flag. `Climber:Questions=serve` now selects *both* the child and the producer;
+  `off` keeps `opencode run --format json` byte-for-byte. Default stays `off`.
+  *Tests:* `off` builds the CLI request and never a child; `serve` builds no CLI request.
+- [x] **7.6** One **live** verification turn, only with approval: one cheap prompt on a scratch
+  folder with the flag on, capturing the real event order (execution.started → step → text →
+  execution.succeeded) and the CLI-shaped lines the mapper emits, plus one run where a form is
+  raised and answered through the channel **on the same child**. Recorded in `verification.md`.
+- [x] **7.7** Fold in the four non-blocking nits from the live-loop gate while `drive.mjs` is open:
+  `text` waits out loading copy, `status` with no state file names a next action, `shot --help`
+  prints help, and the dead SIGINT/SIGTERM block after the keep-alive promise is removed.
+- [ ] **7.8** Gate the lane at **8** once 7.1–7.5 are green and 7.6 (or an explicit deferral) is
+  recorded.
 
 ## Floor (every step)
 

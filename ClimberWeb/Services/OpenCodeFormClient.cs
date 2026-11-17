@@ -109,7 +109,7 @@ public interface IFormWire
         string message,
         CancellationToken cancellationToken = default);
 
-    Task WatchAsync(Func<SseFrame, Task> onFrame, CancellationToken cancellationToken);
+    Task WatchAsync(Func<SseFrame, Task> onFrame, CancellationToken cancellationToken, Action? onOpen = null);
 }
 
 /// <summary>
@@ -249,10 +249,13 @@ public sealed class OpenCodeFormClient : IFormWire
     /// <summary>
     /// Streams <c>GET /api/event</c> until cancelled or the server closes the stream. The
     /// caller owns reconnection and filtering; every frame is handed over unfiltered.
+    /// <paramref name="onOpen"/> runs once the stream is live, before any frame — the producer
+    /// uses it to admit its first turn only after it is certain it can see the whole of it.
     /// </summary>
     public async Task WatchAsync(
         Func<SseFrame, Task> onFrame,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action? onOpen = null)
     {
         ArgumentNullException.ThrowIfNull(onFrame);
 
@@ -264,6 +267,7 @@ public sealed class OpenCodeFormClient : IFormWire
             .ConfigureAwait(false);
 
         response.EnsureSuccessStatusCode();
+        onOpen?.Invoke();
 
         await using var stream = await response.Content
             .ReadAsStreamAsync(cancellationToken)

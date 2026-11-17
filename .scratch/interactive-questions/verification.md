@@ -199,10 +199,12 @@ enqueues input without starting a turn.
    producer switch does not split history or require importing transcripts.
 5. **The event contract is richer than `run --format json`.** It includes
    `session.text.started/delta/ended`, `session.reasoning.*`, `session.tool.input.*`,
-   `session.tool.called/progress/success/failed`, `session.step.started/ended`,
-   `session.status`, `session.idle`, plus the already-used `form.*` and `permission.*`.
-   `session.idle` is an explicit terminal signal; the CLI path has to infer completion from
-   `step_finish` and process exit.
+   `session.tool.called/progress/success/failed`, `session.step.started/ended/failed`, and the
+   already-used `form.*` and `permission.*`. The 100-variant `V2Event` union has **no
+   `session.status` member** (the `SessionStatusUpdated` schema exists but nothing in the union
+   uses it); the terminal vocabulary is `session.idle` plus
+   `session.execution.succeeded|failed|interrupted`, and the live turn confirmed
+   `execution.succeeded` is the one a plain turn emits.
 6. **ACP is a different vocabulary.** The binary exposes `session/new`, `session/load`,
    `session/prompt`, `session/update`, `session/request_permission`, `session/steering`,
    `elicitation/create` and `elicitation/complete`. It has no native form vocabulary; generic
@@ -229,3 +231,52 @@ environment; `opencode api` (which inherits it) for requests, so no credential w
 disk or echoed. `GET /openapi.json` (v2.3.0) supplied the endpoint and schema facts. The probe
 server was stopped after each check. No prompt was executed; the only prompt call used
 `resume:false`.
+
+## The producer turn (2026-11-17)
+
+One approved live turn through the real code — `ServeSupervisor` → `ServeRunRunner` — in the repo
+folder, with `surplus/deepseek-v4.1-flash-1017` passed explicitly, message "Reply with exactly: ok".
+Recorded verbatim at `%TEMP%\climb-ui\serve-turn\report.txt`; the probe file was deleted after it
+ran.
+
+**Order actually served** (frames with our `sessionID`, in arrival order):
+
+```
+session.created            ← POST /api/session with the caller's id succeeded
+session.inbox.enqueued     ← the prompt was durably admitted
+session.execution.started  ← the turn is bracketed; this is what arms the mapper
+session.inbox.delivered
+session.step.started       agent "build", model surplus/deepseek-v4.1-flash-1017
+session.step.first-token
+session.text.started / delta … / ended   ended carries text "ok"
+session.step.streamed
+session.step.ended         finish "stop", cost 0, tokens 7956 in / 3 out, cache read 256
+session.usage.updated      same numbers again
+session.execution.succeeded
+```
+
+**What that settled**
+
+- `resume` may be omitted: the prompt was admitted and the loop ran, confirming the contract's
+  "unless `resume` is false". The body sent `{"text": …}` and nothing else.
+- `session.execution.started` precedes every content event, so arming on it is safe, and every
+  terminal event arrives *after* it: the "ignore a replayed terminal" guard never discarded this
+  turn's end.
+- `session.idle` was **not** emitted for this turn; `session.execution.succeeded` was. Both are
+  handled, and the armed guard keeps a stale `idle` from ending a run.
+- `text.ended.text` is the complete block (`"ok"`), so one line per block is lossless.
+- `step.ended` carries `cost` and `tokens{input,output,reasoning,cache{read,write}}` in exactly the
+  shape `OpenCodeMetrics`/`RunMetrics` already sums; the mapped `step_finish` line summed to the
+  same totals the server reported.
+- `session.usage.updated` repeats the same usage; mapping it too would double-count, so it is
+  dropped.
+- A failed step and the failed execution it causes carry the same message. The first live run
+  proved the naive mapping would print one error row twice; the mapper now remembers it already
+  printed that failure and the execution's end adds no second row.
+
+**Not proved by this turn:** a `form.created` raised during the run and answered through the shared
+child. Raising a form needs the model to call the form tool, which this prompt deliberately avoids.
+The single-child invariant is covered by `ServeProducerWiringTests` (a borrowed child is never
+disposed), and form create/reply/cancel against a real child are already covered by the guarded
+live tests in `OpenCodeFormClient`/`QuestionChannel`. The end-to-end form path needs a run that
+happens to ask a question; it is not simulated.

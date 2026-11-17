@@ -30,6 +30,15 @@ public static class OpenCodeRun
     }
 
     /// <summary>
+    /// What the serve producer runs instead of a command line: one child, one admitted turn.
+    /// </summary>
+    public static string ServeCommandLine(string prompt, string? sessionId = null)
+    {
+        var session = string.IsNullOrEmpty(sessionId) ? "{session}" : sessionId;
+        return $"opencode serve --stdio · POST /api/session/{session}/prompt \"{prompt}\"";
+    }
+
+    /// <summary>
     /// The request <see cref="CommandLine"/> describes, run in <paramref name="folder"/>.
     /// <paramref name="agent"/> and <paramref name="model"/> are omitted when null, so
     /// opencode falls back to its own defaults. A non-null <paramref name="sessionId"/>

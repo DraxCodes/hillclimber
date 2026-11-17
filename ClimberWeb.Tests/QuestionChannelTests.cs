@@ -548,7 +548,10 @@ public class QuestionChannelTests
             return Task.FromResult(CancelOutcome);
         }
 
-        public async Task WatchAsync(Func<SseFrame, Task> onFrame, CancellationToken cancellationToken)
+        public async Task WatchAsync(
+            Func<SseFrame, Task> onFrame,
+            CancellationToken cancellationToken,
+            Action? onOpen = null)
         {
             Interlocked.Increment(ref _watchCalls);
             Emit = onFrame;
