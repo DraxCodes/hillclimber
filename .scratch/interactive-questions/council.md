@@ -3,6 +3,7 @@
 **Status:** deliberation complete; two rows escalated to the user.
 **Date:** 2026-11-16. **Fixed point:** `35f1d42`.
 **Brief:** [brief.md](brief.md). **Chair's sealed proposal:** [chair.md](chair.md).
+**Spec:** [spec.md](spec.md). **Thread plan:** [plan.md](plan.md).
 
 ## Question
 
@@ -155,15 +156,18 @@ Gate run at `35f1d42`; full record in [verification.md](verification.md).
   a **session form** with `form.created` / `form.replied` / `form.cancelled` and a reply
   endpoint. The transport row resolves to serve; stdin stays rejected.
 - **Corrected:** the primitive is richer than the council assumed. A form carries typed fields —
-  `string`, `number`, `integer`, `boolean`, `multiselect`, `option` — not just
-  question-plus-options. The shape seat's round-2 footnote about grouped events is now the main
+  `string`, `number`, `integer`, `boolean`, `multiselect`, `external` — not just
+  question-plus-options. An `option` is an entry attached to a `string` or `multiselect` field,
+  not a field type. The shape seat's round-2 footnote about grouped events is now the main
   open design question, not a footnote.
 - **De-risked:** permissions are a separate channel (`permission.asked` / `permission.replied`,
   their own reply endpoint), so a form is not a permission. The consent constraint becomes
   enforceable: the question row must refuse to render a permission request.
-- **Still open:** a live `form.created` round-trip, `--stdio` semantics, and disconnect
-  behaviour. If `--stdio` speaks the same API with no listener, it is the better transport and
-  the pairing question disappears — one experiment settles it.
+- **Still open:** a live `form.created` round-trip and disconnect behaviour. `--stdio` is
+  settled in the addendum to [verification.md](verification.md): it is a loopback server with a
+  URL line on stdout and a parent-bound lifetime, not a stdio protocol. The listener stays; the
+  pairing credential goes, replaced by a per-run `OPENCODE_PASSWORD` held only in the child's
+  environment.
 
 ## Thread split
 
@@ -178,6 +182,24 @@ Gate run at `35f1d42`; full record in [verification.md](verification.md).
 Lanes 2 and 3 do not share files. Lane 4 is separable from transport. Lane 1 blocks everything:
 without a captured payload the row's shape is a guess.
 
-## Decision
+## Decision (user) — 2026-11-16
 
-_Pending. Filled in by the user, with the date._
+Post-verification rulings. These close the two questions the council escalated as "next" and
+settle the transport-value call.
+
+- **Transport:** a spawned `opencode serve --stdio --port 0` child behind the seam. The URL is
+  read from its one stdout line; its lifetime is the app's pipe; it is authenticated with a
+  per-run `OPENCODE_PASSWORD` that exists only in the child's environment. No pairing code, no
+  fixed port, no global secret. The second surface is a loopback listener owned by the app's
+  own child, not a shared or remote one.
+- **Answerable form shapes:** exactly one field, either a `string` with a non-empty `options`
+  list, or a `boolean` (rendered as the server's own `Yes`/`No` pair). Both are one click, and
+  the pointer and keyboard paths share one commit.
+- **Everything else degrades:** `number`, `integer`, `string` without options, `multiselect`,
+  `external`, and any multi-field form render as a closed notice row that names the kind of
+  answer required and offers one non-answer action: `dismiss` (`session.form.cancel`). The run
+  is never left stuck and no dead form is rendered.
+- **Consent:** a form is not a permission. `permission.asked` has its own channel; the question
+  row refuses it and no answer click may execute an app action.
+- **Scope:** build lane 2 behind the seam, then hillclimb lane 3 against the experience thesis.
+  Lanes 4 and 5 follow the thread plan and stay out of the first two commits.

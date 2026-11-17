@@ -7,4 +7,37 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
+  <!--
+    The live dev host (`scripts/dev/host.mjs`) writes this project's output to a temp directory so
+    the running app never holds a lock on the repo's bin. That also takes the repo bin out of
+    DefaultItemExcludes, which would make a plain `dotnet build` or `dotnet test` look like a source
+    change to `dotnet watch`. Keep it excluded either way.
+  -->
+  <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)/bin/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Tests exercise the supervisor's line parser and child constructor directly. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>ClimberWeb.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <!--
+    A design-time build lists generated files under obj/ as Compile items, and `dotnet watch` treats a
+    change to any Compile item as a source change. Every build and test run rewrites the generated
+    AssemblyInfo file, which is what restarted the host during a plain build. Drop just that file from
+    the design-time list (the real compile is untouched) so obj/ falls back to DefaultItemExcludes.
+    GlobalUsings.g.cs must stay: hot reload compiles against this item list and loses its implicit
+    usings without it.
+  -->
+  <Target Name="ClimberHideGeneratedAssemblyInfoFromWatch"
+          AfterTargets="Compile"
+          Condition="'$(DesignTimeBuild)' == 'true'">
+    <ItemGroup>
+      <Compile Remove="$(IntermediateOutputPath)$(MSBuildProjectName).AssemblyInfo.cs" />
+    </ItemGroup>
+  </Target>
+
 </Project>

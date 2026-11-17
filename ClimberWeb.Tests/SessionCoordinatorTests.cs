@@ -1,3 +1,4 @@
+using ClimberWeb.Components.Ui.Ai;
 using ClimberWeb.Services;
 
 namespace ClimberWeb.Tests;
@@ -354,6 +355,81 @@ public class SessionCoordinatorTests
         Assert.Equal(RunStatus.Completed, record.Summary.Status);
     }
 
+    [Fact]
+    public void ARestoredPendingQuestionIsOneClosedNonInteractiveRow()
+    {
+        using var coordinator = Create(out var run, out _, out _);
+        var id = coordinator.Begin("ask me", RunMethod.Run, Folder);
+
+        run.Report(id, RunStatus.Completed, QuestionLine.Write(Question(QuestionStatus.Pending)));
+
+        var stored = coordinator.StoredEntries();
+        var entry = Assert.Single(stored, row => row.Kind == LogKind.Question);
+        Assert.True(entry.Question!.Restored);
+
+        var item = Assert.Single(LogGrouper.Group(stored), grouped => grouped.Kind == OutputItemKind.Question);
+        Assert.Equal(OutputItemKind.Question, item.Kind);
+
+        var view = QuestionView.For(item.Entries[^1].Question!);
+        Assert.False(view.Interactive);
+        Assert.False(view.Busy);
+        Assert.False(view.ShowPrefix);
+        Assert.False(view.IsFold);
+        Assert.False(view.AwaitsAnswer);
+        Assert.Equal(QuestionView.Copy.Stale, view.StatusLine);
+        Assert.Null(view.Hint);
+        Assert.Null(view.Escape);
+        Assert.Equal(QuestionAction.None, view.Action);
+    }
+
+    [Fact]
+    public void APendingAndAnsweredLineForOneFormRestoreAsOneAnsweredRow()
+    {
+        using var coordinator = Create(out var run, out _, out _);
+        var id = coordinator.Begin("ask me", RunMethod.Run, Folder);
+        var lines = new[]
+        {
+            QuestionLine.Write(Question(QuestionStatus.Pending)),
+            QuestionLine.Write(Question(QuestionStatus.Answered, chosen: "violet")),
+        };
+
+        run.Report(id, RunStatus.Running, lines);
+        run.Report(id, RunStatus.Completed, lines);
+
+        var stored = coordinator.StoredEntries();
+
+        // Both lines persist; the grouper is what keeps the transcript to one row per form.
+        Assert.Equal(2, stored.Count(row => row.Kind == LogKind.Question));
+        var item = Assert.Single(LogGrouper.Group(stored), grouped => grouped.Kind == OutputItemKind.Question);
+        Assert.Equal(OutputItemKind.Question, item.Kind);
+
+        var state = item.Entries[^1].Question!;
+        Assert.True(state.Restored);
+        Assert.Equal(QuestionStatus.Answered, state.Status);
+
+        var view = QuestionView.For(state);
+        Assert.True(view.IsFold);
+        Assert.False(view.FoldOpenByDefault);
+        Assert.Equal("answered: Violet", view.FoldedLabel);
+        Assert.Equal(QuestionAction.None, view.Action);
+    }
+
+    private static QuestionState Question(QuestionStatus status, string? chosen = null) =>
+        new(
+            "frm_1",
+            "ses_1",
+            "Which colour should the status band use?",
+            "colour",
+            QuestionKind.Choice,
+            new[]
+            {
+                new QuestionOption("amber", "Amber", "the current accent"),
+                new QuestionOption("violet", "Violet"),
+                new QuestionOption("slate", "Slate"),
+            },
+            chosen,
+            status);
+
     /// <summary>A run service the test drives by hand, one snapshot at a time.</summary>
     private sealed class FakeRunService : IRunService
     {
@@ -370,6 +446,15 @@ public class SessionCoordinatorTests
         }
 
         public Task ApproveFallbackAsync() => Task.CompletedTask;
+
+        public Task<QuestionSubmitOutcome> AnswerQuestionAsync(string formId, string fieldKey, string value) =>
+            Task.FromResult(QuestionSubmitOutcome.Disconnected);
+
+        public Task<QuestionSubmitOutcome> DismissQuestionAsync(string formId) =>
+            Task.FromResult(QuestionSubmitOutcome.Disconnected);
+
+        public Task<QuestionSubmitOutcome> CheckQuestionAsync(string formId) =>
+            Task.FromResult(QuestionSubmitOutcome.Disconnected);
 
         public void Report(string sessionId, RunStatus status, params string[] logs) =>
             Report(new RunState { SessionId = sessionId, Status = status, Logs = logs });

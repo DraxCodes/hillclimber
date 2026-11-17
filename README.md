@@ -36,7 +36,10 @@ throwaway script. It runs on the LAN so a phone can drive it, behind a PIN.
 - **Sessions** — every run and climb is saved as a conversation in the rail, titled by its
   first prompt. Switching back restores the transcript and continues the same OpenCode
   session (`--session`), and `+` starts a fresh one. One JSON file per session under
-  `Climber:SessionsPath`; deleting from the rail is the only pruning.
+  `Climber:SessionsPath`; deleting from the rail is the only pruning. A model question keeps
+  only its display data (title, kind, options, chosen answer, status) — never the transport's
+  URL, password or raw frame — and restores inert: an answered row folds to `answered: …`,
+  a pending or stale row reads `no answer sent`.
 - **Prompt handoff** — the instruction leaves the prompt box as soon as a run or climb takes
   it (so the same text can't be fired twice), and an idle box offers the last prompt back
   with one click.
@@ -89,6 +92,44 @@ $env:Climber__Pin = "your-real-pin"
 ```
 
 Then open `http://<your-machine>:5179` from the phone.
+
+### Working on the UI live
+
+For UI work, run the app under watch with its output in a temp directory, so `dotnet test`, a plain
+build and the browser checks can use the repo's `bin` while the app keeps running:
+
+```sh
+node scripts/dev/host.mjs start      # http://localhost:5179; also stop, restart, status
+node scripts/dev/drive.mjs start     # one persistent window, already unlocked
+```
+
+`drive.mjs` types the PIN like a person would — there is no bypass — then stays logged in and takes
+commands: `goto /activity`, `text`, `errors`, `shot`, `reload`, `stop`. `shot` takes
+`--width`, `--height` and `--theme light|dark`, and `help` lists everything. Bad flags are refused
+with the nearest valid one (exit 2), and `start` with the app down names `host.mjs start` instead of
+opening a browser on an error page.
+
+A plain `dotnet build` or `dotnet test` is expected to leave the app alone, and does: the project
+excludes the repo `bin` from watch and hides the generated `obj` AssemblyInfo from its design-time
+item list, so neither write looks like a source change. A save that has to rebuild still restarts
+the host, and the tab waits for the new process rather than reloading into the gap.
+
+The open tab reloads itself when the running host changes, and never while a field has focus. Two
+things the loop deliberately does not do:
+
+- **It does not trust hot reload.** `dotnet watch` can report "applied" while the served page is
+  stale, and hot-patching a layout that owns a `SectionOutlet` throws on every new circuit while
+  watch still says success. `GET /__dev/stamp` (Development only) reports what is actually running,
+  and the tab reloads from that.
+- **It does not move the intermediate output.** Only `BaseOutputPath` goes to the temp directory;
+  `BaseIntermediateOutputPath` stays in the repo, because the old `obj` is still globbed into the
+  build and duplicates `AssemblyInfo` attributes.
+
+Both scripts detach, so the app and window outlive the shell that started them. Something outside
+the loop (a job object or an external process-tree cleanup) has nevertheless killed the watch and
+the window silently on this machine, with no crash in the Application log. `host.mjs status` and
+`drive.mjs status` detect exactly that and name the recovery — `node scripts/dev/host.mjs restart`,
+then `node scripts/dev/drive.mjs start`.
 
 ## Configuration
 
@@ -151,6 +192,7 @@ Surplus/OpenRouter pair from the legacy keys below.
 | `Climber:DefaultFolder` | user profile | Folder shown in the target picker. |
 | `Climber:DefaultAgent` | `task-orchestrator` | Agent to run when the target provides one. |
 | `Climber:SessionsPath` | `%APPDATA%/ClimberWeb/sessions` | Where session transcripts are stored. One JSON file per session. |
+| `Climber:Questions` | `serve` | `serve` moves the whole run onto one `opencode serve --stdio` child - the producer feeds the transcript from its event stream, and the question channel subscribes to that same child, so a question the run asks is answerable instead of cancelled. `off` (or an unset or unrecognised value) keeps the plain `opencode run --format json` producer; the shipped `appsettings.json` sets `serve` explicitly, so removing the key is the way back. |
 
 Legacy provider keys remain aliases when `Climber:Providers` is absent:
 

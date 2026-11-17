@@ -24,6 +24,13 @@ builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 // real work rather than a transcript, so the fixture host replaces it with a refusing guard
 // too: a playback host never drives opencode, whichever method is chosen.
 var playback = PlaybackRunService.IsEnabled(builder.Environment.IsDevelopment());
+
+// Questions ride a per-run `opencode serve --stdio` child. Shipped `appsettings.json` sets
+// Climber:Questions to `serve`; an unset, empty or unrecognised value is `off`, so clearing the
+// key is a safe revert and a typo can never start a second process.
+builder.Services.AddSingleton<IQuestionChannelFactory>(sp =>
+    QuestionTransport.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+
 if (playback)
 {
     builder.Services.AddSingleton<IRunService>(
@@ -106,6 +113,13 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 
 // Plain HTTP on the LAN: no HTTPS redirect so phones can connect directly.
 app.MapStaticAssets();
+
+// Development only: the live loop's staleness check. Not a product surface, and never mapped
+// outside Development — the refresh script is inert when this 404s.
+if (DevLoop.IsEnabled(app.Environment.IsDevelopment()))
+{
+    app.MapGet(DevLoop.StampPath, (IWebHostEnvironment environment) => DevLoop.Stamp(environment.ContentRootPath));
+}
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

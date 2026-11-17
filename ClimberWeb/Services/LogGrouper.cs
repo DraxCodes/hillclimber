@@ -9,6 +9,9 @@ public enum OutputItemKind
     /// <summary>The prompt that opened a turn, rendered where a chat shows the reader's own question.</summary>
     Prompt,
 
+    /// <summary>A question the run asked, rendered as one answerable (or folded) row.</summary>
+    Question,
+
     /// <summary>One step's reasoning and tool calls, folded behind a summary.</summary>
     Turn,
 
@@ -57,6 +60,9 @@ public static class LogGrouper
         {
             return Array.Empty<OutputItem>();
         }
+
+        // Repeated states of one question are one row: the first position, the last state.
+        entries = QuestionLines.Collapse(entries);
 
         var items = new List<OutputItem>();
         var turn = new List<LogEntry>();
@@ -170,6 +176,14 @@ public static class LogGrouper
                     FlushMessage();
                     FlushTurn();
                     items.Add(new OutputItem(OutputItemKind.Error, new[] { entry }));
+                    break;
+
+                // A question is the reader's turn, not activity: it closes whatever came
+                // before and stands alone, so it can never be folded into a turn.
+                case LogKind.Question:
+                    FlushMessage();
+                    FlushTurn();
+                    items.Add(new OutputItem(OutputItemKind.Question, new[] { entry }));
                     break;
 
                 // A restored session's question: its own row, never folded into the work

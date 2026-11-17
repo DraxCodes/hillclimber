@@ -248,4 +248,163 @@ public class SessionStoreTests : IDisposable
 
         Assert.Equal("short", StoredEntry.From(entry).ToolOutput);
     }
+
+    [Fact]
+    public void SaveThenLoad_RoundTripsAQuestionRowThroughTheDisplayShape()
+    {
+        var state = Question(QuestionStatus.Answered, chosen: "violet");
+        var stored = StoredEntry.From(new LogEntry(
+            "raw",
+            "10:00:03",
+            LogKind.Question,
+            state.Title,
+            Question: state));
+        var store = Store();
+        store.Save(Record("ses_question", entries: new[] { stored }));
+
+        var loaded = Assert.Single(store.Load("ses_question")!.Entries);
+        Assert.Equal(LogKind.Question, loaded.Kind);
+        Assert.Equal("Which colour should the status band use?", loaded.Text);
+
+        var question = loaded.Question;
+        Assert.NotNull(question);
+        Assert.Equal("frm_1", question!.FormId);
+        Assert.Equal(QuestionStatus.Answered, question.Status);
+        Assert.Equal(QuestionKind.Choice, question.Kind);
+        Assert.Equal("colour", question.FieldKey);
+        Assert.Equal("violet", question.ChosenValue);
+        Assert.Equal(new[] { "Amber", "Violet", "Slate" }, question.Options.Select(option => option.Label));
+        Assert.Equal("the current accent", question.Options[0].Description);
+
+        var restored = loaded.ToEntry(0).Question;
+        Assert.NotNull(restored);
+        Assert.True(restored!.Restored);
+        Assert.Equal(QuestionStatus.Answered, restored.Status);
+        Assert.Equal("violet", restored.ChosenValue);
+        Assert.Equal(string.Empty, restored.SessionId);
+    }
+
+    [Theory]
+    [InlineData(QuestionStatus.Pending)]
+    [InlineData(QuestionStatus.Submitting)]
+    [InlineData(QuestionStatus.Stale)]
+    public void ToEntry_RestoresAnUnsettledQuestionAsNoAnswerSent(QuestionStatus status)
+    {
+        var stored = StoredEntry.From(new LogEntry(
+            "raw",
+            "10:00:03",
+            LogKind.Question,
+            "Which colour should the status band use?",
+            Question: Question(status)));
+
+        var restored = stored.ToEntry(3).Question;
+
+        Assert.NotNull(restored);
+        Assert.True(restored!.Restored);
+        Assert.Equal(QuestionStatus.Stale, restored.Status);
+        Assert.Null(restored.ChosenValue);
+    }
+
+    [Fact]
+    public void ToEntry_KeepsAnUnsupportedRowsNoticeAndKindLabel()
+    {
+        var state = Question(
+            QuestionStatus.Unsupported,
+            kind: QuestionKind.Unsupported,
+            kindLabel: "several answers required") with
+        {
+            Notice = "the form asked for more than one answer",
+        };
+        var stored = StoredEntry.From(new LogEntry("raw", "10:00:03", LogKind.Question, state.Title, Question: state));
+
+        var restored = stored.ToEntry(0).Question;
+
+        Assert.NotNull(restored);
+        Assert.Equal("the form asked for more than one answer", restored!.Notice);
+        Assert.Equal("several answers required", restored.KindLabel);
+    }
+
+    [Fact]
+    public void Load_ReadsAnEntryWrittenBeforeQuestionsWerePersisted()
+    {
+        Directory.CreateDirectory(_folder);
+        File.WriteAllText(Path.Combine(_folder, "ses_legacy.json"), """
+            {
+              "Summary": {
+                "Id": "ses_legacy",
+                "Title": "older session",
+                "Method": "Run",
+                "Status": "Completed",
+                "StartedAt": "2026-11-15T10:00:00+00:00",
+                "FinishedAt": "2026-11-15T10:05:00+00:00",
+                "UpdatedAt": "2026-11-15T10:05:00+00:00",
+                "SpendUsd": 0.10,
+                "EstimatedSpendUsd": 0,
+                "TotalTokens": 10
+              },
+              "Entries": [
+                {
+                  "Timestamp": "10:00:01",
+                  "Kind": "Text",
+                  "Text": "The suite is green.",
+                  "Status": "None"
+                }
+              ],
+              "TargetFolder": "C:\\work\\repo"
+            }
+            """);
+
+        var loaded = Store().Load("ses_legacy");
+
+        Assert.NotNull(loaded);
+        var entry = Assert.Single(loaded!.Entries);
+        Assert.Equal("The suite is green.", entry.Text);
+        Assert.Null(entry.Question);
+        Assert.Null(entry.ToEntry(0).Question);
+    }
+
+    [Fact]
+    public void AStoredQuestionWritesOnlyDisplayData()
+    {
+        var state = Question(QuestionStatus.Answered, chosen: "violet");
+        Store().Save(Record(
+            "ses_question",
+            entries: new[]
+            {
+                StoredEntry.From(new LogEntry("raw", "10:00:03", LogKind.Question, state.Title, Question: state)),
+            }));
+
+        var json = File.ReadAllText(Path.Combine(_folder, "ses_question.json"));
+
+        Assert.Contains("\"Question\"", json);
+        Assert.Contains("\"ChosenValue\": \"violet\"", json);
+        Assert.DoesNotContain("password", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("authorization", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("http", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SessionId", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static QuestionState Question(
+        QuestionStatus status,
+        string? chosen = null,
+        QuestionKind kind = QuestionKind.Choice,
+        string? kindLabel = null) =>
+        new(
+            "frm_1",
+            "ses_1",
+            "Which colour should the status band use?",
+            "colour",
+            kind,
+            kind == QuestionKind.Unsupported
+                ? Array.Empty<QuestionOption>()
+                : new[]
+                {
+                    new QuestionOption("amber", "Amber", "the current accent"),
+                    new QuestionOption("violet", "Violet"),
+                    new QuestionOption("slate", "Slate"),
+                },
+            chosen,
+            status,
+            null,
+            kindLabel);
 }

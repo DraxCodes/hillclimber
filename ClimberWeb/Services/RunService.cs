@@ -87,6 +87,19 @@ public interface IRunService
     /// the fallback. Throws when there is no failed run awaiting approval.
     /// </summary>
     Task ApproveFallbackAsync();
+
+    /// <summary>
+    /// Sends one listed option as data to the model. There is no allow, approve or execute
+    /// route: an answer is never an app action. Returns <see cref="QuestionSubmitOutcome.Disconnected"/>
+    /// when this run has no channel.
+    /// </summary>
+    Task<QuestionSubmitOutcome> AnswerQuestionAsync(string formId, string fieldKey, string value);
+
+    /// <summary>Dismisses a question without answering it.</summary>
+    Task<QuestionSubmitOutcome> DismissQuestionAsync(string formId);
+
+    /// <summary>The read-only <c>check</c> action: asks the server what happened to a form.</summary>
+    Task<QuestionSubmitOutcome> CheckQuestionAsync(string formId);
 }
 
 /// <summary>
@@ -98,6 +111,7 @@ public sealed class RunService : IRunService
 {
     private readonly ICommandRunner _runner;
     private readonly ILogger<RunService>? _logger;
+    private readonly IQuestionChannelFactory? _questions;
     private readonly object _gate = new();
     private readonly RunLogFeed _log = new();
 
@@ -107,11 +121,31 @@ public sealed class RunService : IRunService
     private Task _runTask = Task.CompletedTask;
     private RunOptions? _lastOptions;
     private ProviderPricing? _activePricing;
+    private IQuestionChannel? _channel;
 
-    public RunService(ICommandRunner runner, ILogger<RunService>? logger = null)
+    /// <summary>
+    /// Builds the producer for a serve run from the run's one child. Injectable so a test can
+    /// drive the serve branch of the run loop without spawning a process; the real one speaks
+    /// the child's HTTP API.
+    /// </summary>
+    private readonly Func<ServeChild, RunOptions, ICommandRunner> _serveRunner;
+
+    public RunService(
+        ICommandRunner runner,
+        ILogger<RunService>? logger = null,
+        IQuestionChannelFactory? questions = null,
+        Func<ServeChild, RunOptions, ICommandRunner>? serveRunner = null)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _logger = logger;
+        _questions = questions;
+        _serveRunner = serveRunner ?? ((child, options) => new ServeRunRunner(
+            child.Client,
+            new OpenCodeFormClient(child.Client),
+            options.SessionId!,
+            options.Prompt,
+            options.Agent,
+            options.Provider));
     }
 
     public RunState State
@@ -211,18 +245,98 @@ public sealed class RunService : IRunService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<QuestionSubmitOutcome> AnswerQuestionAsync(string formId, string fieldKey, string value)
+    {
+        var channel = Volatile.Read(ref _channel);
+        if (channel is null || string.IsNullOrEmpty(formId))
+        {
+            return QuestionSubmitOutcome.Disconnected;
+        }
+
+        try
+        {
+            return await channel.SubmitAsync(formId, fieldKey, value).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question answer failed.");
+            return QuestionSubmitOutcome.Disconnected;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<QuestionSubmitOutcome> DismissQuestionAsync(string formId)
+    {
+        var channel = Volatile.Read(ref _channel);
+        if (channel is null || string.IsNullOrEmpty(formId))
+        {
+            return QuestionSubmitOutcome.Disconnected;
+        }
+
+        try
+        {
+            return await channel.CancelAsync(formId).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question dismiss failed.");
+            return QuestionSubmitOutcome.Disconnected;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<QuestionSubmitOutcome> CheckQuestionAsync(string formId)
+    {
+        var channel = Volatile.Read(ref _channel);
+        if (channel is null || string.IsNullOrEmpty(formId))
+        {
+            return QuestionSubmitOutcome.Disconnected;
+        }
+
+        try
+        {
+            return await channel.RecheckAsync(formId).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question check failed.");
+            return QuestionSubmitOutcome.Disconnected;
+        }
+    }
+
     /// <summary>Awaits the current run, if any. Intended for tests and graceful shutdown.</summary>
     public Task WaitForCompletionAsync() => _runTask;
 
     private async Task RunLoopAsync(RunOptions options, CancellationToken cancellationToken)
     {
+        IQuestionChannel? questions = null;
+        ServeChild? server = null;
         try
         {
-            Log($"$ {OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Provider?.Model, options.SessionId)}");
-            var result = await _runner.RunAsync(
-                OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
-                OnOpenCodeLine,
-                cancellationToken).ConfigureAwait(false);
+            // The run owns one serve child in serve mode; the producer and the question
+            // channel both ride it, because a form is only visible to the server that made it.
+            server = await TryStartServerAsync(options, cancellationToken).ConfigureAwait(false);
+
+            Log($"$ {(server is null
+                ? OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Provider?.Model, options.SessionId)
+                : OpenCodeRun.ServeCommandLine(options.Prompt, options.SessionId))}");
+
+            // The channel is optional and never changes the run's outcome: a failure to start
+            // it is one line, and the run continues on the producer it already has.
+            questions = await StartQuestionsAsync(options, server, cancellationToken).ConfigureAwait(false);
+
+            var result = server is not null
+                ? await _serveRunner(server, options)
+                    .RunAsync(
+                        OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
+                        OnOpenCodeLine,
+                        cancellationToken)
+                    .ConfigureAwait(false)
+                : await _runner.RunAsync(
+                    OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
+                    OnOpenCodeLine,
+                    cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -233,11 +347,24 @@ public sealed class RunService : IRunService
             }
             else if (result.ExitCode != 0)
             {
-                Fail(
-                    $"[opencode exited with code {result.ExitCode}]",
-                    $"opencode exited with code {result.ExitCode}",
-                    options,
-                    offerFallback: CanFallBack(options));
+                if (server is not null)
+                {
+                    // The serve producer already wrote the server's own failure row; the band
+                    // repeats those words instead of inventing a process exit code for a
+                    // process this run never started.
+                    var detail = string.IsNullOrWhiteSpace(result.StandardError)
+                        ? "the run failed"
+                        : result.StandardError.Trim();
+                    Fail(null, detail, options, offerFallback: CanFallBack(options));
+                }
+                else
+                {
+                    Fail(
+                        $"[opencode exited with code {result.ExitCode}]",
+                        $"opencode exited with code {result.ExitCode}",
+                        options,
+                        offerFallback: CanFallBack(options));
+                }
             }
             else
             {
@@ -256,6 +383,21 @@ public sealed class RunService : IRunService
                 LogSpend();
             }
         }
+        catch (ServeInterruptedException exception)
+        {
+            // The server ended the turn itself. That is not a provider failure either, and it
+            // is not the reader's stop, so the band says which one it was.
+            Log($"[serve: {exception.Message}]");
+            UpdateState(state => state with
+            {
+                Status = RunStatus.Failed,
+                FinishedAt = DateTimeOffset.Now,
+                Message = exception.Message,
+                FallbackAvailable = false,
+                FallbackMessage = null,
+                Fallback = null,
+            });
+        }
         catch (OperationCanceledException)
         {
             UpdateState(state => state with
@@ -270,26 +412,157 @@ public sealed class RunService : IRunService
             });
             Log("===== Stopped by user =====");
         }
+        catch (ServeStartException exception)
+        {
+            // The serve transport failing is not a provider failing: one line, and no fallback
+            // offer, because retrying the same transport on another provider would fail alike.
+            Log($"[serve: {exception.Message}]");
+            UpdateState(state => state with
+            {
+                Status = RunStatus.Failed,
+                FinishedAt = DateTimeOffset.Now,
+                Message = exception.Message,
+                FallbackAvailable = false,
+                FallbackMessage = null,
+                Fallback = null,
+            });
+        }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "OpenCode run failed.");
             Fail($"ERROR: {ex.Message}", ex.Message, options, offerFallback: CanFallBack(options));
         }
+        finally
+        {
+            await DisposeQuestionsAsync(questions).ConfigureAwait(false);
+
+            // Last, and after the channel: the channel borrows this child in serve mode.
+            if (server is not null)
+            {
+                await server.DisposeAsync().ConfigureAwait(false);
+            }
+        }
     }
+
+    /// <summary>
+    /// Starts the run's serve child when the transport is enabled and the run has a session.
+    /// A child that will not start is one line and a null: the run falls back to the CLI
+    /// producer, which is exactly what it used before this lane existed.
+    /// </summary>
+    private async Task<ServeChild?> TryStartServerAsync(RunOptions options, CancellationToken cancellationToken)
+    {
+        if (_questions is not { Enabled: true } || string.IsNullOrWhiteSpace(options.SessionId))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _questions.StartServerAsync(options.TargetFolder, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question server unavailable.");
+            Log($"[questions unavailable: {exception.Message}]");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Starts a question channel for this run when one is configured and the run has a
+    /// session. Any failure is one quiet line and a null: the run continues without questions.
+    /// </summary>
+    private async Task<IQuestionChannel?> StartQuestionsAsync(
+        RunOptions options,
+        ServeChild? server,
+        CancellationToken cancellationToken)
+    {
+        if (_questions is not { Enabled: true } || string.IsNullOrWhiteSpace(options.SessionId))
+        {
+            return null;
+        }
+
+        // Serve mode means the run already owns its one child. A channel that cannot attach to
+        // that child must not start a second one: forms are process-local to the server that
+        // raised them, so a second child could never see this run's questions anyway.
+        if (server is null)
+        {
+            return null;
+        }
+
+        IQuestionChannel? channel = null;
+        try
+        {
+            channel = _questions.Create();
+            if (channel is null)
+            {
+                return null;
+            }
+
+            channel.Changed += OnQuestionChanged;
+            await channel.StartAsync(options.SessionId, options.TargetFolder, cancellationToken, server)
+                .ConfigureAwait(false);
+            Volatile.Write(ref _channel, channel);
+            return channel;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question channel unavailable.");
+            // The type, not the message: an HttpClient fault reads "… (127.0.0.1:4099)", and no
+            // line in the transcript may carry the run's loopback address. The full exception is
+            // in the host log for diagnosis.
+            Log($"[questions unavailable: the question channel did not attach ({exception.GetType().Name})]");
+            if (channel is not null)
+            {
+                channel.Changed -= OnQuestionChanged;
+                await channel.DisposeAsync().ConfigureAwait(false);
+            }
+
+            return null;
+        }
+    }
+
+    private async Task DisposeQuestionsAsync(IQuestionChannel? channel)
+    {
+        if (channel is null)
+        {
+            return;
+        }
+
+        Volatile.Write(ref _channel, null);
+        channel.Changed -= OnQuestionChanged;
+        try
+        {
+            await channel.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogWarning(exception, "Disposing the question channel failed.");
+        }
+    }
+
+    /// <summary>One line per change; the formatter turns it into a question row and the grouper
+    /// collapses repeated states for one form.</summary>
+    private void OnQuestionChanged(QuestionState state) => Log(QuestionLine.Write(state));
 
     /// <summary>True when this run has a provider and at least one provider after it.</summary>
     private static bool CanFallBack(RunOptions options) =>
         options.Provider is not null && options.FallbackList.Count > 0;
 
     /// <summary>
-    /// Logs <paramref name="logLine"/> and records the run as failed. A failure on a provider
-    /// with a configured fallback exposes the next provider, which only runs after approval.
+    /// Logs <paramref name="logLine"/> (when it is not null) and records the run as failed. A
+    /// failure on a provider with a configured fallback exposes the next provider, which only
+    /// runs after approval.
     /// </summary>
-    private void Fail(string logLine, string message, RunOptions options, bool offerFallback)
+    private void Fail(string? logLine, string message, RunOptions options, bool offerFallback)
     {
         var next = offerFallback ? options.FallbackList.FirstOrDefault() : null;
         var current = options.Provider?.DisplayName ?? "The run";
-        Log(logLine);
+        if (logLine is not null)
+        {
+            Log(logLine);
+        }
         UpdateState(state => state with
         {
             Status = RunStatus.Failed,

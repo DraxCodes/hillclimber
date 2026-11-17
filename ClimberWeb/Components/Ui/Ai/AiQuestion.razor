@@ -1,0 +1,252 @@
+@using Microsoft.AspNetCore.Components.Web
+@using ClimberWeb.Services
+@using ClimberWeb.Components.Ui.Ai
+
+@* AI Elements: the question row, composed from Trace / TraceLine / TraceTitle /
+   TraceCollapsible / Button. It is not a card: a pending question is a line with a 2px
+   leading edge at answer weight, its options as rows, and the two micro lines beneath.
+   The pointer and the keyboard both commit through the option button's own click, so an
+   answer is one action however it is given. *@
+<div data-slot="question" data-state="@State.Status.ToString().ToLowerInvariant()" class="w-full min-w-0">
+    @if (View.IsFold)
+    {
+        <Trace>
+            <TraceCollapsible Open="_open" OnToggle="SetOpen">
+                <Trigger>
+                    <TraceLine>
+                        <TraceIcon><UiIcon Name="message" CssClass="size-4" /></TraceIcon>
+                        <TraceTitle>@View.FoldedLabel</TraceTitle>
+                    </TraceLine>
+                </Trigger>
+                <ChildContent>
+                    <div class="flex min-w-0 flex-col gap-2 font-sans">
+                        <p class="m-0 text-base leading-snug font-medium text-foreground">@View.Title</p>
+                        <div role="list" class="flex min-w-0 flex-col gap-0.5" aria-label="options">
+                            @foreach (var option in View.Options)
+                            {
+                                <div role="listitem" data-slot="question-option" data-chosen="@(option.IsChosen ? "true" : null)"
+                                     class="flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground data-[chosen=true]:text-foreground">
+                                    <span aria-hidden="true" class="w-3 shrink-0 pt-0.5 font-mono text-[0.68rem] text-primary">
+                                        @(option.IsChosen ? QuestionView.Copy.ChosenMark.Trim() : string.Empty)
+                                    </span>
+                                    <span class="min-w-0 break-words">
+                                        @option.Label
+                                        @if (option.IsChosen)
+                                        {
+                                            <span class="sr-only"> @QuestionView.Copy.ChosenForScreenReader</span>
+                                        }
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </ChildContent>
+            </TraceCollapsible>
+        </Trace>
+    }
+    else if (View.Interactive || View.Busy)
+    {
+        <div class="min-w-0 border-l-2 border-primary pl-3">
+            <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span class="font-mono text-[0.68rem] tracking-wide text-muted-foreground uppercase">@QuestionView.Copy.Prefix</span>
+                <span class="min-w-0 font-sans text-base leading-snug font-medium break-words text-foreground">@View.Title</span>
+            </div>
+
+            <div role="radiogroup"
+                 aria-label="@View.Title"
+                 aria-busy="@(View.Busy ? "true" : null)"
+                 class="mt-2 flex min-w-0 flex-col gap-0.5">
+                @for (var index = 0; index < View.Options.Count; index++)
+                {
+                    var position = index;
+                    var option = View.Options[position];
+                    <QuestionOptionRow Option="option"
+                                       Focused="@(position == _focus)"
+                                       Disabled="@View.Busy"
+                                       Registered="reference => SetReference(position, reference)"
+                                       OnFocus="() => _focus = position"
+                                       OnCommit="() => CommitAsync(option)"
+                                       OnKeyDown="eventArgs => MoveFocusAsync(eventArgs, position)" />
+                }
+            </div>
+
+            @if (View.Busy)
+            {
+                <div class="mt-2 flex items-center gap-1.5 font-mono text-[0.68rem] text-muted-foreground">
+                    <UiIcon Name="loader" CssClass="size-3 animate-spin" />
+                    <span>@View.StatusLine</span>
+                </div>
+            }
+            else
+            {
+                <div class="mt-2 font-mono text-[0.68rem] text-muted-foreground">@View.Hint</div>
+                <div class="font-mono text-[0.68rem] text-muted-foreground">@View.Escape</div>
+            }
+        </div>
+
+        @if (View.Interactive && !string.IsNullOrEmpty(View.Announcement))
+        {
+            <span class="sr-only" role="status">@View.Announcement</span>
+        }
+    }
+    else
+    {
+        @* A question that is over keeps the answered fold's glyph so the transcript reads
+           "this was a question", not a stray line of prose; a live ask is marked by asks:
+           and the pending row's edge. *@
+        <Trace>
+            <div class="flex min-w-0 gap-2">
+                @if (!View.ShowPrefix)
+                {
+                    <UiIcon Name="message" CssClass="mt-0.5 size-4 shrink-0 text-muted-foreground/70" />
+                }
+                <div class="flex min-w-0 flex-col gap-0.5">
+                    <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        @if (View.ShowPrefix)
+                        {
+                            <span class="font-mono text-[0.68rem] tracking-wide text-muted-foreground uppercase">@QuestionView.Copy.Prefix</span>
+                        }
+                        <span class="min-w-0 font-sans text-sm leading-snug break-words text-muted-foreground">@View.Title</span>
+                    </div>
+
+                    @if (View.Notice is { Length: > 0 })
+                    {
+                        <div class="font-mono text-[0.68rem] text-muted-foreground">@View.Notice</div>
+                    }
+
+                    @if (View.StatusLine is { Length: > 0 })
+                    {
+                        <div class="font-mono text-[0.68rem] text-muted-foreground">@View.StatusLine</div>
+                    }
+
+                    @if (View.Action != QuestionAction.None)
+                    {
+                        <div class="mt-1">
+                            <Button Variant="outline"
+                                    Size="xs"
+                                    Class="cursor-pointer border-border px-2 font-mono text-[0.68rem] font-normal text-muted-foreground hover:bg-card hover:text-foreground"
+                                    OnClick="ActionAsync">@View.ActionLabel</Button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </Trace>
+    }
+</div>
+
+@code {
+    /// <summary>The one state this row draws.</summary>
+    [Parameter, EditorRequired] public QuestionState State { get; set; } = default!;
+
+    /// <summary>Raised with the option the reader committed, by pointer or keyboard.</summary>
+    [Parameter] public EventCallback<QuestionOptionView> OnAnswer { get; set; }
+
+    /// <summary>Raised with <c>dismiss</c> or <c>check</c>.</summary>
+    [Parameter] public EventCallback<QuestionAction> OnAction { get; set; }
+
+    private readonly Dictionary<int, ElementReference> _references = new();
+    private QuestionView View => QuestionView.For(State);
+    private int _focus;
+    private bool _open;
+    private bool _sending;
+    private bool _arrived;
+
+    protected override void OnParametersSet()
+    {
+        if (View.Options.Count == 0)
+        {
+            _focus = 0;
+        }
+        else if (_focus >= View.Options.Count)
+        {
+            _focus = View.Options.Count - 1;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The question arrived: move the reader to the first option so the answer is one
+        // keystroke away. The announcement in the markup says where focus went. The row is
+        // drawn before its option rows report their elements, so the pass that draws it has
+        // nothing to focus yet; the render that follows the report carries the focus.
+        if (_arrived || !View.Interactive || !_references.TryGetValue(_focus, out var reference))
+        {
+            return;
+        }
+
+        _arrived = true;
+        try
+        {
+            await reference.FocusAsync();
+        }
+        catch (Exception)
+        {
+            // Prerendering or a lost circuit; the reader can still Tab to the row.
+        }
+    }
+
+    private void SetReference(int index, ElementReference reference) => _references[index] = reference;
+
+    private void SetOpen(bool open) => _open = open;
+
+    /// <summary>Moves the keyboard to the first option. The page calls this on arrival.</summary>
+    public async ValueTask FocusFirstAsync()
+    {
+        if (_references.TryGetValue(_focus, out var reference))
+        {
+            await reference.FocusAsync();
+        }
+    }
+
+    private async Task CommitAsync(QuestionOptionView option)
+    {
+        // The pending row is the only interactive state; a second activation while the first
+        // is in flight would be a second answer. The button's native Enter/Space clicks here
+        // too, so pointer and keyboard share this one path.
+        if (_sending || !View.Interactive)
+        {
+            return;
+        }
+
+        _sending = true;
+        try
+        {
+            await OnAnswer.InvokeAsync(option);
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private async Task MoveFocusAsync(KeyboardEventArgs eventArgs, int index)
+    {
+        var count = View.Options.Count;
+        if (!View.Interactive || count == 0)
+        {
+            return;
+        }
+
+        var next = eventArgs.Key switch
+        {
+            "ArrowDown" or "ArrowRight" => (index + 1) % count,
+            "ArrowUp" or "ArrowLeft" => (index - 1 + count) % count,
+            "Home" => 0,
+            "End" => count - 1,
+            _ => index,
+        };
+
+        if (next == index)
+        {
+            return;
+        }
+
+        _focus = next;
+        if (_references.TryGetValue(next, out var reference))
+        {
+            await reference.FocusAsync();
+        }
+    }
+
+    private Task ActionAsync() => OnAction.InvokeAsync(View.Action);
+}

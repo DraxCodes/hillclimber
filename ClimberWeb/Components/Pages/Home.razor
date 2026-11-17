@@ -328,6 +328,21 @@ else
                             </div>
                         }
                     }
+                    else if (item.Kind == OutputItemKind.Question)
+                    {
+                        // One row per form, keyed by its id so a state change folds the same
+                        // row instead of remounting it. The answer is data the channel sends;
+                        // no click here can run anything else.
+                        var question = item.Entries[^1].Question;
+                        if (question is not null)
+                        {
+                            <div class="log-item mx-auto w-full max-w-3xl" data-kind="question" @key="question.FormId">
+                                <AiQuestion State="question"
+                                            OnAnswer="option => AnswerAsync(question, option)"
+                                            OnAction="action => QuestionActionAsync(question, action)" />
+                            </div>
+                        }
+                    }
                     else if (item.Kind == OutputItemKind.Unrecognized)
                     {
                         var unknown = ToolPresentation.ForEvent(item.Entries[0]);
@@ -834,7 +849,11 @@ else
 
     private void SetMaxIterations(int value) => _maxIterations = Math.Clamp(value, 1, 20);
 
-    private string StatusKey => ActiveStatus.ToString().ToLowerInvariant();
+    /// <summary>
+    /// While a question waits for the reader the band says so instead of "running": the run
+    /// is not working, it is waiting. The key stays <c>running</c> for the same dot and tone.
+    /// </summary>
+    private string StatusKey => PendingQuestion is not null ? "running" : ActiveStatus.ToString().ToLowerInvariant();
 
     private string DefaultFolder =>
         Config["Climber:DefaultFolder"] is { Length: > 0 } folder
@@ -934,7 +953,12 @@ else
             ? $"{(int)span.TotalMinutes}m {span.Seconds:00}s"
             : $"{span.TotalSeconds:0.0}s";
 
-    private string StatusText => ActiveStatus.Label();
+    private string StatusText => PendingQuestion is null ? ActiveStatus.Label() : QuestionView.Copy.AwaitingAnswer;
+
+    /// <summary>The newest question still waiting for an answer, or null when none is.</summary>
+    private QuestionState? PendingQuestion => _entries
+        .LastOrDefault(entry => entry.Kind == LogKind.Question && entry.Question?.Status == QuestionStatus.Pending)
+        ?.Question;
 
     /// <summary>The tab that shows the combined stream; subagent tabs are keyed by agent id.</summary>
     private const string PrimaryTab = "primary";
@@ -984,6 +1008,49 @@ else
 
     /// <summary>Remembers a disclosure the reader opened or closed, so a later render keeps it.</summary>
     private void SetTurnOpen(string key, bool open) => _turnOpen[key] = open;
+
+    /// <summary>
+    /// Sends one listed option as the answer. The pointer and the keyboard both arrive here,
+    /// and focus returns to the composer because the reader's next move is their own words.
+    /// </summary>
+    private async Task AnswerAsync(QuestionState question, QuestionOptionView option)
+    {
+        await Run.AnswerQuestionAsync(question.FormId, question.FieldKey, option.Value);
+        await FocusComposerAsync();
+    }
+
+    /// <summary>The row's one non-answer action: dismiss the question, or re-read its state.</summary>
+    private async Task QuestionActionAsync(QuestionState question, QuestionAction action)
+    {
+        switch (action)
+        {
+            case QuestionAction.Dismiss:
+                await Run.DismissQuestionAsync(question.FormId);
+                break;
+            case QuestionAction.Check:
+                await Run.CheckQuestionAsync(question.FormId);
+                break;
+        }
+
+        await FocusComposerAsync();
+    }
+
+    private async Task FocusComposerAsync()
+    {
+        if (_promptInput is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _promptInput.Element.FocusAsync();
+        }
+        catch (Exception)
+        {
+            // The circuit went away between the answer and the focus; nothing to do.
+        }
+    }
 
     /// <summary>
     /// Puts the reader back where they were on the tab that is now showing. Returns false

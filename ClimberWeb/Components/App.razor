@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿@inject IWebHostEnvironment Env
+<!DOCTYPE html>
 <html lang="en" data-theme="light" data-theme-pref="system">
 
 <head>
@@ -35,6 +36,10 @@
     <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    @if (DevLoop.IsEnabled(Env.IsDevelopment()))
+    {
+        <script src="js/dev-refresh.js"></script>
+    }
     <script>
         // Theme cycle: system -> light -> dark. Uses event delegation so it keeps
         // working across Blazor enhanced navigations.

@@ -169,6 +169,40 @@ public class PlaybackFixtureTests
         });
     }
 
+    [Fact]
+    public void TheQuestionsFixtureReachesEveryRowState()
+    {
+        var entries = Lines("questions.jsonl").Select(LogFormatter.Parse).ToArray();
+        var items = LogGrouper.Group(entries);
+
+        // One row per form: the colour question is written twice (asked, then answered) and
+        // collapses to its answer in the position it was first asked, so the transcript has
+        // five rows even though the file carries six question lines.
+        var rows = items
+            .Where(item => item.Kind == OutputItemKind.Question)
+            .Select(item => item.Entries[^1].Question!)
+            .ToArray();
+
+        Assert.Equal(
+            new[]
+            {
+                QuestionStatus.Unsupported,
+                QuestionStatus.Cancelled,
+                QuestionStatus.Stale,
+                QuestionStatus.Answered,
+                QuestionStatus.Pending,
+            },
+            rows.Select(row => row.Status));
+
+        // The pending row is the answerable one: three listed options, no free text.
+        var pending = rows[^1];
+        Assert.Equal(3, pending.Options.Count);
+        Assert.All(pending.Options, option => Assert.False(string.IsNullOrWhiteSpace(option.Value)));
+        Assert.All(rows, row => Assert.DoesNotContain(
+            "permission",
+            $"{row.Title} {row.KindLabel}".ToLowerInvariant()));
+    }
+
     private static void WithSeed(string? value, Action action)
     {
         var previous = Environment.GetEnvironmentVariable(PlaybackRunService.EnvVar);
