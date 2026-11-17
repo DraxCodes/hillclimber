@@ -1,4 +1,11 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { sha256 } from "./hash.mjs";
@@ -33,6 +40,14 @@ function readJson(file) {
   }
 }
 
+function agentIdsFromManifest(manifest) {
+  return Object.keys(manifest.files)
+    .filter((dest) => dest.startsWith(".opencode/agents/"))
+    .map((dest) => dest.slice(".opencode/agents/".length))
+    .filter((id) => !id.includes("/") && id.endsWith(".md"))
+    .map((id) => id.slice(0, -3));
+}
+
 function checkDocs(seam, projectDir, errors, warnings, notes) {
   if (!seam.docs) return;
   const required = ["issues", "adr"];
@@ -64,13 +79,24 @@ function checkConfig(projectDir, agentIds, errors, warnings, notes) {
   }
   const rootModel = value.model;
   const agents = value.agents ?? {};
-  let anyModel = Boolean(rootModel);
+  const isPlaceholder = (model) =>
+    typeof model === "string" && /^<.*>$/.test(model.trim());
+  const placeholders = [];
+  let anyModel = Boolean(rootModel) && !isPlaceholder(rootModel);
+  if (isPlaceholder(rootModel)) placeholders.push("model");
   for (const id of agentIds) {
-    if (agents[id]?.model) anyModel = true;
+    const model = agents[id]?.model;
+    if (model && !isPlaceholder(model)) anyModel = true;
+    if (isPlaceholder(model)) placeholders.push(`agents.${id}.model`);
   }
-  if (!anyModel) {
+  if (!anyModel && placeholders.length === 0) {
     warnings.push(
-      "opencode.json: no model; set a root `model` or per-agent `agents.<id>.model` (base agents inherit)",
+      "opencode.json: no real model; set a root `model` or per-agent `agents.<id>.model` (base agents inherit)",
+    );
+  }
+  if (placeholders.length > 0) {
+    warnings.push(
+      `opencode.json: replace the placeholders in ${placeholders.join(", ")}`,
     );
   }
 
@@ -200,11 +226,7 @@ export function doctor(projectDir, { home = homedir() } = {}) {
     checkDocs(seam, projectDir, errors, warnings, notes);
     checkPacks(seam, projectDir, errors, warnings, notes);
   }
-  const agentIds = Object.keys(manifest.files)
-    .filter((dest) => dest.startsWith(".opencode/agents/"))
-    .map((dest) => dest.slice(".opencode/agents/".length))
-    .filter((id) => !id.includes("/") && id.endsWith(".md"))
-    .map((id) => id.slice(0, -3));
+  const agentIds = agentIdsFromManifest(manifest);
   const ids = agentIds.length > 0 ? agentIds : ALL_AGENTS;
   checkConfig(projectDir, ids, errors, warnings, notes);
   checkGlobalShadowing(home, ids, errors, notes);
@@ -219,4 +241,57 @@ export function doctor(projectDir, { home = homedir() } = {}) {
   }
 
   return { errors, warnings, notes };
+}
+
+function backupDirFor(home) {
+  const base = join(
+    home,
+    ".config",
+    "opencode",
+    `agents.bak-${new Date().toISOString().slice(0, 10)}`,
+  );
+  return existsSync(base) ? `${base}-${Date.now()}` : base;
+}
+
+/**
+ * The mechanical doctor fixes: create the required doc directories and move
+ * same-ID global agents into a dated backup. Everything else needs a human.
+ */
+export function fixDoctor(projectDir, { home = homedir(), dryRun = false } = {}) {
+  const actions = [];
+  const errors = [];
+  const manifest = readManifest(projectDir);
+  if (!manifest) {
+    errors.push(`${MANIFEST_REL}: missing (run \`base init\`)`);
+    return { actions, errors };
+  }
+
+  const { seam, errors: seamErrors } = loadSeam(projectDir);
+  errors.push(...seamErrors);
+  if (seam?.docs) {
+    for (const key of ["issues", "adr"]) {
+      const rel = seam.docs[key];
+      if (!rel || existsSync(join(projectDir, rel))) continue;
+      actions.push(`create ${rel}`);
+      if (!dryRun) mkdirSync(join(projectDir, rel), { recursive: true });
+    }
+  }
+
+  const agentIds = agentIdsFromManifest(manifest);
+  const ids = agentIds.length > 0 ? agentIds : ALL_AGENTS;
+  const agentsDir = join(home, ".config", "opencode", "agents");
+  const backupDir = backupDirFor(home);
+  for (const id of ids) {
+    const file = join(agentsDir, `${id}.md`);
+    if (!existsSync(file)) continue;
+    const target = join(backupDir, `${id}.md`);
+    actions.push(`move global agent ${id} -> ${toPosix(target)}`);
+    if (!dryRun) {
+      mkdirSync(backupDir, { recursive: true });
+      copyFileSync(file, target);
+      rmSync(file, { force: true });
+    }
+  }
+
+  return { actions, errors };
 }

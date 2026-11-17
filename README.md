@@ -237,7 +237,7 @@ ClimberWeb.Tests/      xUnit tests (550 passing)
 scripts/               status/coverage, fixture, and Playwright UI checks
 status/                committed coverage/test artifact read by /status
 fixtures/              throwaway sample project for climb proofs
-.opencode/             vendored workflow base (pinned; see .opencode/README.md)
+.opencode/             vendored workflow base (pinned; see .opencode/skills/workflow-base/SKILL.md)
 .scratch/              specs and tracked issues (local markdown)
 docs/                  logo, UI contract/art direction, ADR, and README assets
 ```
@@ -344,7 +344,8 @@ The project-agnostic agent workflows — council, hillclimb, grilling, handoff, 
 security lens and the 1–10 rubric — are a pinned, vendored copy of the
 `opencode-workflows` base. The seam is
 [`.opencode/workflow.json`](.opencode/workflow.json); the ownership split, the
-daily commands and update/eject are in [`.opencode/README.md`](.opencode/README.md).
+daily commands and update/eject are in
+[`.opencode/skills/workflow-base/SKILL.md`](.opencode/skills/workflow-base/SKILL.md).
 This repo's additions live in the seam, `scripts/ui`, the design docs and the
 rubric addendum ([`docs/agents/hillclimb-addendum.md`](docs/agents/hillclimb-addendum.md)).
 The decision is [ADR 0003](docs/adr/0003-workflow-base.md).

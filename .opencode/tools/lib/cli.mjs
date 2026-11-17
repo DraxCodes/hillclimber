@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyPlan } from "./apply.mjs";
-import { doctor } from "./doctor.mjs";
+import { doctor, fixDoctor } from "./doctor.mjs";
 import { sha256 } from "./hash.mjs";
 import {
   MANIFEST_REL,
@@ -16,6 +16,7 @@ import {
   renderBlock,
 } from "./manifest.mjs";
 import { planCheck, planEject, planInit, planUpdate, listExtraFiles } from "./plan.mjs";
+import { PRESETS, applyPreset } from "./presets.mjs";
 import { SEAM_REL, defaultSeam, loadSeam, validateSeam } from "./seam.mjs";
 
 const REPEATABLE = new Set(["free", "paid", "pack"]);
@@ -109,24 +110,15 @@ function printReport(title, { errors = [], warnings = [], notes = [] }) {
   for (const error of errors) console.log(`  ✗ ${error}`);
 }
 
-function initCommand(flags) {
-  const baseRoot = requireSource(flags);
-  const target = resolve(flags._[0] ?? ".");
-  const version = readVersion(baseRoot);
-  const packs = toArray(flags.pack);
-  const project = flags.project ?? basename(target);
-
-  const seam = defaultSeam({ project, baseVersion: version });
+function applySeamFlags(seam, flags, { extended = false } = {}) {
   if (flags.build) seam.checks.build = { command: flags.build, cwd: "." };
   if (flags.test) seam.checks.test = { command: flags.test, cwd: "." };
-  seam.checks.free = toArray(flags.free).map((command) => ({
-    command,
-    cwd: ".",
-  }));
-  seam.checks.paid = toArray(flags.paid).map((command) => ({
-    command,
-    cwd: ".",
-  }));
+  if (flags.free) {
+    seam.checks.free = toArray(flags.free).map((command) => ({ command, cwd: "." }));
+  }
+  if (flags.paid) {
+    seam.checks.paid = toArray(flags.paid).map((command) => ({ command, cwd: "." }));
+  }
   if (flags.surface) seam.verify.surface = flags.surface;
   if (flags.seed) seam.verify.seed = flags.seed;
   if (flags.capture) seam.verify.capture = flags.capture;
@@ -135,14 +127,37 @@ function initCommand(flags) {
   if (flags.glossary) seam.docs.glossary = flags.glossary;
   if (flags.adr) seam.docs.adr = flags.adr;
   if (flags.rubricAddendum) seam.docs.rubricAddendum = flags.rubricAddendum;
-  seam.packs = packs;
+  if (extended) {
+    if (flags.widths) {
+      seam.verify.widths = String(flags.widths)
+        .split(",")
+        .map((value) => {
+          const n = Number(value.trim());
+          return Number.isFinite(n) ? n : value.trim();
+        });
+    }
+    if (flags.themes) {
+      seam.verify.themes = String(flags.themes)
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
+    if (flags.contract) seam.docs.contract = flags.contract;
+    if (flags.artDirection) seam.docs.artDirection = flags.artDirection;
+  }
+  seam.packs = toArray(flags.pack);
+  return seam;
+}
 
+function installProject({ baseRoot, target, seam, flags }) {
+  const version = readVersion(baseRoot);
   const { errors } = validateSeam(seam);
   if (errors.length > 0) {
     printReport("The seam would be invalid:", { errors });
-    return 2;
+    return { code: 2 };
   }
 
+  const packs = seam.packs ?? [];
   const files = readBaseFiles(baseRoot, listBaseFiles(baseRoot, packs));
   const block = renderBaseBlock(baseRoot, version);
   const plan = planInit({
@@ -156,7 +171,7 @@ function initCommand(flags) {
   if (plan.conflicts.length > 0) {
     printReport("Refusing to initialize:", { errors: plan.conflicts });
     console.log("\nUse --force to replace the differing files.");
-    return 1;
+    return { code: 1 };
   }
 
   const manifest = manifestFor(files, {
@@ -174,20 +189,152 @@ function initCommand(flags) {
   const result = applyPlan(target, plan, { dryRun: Boolean(flags.dryRun) });
   if (flags.dryRun) {
     console.log(`\nDry run: would write ${plan.writes.length} files into ${target}`);
-    return 0;
+    return { code: 0, result, version, dryRun: true };
   }
 
   console.log(
-    `Initialized ${project} at ${target} with opencode-workflows ${version}.`,
+    `Initialized ${seam.project} at ${target} with opencode-workflows ${version}.`,
   );
   console.log(`  files: ${result.written.length} written, ${result.deleted.length} removed`);
   console.log(`  diff: +${result.written.length} -${result.deleted.length}`);
   if (result.backupDir) console.log(`  backup: ${result.backupDir}`);
+  return { code: 0, result, version };
+}
+
+function initCommand(flags) {
+  const baseRoot = requireSource(flags);
+  const target = resolve(flags._[0] ?? ".");
+  const version = readVersion(baseRoot);
+  const project = flags.project ?? basename(target);
+  const seam = applySeamFlags(defaultSeam({ project, baseVersion: version }), flags);
+  const install = installProject({ baseRoot, target, seam, flags });
+  if (install.code !== 0 || install.dryRun) return install.code;
+
   console.log("\nNext:");
   console.log(`  1. Fill .opencode/workflow.json (checks, verify, docs).`);
   console.log(`  2. Run: node .opencode/tools/base.mjs doctor .`);
   console.log(`  3. Merge the fragment from: node .opencode/tools/base.mjs print-config .`);
   return 0;
+}
+
+function configScaffold() {
+  const deny = [{ action: "edit", resource: "*", effect: "deny" }];
+  return {
+    $schema: "https://opencode.ai/config.json",
+    model: "<provider/model>",
+    agents: {
+      "task-orchestrator": { model: "<provider/model#low>" },
+      "plan-architect": { model: "<provider/model#medium>", permissions: deny },
+      "quality-gatekeeper": { model: "<provider/model#medium>", permissions: deny },
+      "security-auditor": { model: "<provider/model#medium>", permissions: deny },
+    },
+  };
+}
+
+function verifyProject(target) {
+  const manifest = readManifest(target);
+  if (!manifest) {
+    console.error(`${MANIFEST_REL}: missing; cannot verify`);
+    return { ok: false };
+  }
+  const { seam, errors } = loadSeam(target);
+  const result = planCheck({
+    projectDir: target,
+    oldManifest: manifest,
+    seamVersion: seam?.base?.version,
+  });
+  const problems = [...errors, ...result.problems];
+  for (const file of result.changed) problems.push(`changed: ${file}`);
+  for (const file of result.missing) problems.push(`missing: ${file}`);
+  for (const file of result.extra) {
+    console.log(`  extra: ${file} (not owned; project addition or stale)`);
+  }
+  console.log(
+    `  check: ${problems.length === 0 ? "clean" : "drift found"} (${result.clean.length} files)`,
+  );
+  for (const problem of problems) console.log(`    ✗ ${problem}`);
+
+  const report = doctor(target);
+  console.log(`  doctor: ${report.errors.length === 0 ? "no errors" : "errors found"}`);
+  for (const warning of report.warnings) console.log(`    ! ${warning}`);
+  for (const error of report.errors) console.log(`    ✗ ${error}`);
+
+  return { ok: problems.length === 0 && report.errors.length === 0 };
+}
+
+function newCommand(flags) {
+  const baseRoot = requireSource(flags);
+  const target = resolve(flags._[0] ?? ".");
+  const version = readVersion(baseRoot);
+  const project = flags.project ?? basename(target);
+  const presetName = flags.preset ?? "bare";
+  if (!PRESETS[presetName]) {
+    console.error(
+      `unknown preset: ${presetName} (use ${Object.keys(PRESETS).join(", ")})`,
+    );
+    return 2;
+  }
+
+  const seam = defaultSeam({ project, baseVersion: version });
+  applyPreset(seam, presetName);
+  applySeamFlags(seam, flags, { extended: true });
+
+  const install = installProject({ baseRoot, target, seam, flags });
+  if (install.code !== 0) return install.code;
+  if (install.dryRun) return 0;
+
+  const surface = seam.verify.surface;
+  const parts = [surface];
+  if (seam.verify.widths?.length) parts.push(seam.verify.widths.join("/"));
+  if (seam.verify.themes?.length) parts.push(seam.verify.themes.join("/"));
+  console.log(`  seam: ${SEAM_REL} (${parts.join("; ")})`);
+  console.log(
+    `  checks: build ${seam.checks.build?.command ?? "none"}; test ${seam.checks.test?.command ?? "none"}; ${seam.checks.free.length} free, ${seam.checks.paid.length} paid`,
+  );
+
+  const created = [];
+  for (const key of ["issues", "adr"]) {
+    const rel = seam.docs[key];
+    const abs = join(target, rel);
+    if (!existsSync(abs)) {
+      mkdirSync(abs, { recursive: true });
+      created.push(rel);
+    }
+  }
+  console.log(
+    `  docs: ${created.length > 0 ? `created ${created.join(", ")}` : "already present"}`,
+  );
+
+  let configWritten = false;
+  if (flags.config) {
+    const file = join(target, "opencode.json");
+    if (existsSync(file)) {
+      console.log("  config: opencode.json already exists; left as-is");
+    } else {
+      writeFileSync(file, `${JSON.stringify(configScaffold(), null, 2)}\n`, "utf8");
+      configWritten = true;
+      console.log("  config: opencode.json written (fill the <provider/model> placeholders)");
+    }
+  }
+
+  const verified = flags.noVerify ? { ok: true } : verifyProject(target);
+
+  console.log("\nNext:");
+  console.log(
+    configWritten
+      ? "  1. Fill the <provider/model> placeholders in opencode.json."
+      : "  1. Merge the fragment from: node .opencode/tools/base.mjs print-config .",
+  );
+  console.log("  2. Commit the vendored tree, the manifest, the seam and the AGENTS block.");
+  if (seam.packs.length > 0 && !verified.ok) {
+    console.log("  3. Run: node .opencode/tools/base.mjs doctor --fix .");
+  }
+  if (seam.packs.length > 0) {
+    console.log(
+      `  · pack: node .opencode/tools/base.mjs pack install ${seam.packs[0]} .`,
+    );
+  }
+  return verified.ok ? 0 : 1;
 }
 
 function updateCommand(flags) {
@@ -268,7 +415,22 @@ function checkCommand(flags) {
 
 function doctorCommand(flags) {
   const target = resolve(flags._[0] ?? ".");
-  const result = doctor(target, flags.home ? { home: resolve(flags.home) } : {});
+  const home = flags.home ? resolve(flags.home) : undefined;
+  if (flags.fix) {
+    const fix = fixDoctor(target, { home, dryRun: Boolean(flags.dryRun) });
+    if (fix.errors.length > 0) {
+      printReport("Cannot fix:", { errors: fix.errors });
+      return 1;
+    }
+    if (fix.actions.length === 0) {
+      console.log("Nothing to fix.");
+    } else {
+      console.log(flags.dryRun ? "Would fix:" : "Fixed:");
+      for (const action of fix.actions) console.log(`  · ${action}`);
+    }
+    if (flags.dryRun) return 0;
+  }
+  const result = doctor(target, home ? { home } : {});
   printReport(`Doctor: ${target}`, result);
   const ok = result.errors.length === 0;
   console.log(ok ? "\nNo errors." : "\nErrors found.");
@@ -380,10 +542,11 @@ function packCommand(flags) {
 const HELP = `opencode-workflows base
 
 Usage:
+  base new [target] [flags]        install a new project with a preset seam
   base init [target] [flags]       install a pinned base into a project
   base update [target] [--check]   bump the base to the current source version
   base check [target]              report drift against the manifest
-  base doctor [target]             validate the seam, config and global shadowing
+  base doctor [target] [--fix]     validate the seam, config and global shadowing
   base status [target]             show the version, files and seam summary
   base eject [target]              remove the base-owned files and the AGENTS block
   base print-config [target]       print the opencode.json fragment to merge
@@ -395,10 +558,15 @@ Flags:
   --force              overwrite modified or differing files
   --dry-run            print the plan, write nothing
   --project <name>     seam project name
+  --preset <name>      bare | web | cli | docs (new)
   --build/--test       seam check commands
   --free/--paid        repeatable seam check commands
   --surface <kind>     web | cli | api | docs | none
   --seed/--capture     visual verification hints
+  --widths/--themes    comma lists (new)
+  --config             write opencode.json once when absent (new)
+  --no-verify          skip the post-install check and doctor (new)
+  --fix                apply the mechanical doctor fixes
   --pack <name>        repeatable pack selection
 `;
 
@@ -408,6 +576,8 @@ export function run(argv = process.argv.slice(2)) {
 
   try {
     switch (command) {
+      case "new":
+        return newCommand(flags);
       case "init":
         return initCommand(flags);
       case "update":

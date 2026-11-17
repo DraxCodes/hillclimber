@@ -54,6 +54,10 @@ node .opencode/tools/base.mjs update .   # bump to the base checkout's version
 node .opencode/tools/base.mjs eject .    # remove base-owned clean files and the AGENTS block
 ```
 
+A brand-new project starts from a base checkout with `base new <dir> --preset web`;
+see the base `README.md`. `base doctor --fix .` performs the mechanical fixes
+(required doc dirs, same-ID global agents).
+
 `update` refuses locally modified files unless `--force`. `eject` leaves the seam
 in place for the project.
 

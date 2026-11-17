@@ -1,7 +1,7 @@
 # Verification — workflow-base
 
 Date: 2026-11-17. Fixed point: `1d84821`. Base: `opencode-workflows` v0.1.0 at
-`cd9a155` (tag `v0.1.0`).
+`71d92e0` (tag `v0.1.0`).
 
 This records the evidence the spec's §8 asks for. Commands were run in this
 session; nothing here is a remembered result.
@@ -11,15 +11,17 @@ session; nothing here is a remembered result.
 `node --test`:
 
 ```
-# tests 27
-# pass 27
+# tests 31
+# pass 31
 # fail 0
 ```
 
 Covers the seam schema, hash normalization (CRLF/LF), plan/applier rollback,
 `init → check → doctor → update → pack → eject`, unowned-extra reporting, the
-manifest version fallback, a missing required doc, a stale `AGENTS.md` block, and
-the shipped-content scan for project terms.
+manifest version fallback, a missing required doc, a stale `AGENTS.md` block,
+`base new` with a preset/`--config`/`--dry-run`/unknown preset, `doctor --fix`
+(both dry run and real, including the global-agent backup), and the shipped-content
+scan for project terms.
 
 ## This repo
 
@@ -27,7 +29,7 @@ the shipped-content scan for project terms.
 
 ```
 opencode-workflows 0.1.0 at C:\Users\joelp\code\HillClimberUI
-  clean: 32 files
+  clean: 33 files
 Clean.
 ```
 
@@ -60,20 +62,26 @@ The four stale global agents were moved to
 
 ## Fresh-repo walkthrough
 
-`base init` into a temp directory, then `mkdir .scratch docs/adr`:
+`base new <temp> --project demo --preset web --config --pack engineering`:
 
-- files written: 30 (agents, commands, skills, tools, seam, manifest,
-  `AGENTS.md`);
-- `check`: `clean: 27 files`;
-- `doctor`: no errors; warnings only for the absent optional `GLOSSARY.md` and the
-  absent `opencode.json` (the project supplies both);
-- discovered tree: `.opencode/agents/*`, `.opencode/commands/*`,
-  `.opencode/skills/*`, `.opencode/tools/*`, `.opencode/workflow.json`,
-  `.opencode/.workflow-manifest.json`, `AGENTS.md` — the fixed OpenCode load paths,
-  with no global install.
+- files written: 36 (agents, commands, skills, tools, seam, manifest,
+  `AGENTS.md`, the `opencode.json` scaffold);
+- seam: `web; 375/900; light/dark`; checks `npm run build` / `npm test`;
+- docs: created `.scratch` and `docs/adr`;
+- config: one-shot `opencode.json` scaffold written with `<provider/model>`
+  placeholders (only because the file was absent);
+- `check`: `clean: 33 files`;
+- `doctor`: no errors; warnings only for the absent optional `GLOSSARY.md`, the
+  not-yet-installed `engineering` pack, and the deliberate placeholders;
+- the printed next steps name the placeholder fill, the commit, and the pack
+  install hint.
+
+`base new --dry-run` writes nothing, and an unknown preset exits 2 listing the
+valid names.
 
 This is the evidence for the opt-in/load-path claim: a fresh project gets the
-workflows only from its own checkout, and `opencode.json` stays the project's.
+workflows only from its own checkout, and `opencode.json` stays the project's
+after the one-shot scaffold.
 
 ## Not run
 
