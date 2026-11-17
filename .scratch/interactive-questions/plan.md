@@ -89,10 +89,11 @@ first.
 
 ## Lane 5 — evidence
 
-- [ ] **5.1** Commit `scripts/ui/fixtures/questions.seed.jsonl` as an app-internal display seed
-  (not an `opencode run` recording) and `questions.mjs` (free, no tokens).
-- [ ] **5.2** Run the sheet; record the read-through and flaws in
-  `.scratch/interactive-questions/evidence.md`; hand it to the gatekeeper.
+- [x] **5.1** Commit the display seed as `ClimberWeb.Tests/Fixtures/questions.jsonl` (a fixture, not
+  an `opencode run` recording), replayed by the existing `CLIMBER_SEED` host. No new `questions.mjs`
+  was added: the probes stayed throwaway under `%TEMP%`, and `PlaybackFixtureTests` pins the states.
+- [x] **5.2** Read-through and both scorecards recorded in
+  `.scratch/interactive-questions/evidence.md`; the gatekeeper scored them 7 → 8.
 
 ## Lane 6 — future: live app harness (not built now)
 
@@ -124,7 +125,8 @@ anything not run as "not run".
 - [x] 3.1–3.3 row, contract block, `Home.razor` hook
 - [x] 3.5.1–3.5.2, 3.5.4 committed replay seed + probes (3.5.3 → lane 6)
 - [x] floor: build + `dotnet test` + theme-nav + security + providers + polish (100, 0/560)
-- [ ] hillclimb gate: score 8 on pending + answered + unsupported at 900/375, both themes
+- [x] hillclimb gate: **8/10** on pending + answered + unsupported at 900/375, both themes
+  (7 → 8; record in `evidence.md`)
 - [ ] 4.1–4.3 persistence
 - [ ] 5.1–5.2 committed seed + evidence note
 - [ ] 6.x future live harness (not this pass)
