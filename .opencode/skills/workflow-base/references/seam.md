@@ -9,7 +9,7 @@ keys are rejected so a typo cannot silently disable a check.
 ```json
 {
   "schemaVersion": 1,
-  "base": { "name": "opencode-workflows", "version": "0.1.0" },
+  "base": { "name": "drax-ai-workflow", "version": "0.1.0" },
   "project": "example",
   "workflows": ["council", "hillclimb", "grilling", "handoff", "security"],
   "checks": {
@@ -48,7 +48,7 @@ Must be `1`.
 
 ### `base`
 
-`base.name` must be `opencode-workflows`; `base.version` must equal the manifest
+`base.name` must be `drax-ai-workflow`; `base.version` must equal the manifest
 version. `base update` rewrites this field, so do not hand-bump it.
 
 ### `project`

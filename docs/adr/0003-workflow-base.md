@@ -7,7 +7,7 @@ hand into `.opencode/` and partly into `~/.config/opencode`, which drifted.
 
 ## Decision
 
-This repo becomes a **consumer** of the `opencode-workflows` base, pinned at
+This repo becomes a **consumer** of the `drax-ai-workflow` base, pinned at
 v0.1.0.
 
 - The base owns `.opencode/agents/`, `.opencode/commands/`, `.opencode/skills/`,

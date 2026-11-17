@@ -1,12 +1,16 @@
 # Verification — workflow-base
 
-Date: 2026-11-17. Fixed point: `1d84821`. Base: `opencode-workflows` v0.1.0 at
-`71d92e0` (tag `v0.1.0`).
+Date: 2026-11-17. Fixed point: `1d84821`. Base: `drax-ai-workflow` v0.1.0 at
+`2e24fae` (tag `v0.1.0`).
+
+> Renamed from `opencode-workflows` to `drax-ai-workflow` on 2026-11-17. The
+> internal skill id, AGENTS markers, `WORKFLOW_BASE` env and `base` CLI are
+> unchanged, so the workflows behave exactly as before.
 
 This records the evidence the spec's §8 asks for. Commands were run in this
 session; nothing here is a remembered result.
 
-## Base repo (`C:\Users\joelp\code\opencode-workflows`)
+## Base repo (`C:\Users\joelp\code\drax-ai-workflow`)
 
 `node --test`:
 
@@ -28,7 +32,7 @@ scan for project terms.
 `node .opencode/tools/base.mjs check .`:
 
 ```
-opencode-workflows 0.1.0 at C:\Users\joelp\code\HillClimberUI
+drax-ai-workflow 0.1.0 at C:\Users\joelp\code\HillClimberUI
   clean: 33 files
 Clean.
 ```

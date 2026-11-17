@@ -5,7 +5,7 @@ description: How this project's vendored workflow base works — the seam, owner
 
 # Workflow base
 
-This project carries a pinned, vendored copy of the **opencode-workflows** base
+This project carries a pinned, vendored copy of the **drax-ai-workflow** base
 under `.opencode/`. The base provides the agents (`task-orchestrator`,
 `plan-architect`, `quality-gatekeeper`, `security-auditor`), the commands
 (`council`, `hillclimb`, `grill-me`, `handoff`), the skills (`council`,

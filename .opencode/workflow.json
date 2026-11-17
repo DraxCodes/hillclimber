@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "base": {
-    "name": "opencode-workflows",
+    "name": "drax-ai-workflow",
     "version": "0.1.0"
   },
   "project": "HillClimberUI",

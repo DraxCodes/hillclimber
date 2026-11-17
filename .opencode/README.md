@@ -1,6 +1,6 @@
 # Workflow base (vendored)
 
-This directory is a **pinned, vendored copy** of the `opencode-workflows` base at
+This directory is a **pinned, vendored copy** of the `drax-ai-workflow` base at
 **v0.1.0**. It is committed, reviewable and hash-checked. Do not edit the generated
 files here.
 
@@ -34,7 +34,7 @@ node .opencode/tools/base.mjs status .
 
 ## Update and eject
 
-From a base checkout (`C:\Users\joelp\code\opencode-workflows`, or `--from <dir>`):
+From a base checkout (`C:\Users\joelp\code\drax-ai-workflow`, or `--from <dir>`):
 
 ```sh
 node .opencode/tools/base.mjs update .

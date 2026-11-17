@@ -3,7 +3,7 @@
 <!-- workflow-base:begin -->
 ## Workflow base
 
-This project uses the vendored workflow base **opencode-workflows** v0.1.0. The seam is
+This project uses the vendored workflow base **drax-ai-workflow** v0.1.0. The seam is
 `.opencode/workflow.json`; validate it with `node .opencode/tools/base.mjs doctor .`. If the
 seam is missing, these workflows are dormant: say so and stop.
 

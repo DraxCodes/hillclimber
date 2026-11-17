@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "base": "opencode-workflows",
+  "base": "drax-ai-workflow",
   "version": "0.1.0",
-  "commit": "71d92e0",
-  "installedAt": "2026-11-17T19:51:06.295Z",
+  "commit": "2e24fae",
+  "installedAt": "2026-11-17T20:01:36.762Z",
   "files": {
     ".opencode/agents/plan-architect.md": "sha256:4db73dfe74987ec131f968e918e12408c5d45612633c858849b4f7f4ed70528a",
     ".opencode/agents/quality-gatekeeper.md": "sha256:63341e67b592ef6ef2611c94c45ca1564f57895334b1acce45d6ddbd4b649020",
@@ -27,19 +27,19 @@
     ".opencode/skills/hillclimb/SKILL.md": "sha256:0d11e5bff4ce5c4f0b16b47502d284f0417b8eb4c825f75a578c4c9808545933",
     ".opencode/skills/workflow-base/references/domain.md": "sha256:6ca3a71c5885afbdddaa2d72d66923ccf32b72b9fd1b3eb213ed54bd6c135ea4",
     ".opencode/skills/workflow-base/references/issue-tracker.md": "sha256:f15592db62b0d88022a35746f91eb3f7f32f407d9302b6e6d438d2a325522313",
-    ".opencode/skills/workflow-base/references/seam.md": "sha256:fe2b349143838ee7193827ac50ea4b169d55cbd9650a5478fad1c13347278615",
-    ".opencode/skills/workflow-base/SKILL.md": "sha256:2168ceac097004344f0b9ed0ffd0ff371865a6c6ae866d39f6072ec8468d7bbf",
+    ".opencode/skills/workflow-base/references/seam.md": "sha256:27f276333c40d5b88c0a566c151df0be4e1534331bed8ef62b2aea916cb7ddca",
+    ".opencode/skills/workflow-base/SKILL.md": "sha256:4a6903c591338e28aa6adce24c543a29eba0012fce410a7ac94303d593c36306",
     ".opencode/tools/base.mjs": "sha256:2b3c2d3be0f63e4ea9555d760cbd3effd8d465bae738d920806d328a0e230829",
     ".opencode/tools/lib/apply.mjs": "sha256:d69e1bb0128c739f872e114d05c1aa410f5fd54a9d742473c26dc0f744d1a171",
-    ".opencode/tools/lib/cli.mjs": "sha256:92b89e4b95ff0e7f1e0e910e837769af19a34611d90c15ff72a62d909ed36d82",
+    ".opencode/tools/lib/cli.mjs": "sha256:33503e1b6353d20323f71bb12c8d52d349269f71892565c6c688cf8717125b3b",
     ".opencode/tools/lib/doctor.mjs": "sha256:1005729103d2dbb7e016931ee17e5a58515e42c36fbb534a5731dfd915a6a81c",
     ".opencode/tools/lib/hash.mjs": "sha256:8de6962d191d008679d12912e029a46df75fa483cbbfdb64e64b5d3ba80f4c7a",
     ".opencode/tools/lib/manifest.mjs": "sha256:8f232231f3f0d0e3baa7b7702e827298068640a7f229f75a6458fe9a41dd5859",
     ".opencode/tools/lib/plan.mjs": "sha256:e2b25ca0047e4e7ea6f9a1becb05bbb13fa707574fcd55a750ae489b6c4aa500",
     ".opencode/tools/lib/presets.mjs": "sha256:ce9abb0709fbcf7ebbd51cb5fa9bce60c35caf8f9fba54e49db028a6faef8997",
-    ".opencode/tools/lib/seam.mjs": "sha256:1fa520f3e6ea14abfbbc4584231cba0c2c222fc5e1b4defb269a7a302727384b"
+    ".opencode/tools/lib/seam.mjs": "sha256:9438ce049656c5b1add4e8911a560390b8d5d28acf28669e57b105e623c07854"
   },
-  "agentsBlockHash": "sha256:ba822810c38dbb673b709bb66a264b353e10924f2f97cb1dbef2d70f7c263171",
+  "agentsBlockHash": "sha256:bfdaf5356f35c798ab43c7d8c4a9f35fc23cdfbac5a9a0eedbf0bd29500ea9f1",
   "packs": [
     "engineering"
   ]

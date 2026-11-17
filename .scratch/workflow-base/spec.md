@@ -4,6 +4,8 @@
 **Council:** [council.md](council.md) — options, dissent, trade-off register
 **Fixed point for review:** `1d84821` (session start)
 **Feature slug:** `workflow-base`
+**Later rename:** the base repo is now `drax-ai-workflow`; this spec keeps the
+working name it was written under. See [verification.md](verification.md).
 
 ---
 

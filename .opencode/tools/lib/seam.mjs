@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const SEAM_REL = ".opencode/workflow.json";
-export const BASE_NAME = "opencode-workflows";
+export const BASE_NAME = "drax-ai-workflow";
 export const WORKFLOWS = ["council", "hillclimb", "grilling", "handoff", "security"];
 export const SURFACES = ["web", "cli", "api", "docs", "none"];
 export const THEMES = ["light", "dark"];

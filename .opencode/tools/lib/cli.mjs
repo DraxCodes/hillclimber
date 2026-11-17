@@ -92,7 +92,7 @@ function requireSource(flags) {
   const root = sourceRoot(flags);
   if (!root) {
     throw new Error(
-      "no base checkout found; run from the opencode-workflows repo, set WORKFLOW_BASE, or pass --from <dir>",
+      "no base checkout found; run from the drax-ai-workflow repo, set WORKFLOW_BASE, or pass --from <dir>",
     );
   }
   return root;
@@ -193,7 +193,7 @@ function installProject({ baseRoot, target, seam, flags }) {
   }
 
   console.log(
-    `Initialized ${seam.project} at ${target} with opencode-workflows ${version}.`,
+    `Initialized ${seam.project} at ${target} with drax-ai-workflow ${version}.`,
   );
   console.log(`  files: ${result.written.length} written, ${result.deleted.length} removed`);
   console.log(`  diff: +${result.written.length} -${result.deleted.length}`);
@@ -398,7 +398,7 @@ function checkCommand(flags) {
     seamVersion: seam?.base?.version,
   });
   const problems = [...errors, ...result.problems];
-  console.log(`opencode-workflows ${manifest.version} at ${target}`);
+  console.log(`drax-ai-workflow ${manifest.version} at ${target}`);
   if (result.clean.length > 0) console.log(`  clean: ${result.clean.length} files`);
   for (const file of result.changed) console.log(`  changed: ${file}`);
   for (const file of result.missing) console.log(`  missing: ${file}`);
@@ -445,7 +445,7 @@ function statusCommand(flags) {
     return 1;
   }
   const { seam } = loadSeam(target);
-  console.log(`opencode-workflows ${manifest.version}`);
+  console.log(`drax-ai-workflow ${manifest.version}`);
   console.log(`  commit: ${manifest.commit || "(unknown)"}`);
   console.log(`  installed: ${manifest.installedAt}`);
   console.log(`  packs: ${(manifest.packs ?? []).join(", ") || "(none)"}`);
@@ -488,7 +488,7 @@ function ejectCommand(flags) {
   const extra = listExtraFiles(target, manifest);
   const result = applyPlan(target, plan, { dryRun: Boolean(flags.dryRun) });
   if (flags.dryRun) return 0;
-  console.log(`Ejected opencode-workflows ${manifest.version}.`);
+  console.log(`Ejected drax-ai-workflow ${manifest.version}.`);
   console.log(`  removed: ${result.deleted.length} files`);
   console.log(`  left in place: ${SEAM_REL} (the project seam)`);
   for (const file of extra) {
@@ -539,7 +539,7 @@ function packCommand(flags) {
   return result.status ?? 1;
 }
 
-const HELP = `opencode-workflows base
+const HELP = `drax-ai-workflow base
 
 Usage:
   base new [target] [flags]        install a new project with a preset seam
