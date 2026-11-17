@@ -112,6 +112,13 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 
 // Plain HTTP on the LAN: no HTTPS redirect so phones can connect directly.
 app.MapStaticAssets();
+
+// Development only: the live loop's staleness check. Not a product surface, and never mapped
+// outside Development — the refresh script is inert when this 404s.
+if (DevLoop.IsEnabled(app.Environment.IsDevelopment()))
+{
+    app.MapGet(DevLoop.StampPath, (IWebHostEnvironment environment) => DevLoop.Stamp(environment.ContentRootPath));
+}
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

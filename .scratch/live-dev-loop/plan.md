@@ -15,18 +15,19 @@ free UI harnesses against the live host.
 
 ## Lane 1 — stamp and refresh (product code)
 
-- [x] **1.1** `DevStamp` (`ClimberWeb/Services/DevStamp.cs`) + `GET /__dev/stamp` mapped only when
-  `IsDevelopment()`. JSON `{ build, startedAt, pid }` from the loaded assembly's write time, the
-  process start time and the PID. Loopback-only, no path or version leak.
-  *Tests:* the endpoint maps in Development and not otherwise (decision helper, not a live host);
-  payload shape; the build stamp changes when the assembly file changes; no secret or path in the
-  payload.
-- [x] **1.2** `wwwroot/js/dev-refresh.js`: poll `/__dev/stamp` every 1 s, reload once per stamp
-  change, skip while an `input`/`textarea`/`select` has focus or a dialog is open, stop after the
-  reload is requested, ignore non-200.
-  *Tests:* pure decision function extracted and unit-tested (`shouldReload(prev, next, focus,
-  dialog)`); no fetch when the stamp 404s. The script tag is rendered only in Development, behind a
-  helper pinned by a test.
+- [x] **1.1** `DevStamp` (`ClimberWeb/Services/DevLoop.cs`) + `GET /__dev/stamp` mapped only when
+  `IsDevelopment()`. JSON `{ build, source, startedAt, pid }`: the loaded assembly's write time, the
+  newest watched source write (`Components`, `Services`, `wwwroot`; skips `bin`/`obj`/`lib`/
+  `node_modules`), the process start time and the PID. No path or version leak.
+  *Tests:* the Development gate; observed 200 with the expected payload; process id and assembly
+  stamp present; newest watched write wins; foreign extensions and generated/vendored directories
+  are ignored; a missing tree has no stamp; the serialized payload contains no path.
+- [x] **1.2** `wwwroot/js/dev-refresh.js`: poll `/__dev/stamp` every 1 s (plus one immediate tick),
+  reload once per change after a 1.2 s settle, hold while an `input`/`textarea`/`select` is focused
+  or a dialog is open, ignore non-200 and failed fetches (a restarting host), and remember the last
+  stamp in `sessionStorage` so a save right after a reload is not missed.
+  *Verified live:* idle → reload in 2.9 s; focused in the PIN field → held for 5 s; blur → reload in
+  1.0 s. The script tag renders only in Development, behind `DevLoop.IsEnabled`, pinned by a test.
   *Floor note:* no new Tailwind class, so no `npm run css`.
 
 ## Lane 2 — the host script
