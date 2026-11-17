@@ -132,7 +132,9 @@ falls back to `key`.
   and every REST payload is wrapped in `{"data":…}`. Dispatch an **allowlist**:
   `form.created`, `form.replied`, `form.cancelled`. Everything else, including
   `permission.asked`, is dropped before any state or line.
-- On every connect, `GET /api/session/{id}/form` and render pending forms `Stale`.
+- On every connect, `GET /api/session/{id}/form`. A pending form not yet on screen renders
+  `Stale` (`no answer sent`); a form already shown keeps its state, so a brief reconnect never
+  strands a live question.
 - Reconnect 250 ms → 2 s → 5 s cap; five failures in 60 s → `Unavailable`; a silent 60 s stream
   reconnects silently.
 - Lifetime is the run: start only when `Climber:Questions == serve` and a session id exists;

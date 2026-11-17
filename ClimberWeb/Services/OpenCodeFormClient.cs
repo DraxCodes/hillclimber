@@ -86,11 +86,38 @@ public sealed class SseParser
 }
 
 /// <summary>
+/// The transport boundary the channel talks to: one run's forms. Tests substitute it; the
+/// production implementation is <see cref="OpenCodeFormClient"/> over a spawned child.
+/// </summary>
+public interface IFormWire
+{
+    Task<IReadOnlyList<QuestionState>> ListAsync(string sessionId, CancellationToken cancellationToken = default);
+
+    Task<QuestionState?> GetAsync(string sessionId, string formId, CancellationToken cancellationToken = default);
+
+    Task<QuestionSubmitOutcome> ReplyAsync(
+        string sessionId,
+        string formId,
+        string fieldKey,
+        QuestionKind kind,
+        string value,
+        CancellationToken cancellationToken = default);
+
+    Task<QuestionSubmitOutcome> CancelAsync(
+        string sessionId,
+        string formId,
+        string message,
+        CancellationToken cancellationToken = default);
+
+    Task WatchAsync(Func<SseFrame, Task> onFrame, CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// The wire for one run's forms: list, get, reply, cancel and the event stream. It maps the
 /// server's status codes to <see cref="QuestionSubmitOutcome"/> and never decides what a state
 /// means; the channel does that. Only display data leaves this class.
 /// </summary>
-public sealed class OpenCodeFormClient
+public sealed class OpenCodeFormClient : IFormWire
 {
     private static readonly TimeSpan DefaultSubmitTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DefaultReadTimeout = TimeSpan.FromSeconds(5);
