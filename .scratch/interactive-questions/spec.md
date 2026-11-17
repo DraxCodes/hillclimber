@@ -110,9 +110,9 @@ public interface IQuestionChannel : IAsyncDisposable
 }
 ```
 
-`IRunService` gains exactly two members: `AnswerQuestionAsync(formId, fieldKey, value)` and
-`DismissQuestionAsync(formId)`. There is no `Allow`, `Approve`, `Execute` or arbitrary-promise
-route on either interface.
+`IRunService` gains exactly three members: the two actions `AnswerQuestionAsync(formId, fieldKey, value)`
+and `DismissQuestionAsync(formId)`, plus the read-only `CheckQuestionAsync(formId)` behind the row's
+`check`. There is no `Allow`, `Approve`, `Execute` or arbitrary-promise route on either interface.
 
 **Support matrix (`QuestionSupport.Classify`, enforced where the reply is sent):** one field,
 `type == "string" && options.Count > 0` → `Choice`; `type == "boolean"` → `Boolean`; anything

@@ -371,6 +371,15 @@ public class SessionCoordinatorTests
 
         public Task ApproveFallbackAsync() => Task.CompletedTask;
 
+        public Task<QuestionSubmitOutcome> AnswerQuestionAsync(string formId, string fieldKey, string value) =>
+            Task.FromResult(QuestionSubmitOutcome.Disconnected);
+
+        public Task<QuestionSubmitOutcome> DismissQuestionAsync(string formId) =>
+            Task.FromResult(QuestionSubmitOutcome.Disconnected);
+
+        public Task<QuestionSubmitOutcome> CheckQuestionAsync(string formId) =>
+            Task.FromResult(QuestionSubmitOutcome.Disconnected);
+
         public void Report(string sessionId, RunStatus status, params string[] logs) =>
             Report(new RunState { SessionId = sessionId, Status = status, Logs = logs });
 

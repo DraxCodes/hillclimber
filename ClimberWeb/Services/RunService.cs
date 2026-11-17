@@ -87,6 +87,19 @@ public interface IRunService
     /// the fallback. Throws when there is no failed run awaiting approval.
     /// </summary>
     Task ApproveFallbackAsync();
+
+    /// <summary>
+    /// Sends one listed option as data to the model. There is no allow, approve or execute
+    /// route: an answer is never an app action. Returns <see cref="QuestionSubmitOutcome.Disconnected"/>
+    /// when this run has no channel.
+    /// </summary>
+    Task<QuestionSubmitOutcome> AnswerQuestionAsync(string formId, string fieldKey, string value);
+
+    /// <summary>Dismisses a question without answering it.</summary>
+    Task<QuestionSubmitOutcome> DismissQuestionAsync(string formId);
+
+    /// <summary>The read-only <c>check</c> action: asks the server what happened to a form.</summary>
+    Task<QuestionSubmitOutcome> CheckQuestionAsync(string formId);
 }
 
 /// <summary>
@@ -98,6 +111,7 @@ public sealed class RunService : IRunService
 {
     private readonly ICommandRunner _runner;
     private readonly ILogger<RunService>? _logger;
+    private readonly IQuestionChannelFactory? _questions;
     private readonly object _gate = new();
     private readonly RunLogFeed _log = new();
 
@@ -107,11 +121,16 @@ public sealed class RunService : IRunService
     private Task _runTask = Task.CompletedTask;
     private RunOptions? _lastOptions;
     private ProviderPricing? _activePricing;
+    private IQuestionChannel? _channel;
 
-    public RunService(ICommandRunner runner, ILogger<RunService>? logger = null)
+    public RunService(
+        ICommandRunner runner,
+        ILogger<RunService>? logger = null,
+        IQuestionChannelFactory? questions = null)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _logger = logger;
+        _questions = questions;
     }
 
     public RunState State
@@ -211,14 +230,80 @@ public sealed class RunService : IRunService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<QuestionSubmitOutcome> AnswerQuestionAsync(string formId, string fieldKey, string value)
+    {
+        var channel = Volatile.Read(ref _channel);
+        if (channel is null || string.IsNullOrEmpty(formId))
+        {
+            return QuestionSubmitOutcome.Disconnected;
+        }
+
+        try
+        {
+            return await channel.SubmitAsync(formId, fieldKey, value).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question answer failed.");
+            return QuestionSubmitOutcome.Disconnected;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<QuestionSubmitOutcome> DismissQuestionAsync(string formId)
+    {
+        var channel = Volatile.Read(ref _channel);
+        if (channel is null || string.IsNullOrEmpty(formId))
+        {
+            return QuestionSubmitOutcome.Disconnected;
+        }
+
+        try
+        {
+            return await channel.CancelAsync(formId).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question dismiss failed.");
+            return QuestionSubmitOutcome.Disconnected;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<QuestionSubmitOutcome> CheckQuestionAsync(string formId)
+    {
+        var channel = Volatile.Read(ref _channel);
+        if (channel is null || string.IsNullOrEmpty(formId))
+        {
+            return QuestionSubmitOutcome.Disconnected;
+        }
+
+        try
+        {
+            return await channel.RecheckAsync(formId).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question check failed.");
+            return QuestionSubmitOutcome.Disconnected;
+        }
+    }
+
     /// <summary>Awaits the current run, if any. Intended for tests and graceful shutdown.</summary>
     public Task WaitForCompletionAsync() => _runTask;
 
     private async Task RunLoopAsync(RunOptions options, CancellationToken cancellationToken)
     {
+        IQuestionChannel? questions = null;
         try
         {
             Log($"$ {OpenCodeRun.CommandLine(options.Prompt, options.Agent, options.Provider?.Model, options.SessionId)}");
+
+            // The channel is optional and never changes the run's outcome: a failure to start
+            // it is one line, and the run continues on the plain producer.
+            questions = await StartQuestionsAsync(options, cancellationToken).ConfigureAwait(false);
+
             var result = await _runner.RunAsync(
                 OpenCodeRun.Request(options.Prompt, options.TargetFolder, options.Agent, options.Provider?.Model, options.SessionId),
                 OnOpenCodeLine,
@@ -275,7 +360,74 @@ public sealed class RunService : IRunService
             _logger?.LogError(ex, "OpenCode run failed.");
             Fail($"ERROR: {ex.Message}", ex.Message, options, offerFallback: CanFallBack(options));
         }
+        finally
+        {
+            await DisposeQuestionsAsync(questions).ConfigureAwait(false);
+        }
     }
+
+    /// <summary>
+    /// Starts a question channel for this run when one is configured and the run has a
+    /// session. Any failure is one quiet line and a null: the run continues without questions.
+    /// </summary>
+    private async Task<IQuestionChannel?> StartQuestionsAsync(RunOptions options, CancellationToken cancellationToken)
+    {
+        if (_questions is not { Enabled: true } || string.IsNullOrWhiteSpace(options.SessionId))
+        {
+            return null;
+        }
+
+        IQuestionChannel? channel = null;
+        try
+        {
+            channel = _questions.Create();
+            if (channel is null)
+            {
+                return null;
+            }
+
+            channel.Changed += OnQuestionChanged;
+            await channel.StartAsync(options.SessionId, options.TargetFolder, cancellationToken)
+                .ConfigureAwait(false);
+            Volatile.Write(ref _channel, channel);
+            return channel;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger?.LogWarning(exception, "Question channel unavailable.");
+            Log("[questions unavailable: the run's server did not start]");
+            if (channel is not null)
+            {
+                channel.Changed -= OnQuestionChanged;
+                await channel.DisposeAsync().ConfigureAwait(false);
+            }
+
+            return null;
+        }
+    }
+
+    private async Task DisposeQuestionsAsync(IQuestionChannel? channel)
+    {
+        if (channel is null)
+        {
+            return;
+        }
+
+        Volatile.Write(ref _channel, null);
+        channel.Changed -= OnQuestionChanged;
+        try
+        {
+            await channel.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogWarning(exception, "Disposing the question channel failed.");
+        }
+    }
+
+    /// <summary>One line per change; the formatter turns it into a question row and the grouper
+    /// collapses repeated states for one form.</summary>
+    private void OnQuestionChanged(QuestionState state) => Log(QuestionLine.Write(state));
 
     /// <summary>True when this run has a provider and at least one provider after it.</summary>
     private static bool CanFallBack(RunOptions options) =>

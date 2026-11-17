@@ -61,6 +61,18 @@ public sealed class PlaybackRunService : IRunService
     public Task ApproveFallbackAsync() => throw new InvalidOperationException(
         $"This host was started with {EnvVar}; it only replays the committed transcript.");
 
+    /// <summary>A replay has no channel: answering is a no-op, never a command.</summary>
+    public Task<QuestionSubmitOutcome> AnswerQuestionAsync(string formId, string fieldKey, string value) =>
+        Task.FromResult(QuestionSubmitOutcome.Disconnected);
+
+    /// <inheritdoc />
+    public Task<QuestionSubmitOutcome> DismissQuestionAsync(string formId) =>
+        Task.FromResult(QuestionSubmitOutcome.Disconnected);
+
+    /// <inheritdoc />
+    public Task<QuestionSubmitOutcome> CheckQuestionAsync(string formId) =>
+        Task.FromResult(QuestionSubmitOutcome.Disconnected);
+
     /// <summary>
     /// True only in Development with <see cref="EnvVar"/> set. The environment is a parameter,
     /// not a lookup, so the refusal is testable and the caller cannot forget the gate.

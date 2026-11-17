@@ -22,6 +22,18 @@ public interface IQuestionChannel : IAsyncDisposable
     Task<QuestionSubmitOutcome> RecheckAsync(string formId);
 }
 
+/// <summary>
+/// Decides whether a run gets a question channel and builds it. A null or disabled factory
+/// leaves the run on the plain <c>opencode run</c> producer with no channel at all.
+/// </summary>
+public interface IQuestionChannelFactory
+{
+    bool Enabled { get; }
+
+    /// <summary>A channel for one run, or null when the run should have none.</summary>
+    IQuestionChannel? Create();
+}
+
 /// <summary>Reconnect policy for <see cref="QuestionChannel"/>. Defaults are the spec's numbers.</summary>
 public sealed record QuestionChannelOptions
 {
