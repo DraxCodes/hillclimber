@@ -62,9 +62,13 @@ free UI harnesses against the live host.
 
 - [x] **4.1** Take the screenshots that prove the loop: before/after an edit without a restart, the
   same page after a forced restart, and the tab auto-refreshing. Record in `evidence.md`.
+  *Done:* `loop-before/after.png` for a real copy edit (reloaded, new text, 0 errors, same browser
+  pid); `loop/activity-{900,375}-{light,dark}.png`; the driver's own window on `/` and `/status`.
 - [x] **4.2** Floor, all against the live host: `dotnet build`, `dotnet test`, `theme-nav`,
   `security`, `providers`. `security.mjs` passing unchanged is the proof of D1.
-- [x] **4.3** Gate at **8** on the live-loop experience (`docs/agents/hillclimb-rubric.md`), with
+  *Result:* build 0/0; **722 passed** with the app live; theme-nav 0; security 0; providers 15/15.
+  `polish.mjs` and `surfaces.mjs` not run.
+- [ ] **4.3** Gate at **8** on the live-loop experience (`docs/agents/hillclimb-rubric.md`), with
   the user's seat as the judge: app never dark, tab follows, screenshot on demand.
 
 ## Lane 5 — deferred to the next pass
