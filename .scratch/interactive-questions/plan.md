@@ -101,7 +101,11 @@ first.
 - [x] **5.2** Read-through and both scorecards recorded in
   `.scratch/interactive-questions/evidence.md`; the gatekeeper scored them 7 → 8.
 
-## Lane 6 — future: live app harness (not built now)
+## Lane 6 — future: live app harness (moved)
+
+**Moved to [`../live-dev-loop/plan.md`](../live-dev-loop/plan.md).** The loop itself (watch host,
+stamp, auto-refresh, driver) comes first there; its lane 5 carries the control endpoint and the MCP
+sidecar listed below, unchanged in intent.
 
 - [ ] **6.1** Dev-only control endpoint over the runtime stimulus seam, gated by
   `Development` + `CLIMBER_DEV_CONTROL=1`, loopback + a per-process token.
