@@ -26,6 +26,71 @@ public sealed record SessionSummary(
     decimal EstimatedSpendUsd,
     long TotalTokens);
 
+/// <summary>One answer option as it is kept on disk: display data only.</summary>
+public sealed record StoredOption(string Value, string Label, string? Description = null);
+
+/// <summary>
+/// The display subset of one question row. Only what the transcript renders is kept: the
+/// status is the one that was true when the row was written, and the run's session id is not
+/// duplicated here because the file's own summary carries it. A restored row is inert
+/// (see <see cref="QuestionRestore"/>), so it never needs either to answer again.
+/// </summary>
+/// <param name="FormId">The server's form id; the row's identity and the grouper's key.</param>
+/// <param name="Status">The status the live row had when it was persisted.</param>
+/// <param name="Title">The model's question, verbatim.</param>
+/// <param name="FieldKey">The single field the reply would have addressed.</param>
+/// <param name="Kind">Choice, boolean, or unsupported.</param>
+/// <param name="Options">Every listed answer, in the server's order.</param>
+/// <param name="ChosenValue">The option value that was sent, when one was.</param>
+/// <param name="Notice">A display notice, when the row carried one.</param>
+/// <param name="KindLabel">What an unsupported form required, when that is why it was inert.</param>
+public sealed record StoredQuestion(
+    string FormId,
+    QuestionStatus Status,
+    string Title,
+    string FieldKey,
+    QuestionKind Kind,
+    IReadOnlyList<StoredOption> Options,
+    string? ChosenValue = null,
+    string? Notice = null,
+    string? KindLabel = null)
+{
+    /// <summary>The persistable form of a display state; drops the session id and the flag.</summary>
+    public static StoredQuestion From(QuestionState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        return new StoredQuestion(
+            state.FormId,
+            state.Status,
+            state.Title,
+            state.FieldKey,
+            state.Kind,
+            state.Options.Select(option => new StoredOption(option.Value, option.Label, option.Description)).ToArray(),
+            state.ChosenValue,
+            state.Notice,
+            state.KindLabel);
+    }
+
+    /// <summary>
+    /// The display state, through the restore rule: pending and mid-submit rows read
+    /// <c>no answer sent</c>, and every restored row is inert.
+    /// </summary>
+    public QuestionState ToState() => QuestionRestore.Apply(new QuestionState(
+        FormId,
+        string.Empty,
+        Title,
+        FieldKey,
+        Kind,
+        (Options ?? Array.Empty<StoredOption>())
+            .Select(option => new QuestionOption(option.Value, option.Label, option.Description))
+            .ToArray(),
+        ChosenValue,
+        Status,
+        Notice,
+        KindLabel));
+}
+
 /// <summary>
 /// One persisted transcript row: the display <see cref="LogEntry"/> shape minus the raw
 /// event line. The raw line is the full opencode JSON payload and never touches disk
@@ -41,6 +106,7 @@ public sealed record SessionSummary(
 /// <param name="ToolTitle">A tool call's distinguishing title, when it has one.</param>
 /// <param name="Command">The shell command a tool call ran, when it ran one.</param>
 /// <param name="ExitCode">The shell command's exit code, when it reported one.</param>
+/// <param name="Question">A question row's display state; null for every other kind.</param>
 public sealed record StoredEntry(
     string Timestamp,
     LogKind Kind,
@@ -50,7 +116,8 @@ public sealed record StoredEntry(
     StepStatus Status = StepStatus.None,
     string? ToolTitle = null,
     string? Command = null,
-    int? ExitCode = null)
+    int? ExitCode = null,
+    StoredQuestion? Question = null)
 {
     /// <summary>
     /// How much of a tool result goes to disk. The live view keeps the whole result so a
@@ -65,7 +132,8 @@ public sealed record StoredEntry(
     /// grouper and presentation pipeline without keeping the payload. Plain lines are
     /// the exception: they are the climber's own markers and test summaries rather than
     /// opencode events, and the renderer prints <see cref="LogEntry.Raw"/> for them, so
-    /// their text is kept verbatim.
+    /// their text is kept verbatim. A question keeps only its display subset, never the
+    /// transport's URL, password, header or raw frame.
     /// </summary>
     public static StoredEntry From(LogEntry entry) => new(
         entry.Timestamp,
@@ -76,13 +144,16 @@ public sealed record StoredEntry(
         entry.Status,
         entry.ToolTitle,
         entry.Command,
-        entry.ExitCode);
+        entry.ExitCode,
+        entry.Question is { } question ? StoredQuestion.From(question) : null);
 
     /// <summary>
     /// The display form. <see cref="LogEntry.Raw"/> is a rendering key, not data: a
     /// synthetic line is rebuilt from the fields that were kept, so two identical
     /// restored rows still key apart by their position in the feed. A plain line keeps
-    /// its text as the raw line, because that is what the renderer prints.
+    /// its text as the raw line, because that is what the renderer prints. A question is
+    /// restored inert: a pending or mid-submit row can no longer be answered, so it reads
+    /// <c>no answer sent</c> and offers no action.
     /// </summary>
     public LogEntry ToEntry(int index) => new(
         Kind == LogKind.Plain ? Text : $"[history:{index}]",
@@ -94,7 +165,8 @@ public sealed record StoredEntry(
         Status,
         ToolTitle,
         Command,
-        ExitCode);
+        ExitCode,
+        Question?.ToState());
 }
 
 /// <summary>A stored session: the rail summary plus what a resume needs.</summary>

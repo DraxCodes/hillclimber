@@ -90,6 +90,16 @@ public sealed record QuestionView(
             _ => (false, false, false, false, Copy.Unavailable, QuestionAction.None),
         };
 
+        // Nothing in an archived session can be answered, dismissed or checked: a restored row
+        // is a record, not a control. QuestionRestore has already folded a pending or mid-submit
+        // status to Stale; this drops the actions the other terminal states still carry.
+        if (state.Restored)
+        {
+            interactive = false;
+            busy = false;
+            action = QuestionAction.None;
+        }
+
         var notice = state.Status == QuestionStatus.Unsupported
             ? state.KindLabel ?? Copy.UnknownKind
             : null;
@@ -101,7 +111,7 @@ public sealed record QuestionView(
             : string.Empty;
 
         var firstLabel = state.Options.Count > 0 ? state.Options[0].Label : state.Title;
-        var announcement = state.Status == QuestionStatus.Pending
+        var announcement = state is { Restored: false, Status: QuestionStatus.Pending }
             ? $"question from the run · focus moved to {firstLabel}"
             : string.Empty;
 
@@ -123,8 +133,8 @@ public sealed record QuestionView(
             announcement);
     }
 
-    /// <summary>The status-band word while a question waits for the reader.</summary>
-    public bool AwaitsAnswer => State.Status == QuestionStatus.Pending;
+    /// <summary>The status-band word while a live question waits for the reader.</summary>
+    public bool AwaitsAnswer => !State.Restored && State.Status == QuestionStatus.Pending;
 
     /// <summary>The action's visible label, or null when the row offers none.</summary>
     public string? ActionLabel => Action switch

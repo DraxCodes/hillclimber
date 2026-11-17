@@ -37,6 +37,10 @@ public sealed record QuestionOption(string Value, string Label, string? Descript
 /// Everything the row needs to render and the channel needs to answer. Display-only: no URL,
 /// password, header or raw frame may enter this record.
 /// </summary>
+/// <param name="Restored">
+/// True when the state came back from a stored session rather than a live channel. Nothing in
+/// an archived session can be answered, dismissed or checked, so a restored row is inert.
+/// </param>
 public sealed record QuestionState(
     string FormId,
     string SessionId,
@@ -47,7 +51,32 @@ public sealed record QuestionState(
     string? ChosenValue,
     QuestionStatus Status,
     string? Notice = null,
-    string? KindLabel = null);
+    string? KindLabel = null,
+    bool Restored = false);
+
+/// <summary>
+/// Projects a question state read back from a stored session into the only state a restored
+/// transcript may show. The store keeps the status that was true when the session was saved;
+/// this is the read-side rule: a pending or mid-submit row can no longer be answered, so it
+/// reads <see cref="QuestionStatus.Stale"/> (<c>no answer sent</c>), and every restored row is
+/// marked inert so no action is offered over a channel that no longer exists.
+/// </summary>
+public static class QuestionRestore
+{
+    /// <summary>Returns <paramref name="state"/> as a restored, non-interactive row.</summary>
+    public static QuestionState Apply(QuestionState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        return state with
+        {
+            Status = state.Status is QuestionStatus.Pending or QuestionStatus.Submitting
+                ? QuestionStatus.Stale
+                : state.Status,
+            Restored = true,
+        };
+    }
+}
 
 /// <summary>The result of one submit or cancel, mapped from the server's status.</summary>
 public enum QuestionSubmitOutcome

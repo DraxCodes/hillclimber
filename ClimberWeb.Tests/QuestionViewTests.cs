@@ -101,6 +101,57 @@ public class QuestionViewTests
     }
 
     [Fact]
+    public void QuestionRestoreFoldsAPendingRowIntoTheStaleCopy()
+    {
+        var restored = QuestionRestore.Apply(State());
+
+        Assert.True(restored.Restored);
+        Assert.Equal(QuestionStatus.Stale, restored.Status);
+
+        var view = QuestionView.For(restored);
+        Assert.False(view.Interactive);
+        Assert.False(view.AwaitsAnswer);
+        Assert.False(view.ShowPrefix);
+        Assert.Equal("no answer sent", view.StatusLine);
+        Assert.Equal(string.Empty, view.Announcement);
+        Assert.Equal(QuestionAction.None, view.Action);
+    }
+
+    [Fact]
+    public void ARestoredTerminalRowKeepsItsCopyButOffersNoAction()
+    {
+        var unsupported = QuestionView.For(State(
+            QuestionStatus.Unsupported,
+            kind: QuestionKind.Unsupported,
+            options: Array.Empty<QuestionOption>(),
+            kindLabel: "several answers required") with { Restored = true });
+        var refused = QuestionView.For(State(QuestionStatus.Refused) with { Restored = true });
+        var unconfirmed = QuestionView.For(State(QuestionStatus.Unconfirmed) with { Restored = true });
+
+        Assert.Equal("several answers required", unsupported.Notice);
+        Assert.Equal("that answer was refused", refused.StatusLine);
+        Assert.Equal("submit unconfirmed", unconfirmed.StatusLine);
+        Assert.All(
+            new[] { unsupported, refused, unconfirmed },
+            view =>
+            {
+                Assert.False(view.Interactive);
+                Assert.Equal(QuestionAction.None, view.Action);
+            });
+    }
+
+    [Fact]
+    public void ARestoredAnsweredRowStaysFoldedAndClosed()
+    {
+        var view = QuestionView.For(State(QuestionStatus.Answered, chosen: "violet") with { Restored = true });
+
+        Assert.True(view.IsFold);
+        Assert.False(view.FoldOpenByDefault);
+        Assert.Equal("answered: Violet", view.FoldedLabel);
+        Assert.Equal(QuestionAction.None, view.Action);
+    }
+
+    [Fact]
     public void AnUnsupportedShapeOffersOnlyDismissAndNamesWhatIsNeeded()
     {
         var view = QuestionView.For(State(
