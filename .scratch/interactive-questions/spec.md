@@ -1,6 +1,7 @@
 # Spec — interactive model questions
 
-**Status:** approved for lanes 2–3. **Date:** 2026-11-16. **Fixed point:** `23be0ba`.
+**Status:** approved for lanes 2–4; lanes 2–5 built, and the live row and restored
+states each gated at 8. **Date:** 2026-11-16. **Fixed point:** `23be0ba`.
 **Council:** [council.md](council.md). **Verification:** [verification.md](verification.md).
 **Plan:** [plan.md](plan.md).
 

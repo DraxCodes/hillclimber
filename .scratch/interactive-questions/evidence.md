@@ -102,3 +102,105 @@ controls share one hover/cursor language.
 - **Not captured visually:** `refused`, `unconfirmed`, `unavailable`, and the
   boolean options on a *live* row. Their copy is pinned by `QuestionViewTests`;
   the boolean busy row was seen only in the throwaway seed.
+
+# Lane 4 — persistence (restored rows)
+
+2026-11-17. Surface: `StoredQuestion`/`StoredOption` on `StoredEntry`, the
+`QuestionRestore` read rule, and `QuestionView.For` rendering restored rows.
+Target: **8** (rubric default).
+
+## Seed
+
+`CLIMBER_SEED=questions.jsonl` cannot reach restore: the playback host registers
+`MemorySessionStore`, so a seeded run never calls `StoredEntries()`. Two
+Development hosts were used instead:
+
+- **Live regression:** the committed `CLIMBER_SEED=questions.jsonl` host, unchanged.
+- **Restore (throwaway, outside the repo):**
+  `%TEMP%\climb-ui-lane4-sessions\ses_restoredquestions.json` — a hand-written
+  stored session with **seven question entries over six form ids**: restored
+  `Pending`, `Stale`, `Unsupported` (`number answer required`), `Refused`,
+  `Unconfirmed`, and a `Pending` + `Answered` pair for one form id, so restore
+  and the one-row-per-form collapse are both exercised. Plus one prompt and one
+  prose row. Never committed: it is page-local state the committed fixture
+  cannot reach.
+
+## Shots
+
+`%TEMP%\climb-ui-shots\questions-restored\`, 2x:
+
+| File | State |
+| --- | --- |
+| `seeded-live-900-light.png` | live pending row, edge/options/`asks:`/`awaiting answer`; unsupported still has `dismiss` |
+| `restored-900-light.png`, `restored-375-light.png` | six restored rows, light, 900×1200 / 375×812 CSS |
+| `restored-900-dark.png`, `restored-375-dark.png` | same, dark |
+| `restored-900-dark-answered-open.png` | answered fold open: title, `→ Violet`, `Amber` |
+
+All restored rows use the settled `message` glyph. Pending and stale read
+`no answer sent`; unsupported/refused/unconfirmed keep their notice and no
+action; answered folds closed to `answered: Violet` and opens on demand.
+
+## Read-through
+
+Tab: lock → answered fold → folder → composer; no restored row enters the tab
+order (zero `role="radio"`, zero `dismiss`/`check` chips). Enter/Space toggles
+the answered fold (`aria-expanded` false→true→false). DOM counts: two
+`no answer sent`, zero `awaiting answer`, six rows from seven question lines,
+one `answered: Violet`. Restored title and micro copy measure **4.67:1 light /
+4.8:1 dark** (compositing helper; `polish.mjs` skips `oklab()`).
+
+## Scorecards
+
+### Iteration 1 — 7/10, Nearly clean
+
+Held at 7 by two flaws:
+
+1. **Restored terminal rows kept the live `asks:` marker.** Unsupported,
+   refused and unconfirmed rows dropped their dead actions but still read as an
+   open ask with no way to act; `asks:` is app copy defined as the live marker
+   in Phase 2i. Three of six restored rows.
+2. **`restored-900-light.png` was a 1280 CSS capture.** The probe took the
+   light shot before resizing. The 900-light restored state was unseen, which
+   alone invalidates a score at 8.
+
+### Iteration 2 — 8/10, Clean & Clear (+1)
+
+- `QuestionView.For` sets `ShowPrefix = false` when `state.Restored`; restored
+  rows keep the settled glyph, their notice and no action. Pinned by
+  `ARestoredTerminalRowKeepsItsCopyButDropsTheLiveMarkerAndActions`; live rows
+  stay pinned to `asks:` by `AnUnsupportedShapeOffersOnlyDismissAndNamesWhatIsNeeded`.
+  Recorded in `docs/ui-contract.md` Phase 2i and spec § Persistence.
+- The probe now sets 900×1200 before the light capture; PNG headers confirm
+  **1800×2400 px = 900×1200 CSS** for both 900 shots, 750×1624 for the 375 pair.
+
+No level-7 edge remains: all six restored states share one composition at both
+widths and themes, no restored row offers an action, the only control is the
+answered fold with the same trigger language as the live fold, and every visible
+string clears the contrast bar. The distance to 9 is art-direction flatness
+(uniformly muted history) and the recorded reverse-feed exception, not a flaw
+in this lane.
+
+## Floor
+
+| Command | Result |
+| --- | --- |
+| `dotnet build ClimberWeb` | 0 warnings, 0 errors |
+| `dotnet test --nologo -v minimal` | Passed 712, Failed 0, Skipped 0 |
+| `node scripts/ui/theme-nav.mjs` | FAILURES: 0 |
+| `node scripts/ui/security.mjs` | FAILURES: 0 |
+| `node scripts/ui/providers.mjs` | 15 checks, 0 failures |
+| `node scripts/ui/polish.mjs` | 100 (0 defects in 560) — supporting |
+| `node scripts/ui/surfaces.mjs` | **not run** (paid; no approval) |
+| `npm run css` | **not run** — the change adds no Tailwind class |
+
+## Conditions recorded, not flaws
+
+- **The reverse feed's top clip at 375** is `EXCEPTION 1` in
+  `docs/ui-contract.md`, pre-existing; the oldest restored row sits partly
+  above the scrolled viewport.
+- **The open answered fold is captured at 900 dark only.** The 375/light cell
+  uses the same `TraceCollapsible` and option markup already exercised by the
+  live-row evidence.
+- **The stored question object is display-only.** `SessionStoreTests` prove a
+  saved file contains no `password`, `authorization`, `http` or `SessionId`
+  key, and a legacy file without `Question` still loads.

@@ -1,7 +1,8 @@
 # Thread plan — interactive model questions
 
-**Status:** lanes 0, 2, 3, 3.5 and 5 done; the row scored **8/10** and shipped. Lane 4 (persistence)
-is next. **Date:** 2026-11-17. **Spec:** [spec.md](spec.md). **Handoff:** [handoff.md](handoff.md).
+**Status:** lanes 0, 2, 3, 3.5, 4 and 5 done; the live row and its restored states each
+scored **8/10** and ship. Lane 6 (live-app harness) stays deferred. **Date:** 2026-11-17.
+**Spec:** [spec.md](spec.md). **Handoff:** [handoff.md](handoff.md).
 
 All of this work lives on the `feat/interactive-questions` branch; `master` is back at
 `23be0ba` (= `origin/master`) and has none of it.
@@ -83,13 +84,14 @@ first.
 
 ## Lane 4 — persistence
 
-- [ ] **4.1** `StoredQuestion`/`StoredOption` + `StoredEntry.Question` + `From`/`ToEntry`.
+- [x] **4.1** `StoredQuestion`/`StoredOption` + `StoredEntry.Question` + `From`/`ToEntry`.
   *Tests:* round-trip through `JsonSessionStore`; a legacy file still loads; no
   `password`/`url` key in the JSON.
-- [ ] **4.2** Restore rules: pending/`Stale` → `no answer sent`, closed; answered closed.
+- [x] **4.2** Restore rules: pending/`Stale` → `no answer sent`, closed; answered closed;
+  every restored row inert with the settled glyph, never the live `asks:`.
   *Tests:* `SessionCoordinatorTests` — pending restores one closed non-interactive row;
   pending+answered restores one `answered:` row.
-- [ ] **4.3** README row for the persistence shape.
+- [x] **4.3** README row for the persistence shape.
 
 ## Lane 5 — evidence
 
@@ -131,6 +133,6 @@ anything not run as "not run".
 - [x] floor: build + `dotnet test` + theme-nav + security + providers + polish (100, 0/560)
 - [x] hillclimb gate: **8/10** on pending + answered + unsupported at 900/375, both themes
   (7 → 8; record in `evidence.md`)
-- [ ] 4.1–4.3 persistence
-- [ ] 5.1–5.2 committed seed + evidence note
+- [x] 4.1–4.3 persistence; gate **8/10** on the restored states (7 → 8; `evidence.md`)
+- [x] 5.1–5.2 committed seed + evidence note
 - [ ] 6.x future live harness (not this pass)
