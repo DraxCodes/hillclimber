@@ -7,12 +7,18 @@ export const DEFAULT_PROFILE = join(homedir(), ".config", "drax", "bootstrap.jso
 
 /** OpenCode substitutes `{env:NAME}` and `{file:path}`; nothing else is a reference. */
 const SECRET_REF = /^\{(?:env|file):[^}]+\}$/i;
-const PLACEHOLDER = /^<.*>$/;
-const CREDENTIAL_KEY =
-  /(?:api[-_]?key|token|secret|password|credential|authorization)/i;
 
-function looksLikeReference(value) {
-  return SECRET_REF.test(value) || PLACEHOLDER.test(value);
+/**
+ * Credential-named fields. `<...>` is deliberately not accepted here: a
+ * placeholder is for an unfilled field, and it would let an opaque literal
+ * through unchanged.
+ */
+const CREDENTIAL_KEY =
+  /(?:api[-_]?key|(?:^|[-_])key$|token|secret|password|passwd|credential|authorization|bearer|(?:^|[-_])auth$)/i;
+
+/** A value that already references a secret store, not the secret itself. */
+function isReference(value) {
+  return SECRET_REF.test(value);
 }
 
 function collectCredentials(node, path, out) {
@@ -34,8 +40,8 @@ function collectCredentials(node, path, out) {
 /**
  * Load a bootstrap profile. The profile is machine-local and never shipped:
  * `opencode` is written as the project's config, `agentsMd` is appended to
- * AGENTS.md outside the managed block. Any credential-named field must be a
- * `{env:NAME}`/`{file:path}` reference or a `<placeholder>`; a literal is
+ * AGENTS.md outside the managed block. Any credential-named field must be an
+ * `{env:NAME}` or `{file:path}` reference; a literal or a `<placeholder>` is
  * rejected before anything is written.
  */
 export function loadProfile(file, { required = false } = {}) {
@@ -68,7 +74,7 @@ export function loadProfile(file, { required = false } = {}) {
   const credentials = [];
   collectCredentials(value.opencode, ["opencode"], credentials);
   for (const { path, value: credential } of credentials) {
-    if (!looksLikeReference(credential)) {
+    if (!isReference(credential)) {
       errors.push(
         `profile.${path}: use a {env:NAME} or {file:path} reference, not a literal secret`,
       );

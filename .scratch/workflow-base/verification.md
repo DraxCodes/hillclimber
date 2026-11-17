@@ -2,8 +2,8 @@
 
 Date: 2026-11-17. Fixed point: `1d84821`. Base: `drax-ai-workflow` v0.1.0 at
 `d4eb552` (tag `v0.1.0`), published at
-<https://github.com/DraxCodes/drax-ai-workflow>; re-vendored to v0.2.1 at
-`d397a20` (see the 0.2.x sections below).
+<https://github.com/DraxCodes/drax-ai-workflow>; re-vendored to v0.2.2 at
+`7245da3` (see the 0.2.x sections below).
 
 > Renamed from `opencode-workflows` to `drax-ai-workflow` on 2026-11-17. The
 > internal skill id, AGENTS markers, `WORKFLOW_BASE` env and `base` CLI are
@@ -157,6 +157,34 @@ Live CLI repro against the fixed base:
 - `options.token: "myOpaque..."` → exit 2, same message;
 - `apiKey: "{file:./k.txt}"` → exit 0, written as-is.
 
+### 0.2.2 — placeholder and key/bearer bypasses
+
+The re-check of 0.2.1 found two narrower holes, both reproduced:
+
+- a literal wrapped in `<...>` passed because placeholders were accepted for
+  credential fields; `{"apiKey":"<myOpaque…>"}` exited 0;
+- the credential-name list missed `key` and `Bearer`, so
+  `options.key`/`headers.Bearer` literals passed.
+
+Fixed in `7245da3` (tag `v0.2.2`): credential fields accept only `{env:NAME}` or
+`{file:path}` — no `<...>` — and the checked names now include `key`, `bearer`,
+`passwd` and `auth`. Doctor's backstop matches the same names and no longer
+exempts `<...>`.
+
+Live repro against the fixed base (all exit 2, nothing written):
+
+- `options.apiKey: "<myOpaque…>"`;
+- `options.key: "myOpaque…"`;
+- `options.headers.Bearer: "myOpaque…"`.
+
+Base `node --test`: `# tests 43 / # pass 43 / # fail 0`.
+
+Cold start from the public `v0.2.2` tag with the real machine profile: 33 files,
+config written from the profile with no placeholders, `check: clean (30 files)`,
+`doctor: no errors`. The generated agents are `deepseek#low`, `deepseek#medium`,
+`glm-5.3-flash#medium`, `claude-sonnet-5#medium`, and the key is
+`{env:SURPLUS_API_KEY}`.
+
 ## Council seats
 
 Surplus catalog checked this session: `deepseek-v4.1-flash-1017`,
@@ -169,7 +197,7 @@ This repo's `opencode.json` now implements the mix the seat table claims:
 `security-auditor → surplus/claude-sonnet-5#medium`, chair and shape still on
 `surplus/deepseek-v4.1-flash-1017`.
 
-After re-vendoring to 0.2.1:
+After re-vendoring to 0.2.2:
 
 ```
 check: clean: 35 files

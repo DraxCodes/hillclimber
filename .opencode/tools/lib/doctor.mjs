@@ -153,7 +153,12 @@ const SECRET_PATTERNS = [
   },
   { re: /AccountKey=[A-Za-z0-9+/=]{20,}/, kind: "error", label: "Azure account key" },
   {
-    re: /["']?(?:api[-_]?key|token|secret|password|credential|authorization)["']?\s*:\s*"(?!\{env:|\{file:|<)/i,
+    re: /["']?(?:api[-_]?key|token|secret|password|passwd|credential|authorization|bearer)["']?\s*:\s*"(?!\{env:|\{file:)/i,
+    kind: "warning",
+    label: "inline credential",
+  },
+  {
+    re: /["'](?:key|auth)["']\s*:\s*"(?!\{env:|\{file:)/i,
     kind: "warning",
     label: "inline credential",
   },
