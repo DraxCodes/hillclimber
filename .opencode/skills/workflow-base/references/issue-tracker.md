@@ -1,6 +1,7 @@
 # Issue tracker: Local Markdown
 
-Issues and specs for this repo live as markdown files in `.scratch/`.
+Issues and specs live as markdown files in the seam's issue directory
+(`docs.issues`, default `.scratch/`). The examples below use the default.
 
 ## Conventions
 

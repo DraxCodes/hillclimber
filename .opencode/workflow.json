@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "base": {
+    "name": "opencode-workflows",
+    "version": "0.1.0"
+  },
+  "project": "HillClimberUI",
+  "workflows": [
+    "council",
+    "hillclimb",
+    "grilling",
+    "handoff",
+    "security"
+  ],
+  "checks": {
+    "build": {
+      "command": "dotnet build --nologo",
+      "cwd": "."
+    },
+    "test": {
+      "command": "dotnet test --nologo",
+      "cwd": "."
+    },
+    "free": [
+      {
+        "command": "node theme-nav.mjs",
+        "cwd": "scripts/ui"
+      },
+      {
+        "command": "node security.mjs",
+        "cwd": "scripts/ui"
+      },
+      {
+        "command": "node providers.mjs",
+        "cwd": "scripts/ui"
+      }
+    ],
+    "paid": [
+      {
+        "command": "node surfaces.mjs",
+        "cwd": "scripts/ui"
+      }
+    ]
+  },
+  "verify": {
+    "surface": "web",
+    "seed": "CLIMBER_SEED",
+    "capture": "node polish.mjs",
+    "captureCwd": "scripts/ui",
+    "widths": [
+      375,
+      900
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "notes": "First-run and keyboard read-through; stop the dev host before dotnet test on Windows; token-spending surfaces.mjs only with explicit approval."
+  },
+  "docs": {
+    "issues": ".scratch",
+    "glossary": "GLOSSARY.md",
+    "adr": "docs/adr",
+    "rubricAddendum": "docs/agents/hillclimb-addendum.md",
+    "contract": "docs/ui-contract.md",
+    "artDirection": "docs/ui-art-direction.md"
+  },
+  "neverCommit": [
+    ".env",
+    "*.pem",
+    "*.key",
+    "*.local.json",
+    "appsettings.*.local.json"
+  ],
+  "packs": [
+    "engineering"
+  ]
+}

@@ -63,38 +63,18 @@ each is read-only.
 
 The chair proposes its own option first, so it is not only a switchboard.
 
-## Default seat models
+## Seat models
 
-The chair and the shape seat run on the default cheap model. The experience seat carries the
-taste judgement, and the risk seat is deliberately blunt.
+Seats run on the agents' configured models, so the project decides the mix in
+`opencode.json`. Aim for at least two model lineages across the four seats: put the
+cheapest reliable model on chair and shape (aggregation and structure), the strongest taste
+judgement on experience, and the bluntest model on risk. The project's own `AGENTS.md` may
+name a measured mix; use it when it does.
 
-| Seat | Model | Why |
-| --- | --- | --- |
-| Chair, Shape | `surplus/deepseek-v4.1-flash-1017` (`#medium`) | first or second on every field-test brief; aggregation and structure |
-| Experience | `surplus/glm-5.3-flash` (`#medium`) | won both experience briefs; ~1/50th a premium seat |
-| Risk | `surplus/claude-sonnet-5` (`#medium`) | second on the risk brief; the only seat that raised the audit and gating concerns |
-
-**Measured, not assumed.** A blind three-brief field test (2026-11-16, five models, identical
-prompts) ranked DeepSeek first overall, GLM second, Qwen third, Sonnet 5 fourth, Haiku 4.5
-fifth — but the lenses split: GLM is 1st/2nd on experience and 4th on risk, Sonnet is 4th/4th
-on experience and 2nd on risk. Each seat is therefore on the lens it won, not on its mean.
-Qwen placed third on all three briefs and does not earn a default. See
-`.scratch/council-field-test/results.md` for the method and its limits, and re-run it if the
-mix matters again; it costs about a nickel.
-
-Rules for the mix:
-
-- **`min80` is a hard floor.** A model whose sellers do not clear an 80% discount fails with
-  a 404 before it produces anything. Verified routable: `deepseek-v4.1-flash-1017`,
-  `glm-5.3-flash`, `qwen3.8-flash`, `claude-haiku-4.5`, `claude-sonnet-4.6`,
-  `claude-sonnet-5`, `claude-opus-4.8`. **Not** routable, despite being listed:
-  `claude-sonnet-4.5`, `claude-haiku-5.5`, `claude-sonnet-5.5`. Re-probe before swapping a
-  seat; the market moves.
-- Fall back to the default cheap model if a seat's model fails; record the fallback in the
-  artifact. Never silently change the mix.
-- Escalate to `claude-opus-4.8` only when the user asks or the trade-off register splits
-  evenly. `claude-sonnet-4.6` and `claude-haiku-4.5` are configured but not defaulted to.
-- Model diversity is a hypothesis, not a guarantee. A better brief beats a better model.
+**Verify, do not assume.** A provider can list a model and still fail the request (a
+routing floor, a retired version, a market that moved). Make one one-token call before
+changing a seat, and record the fallback in the artifact. Model diversity is a hypothesis,
+not a guarantee; a better brief beats a better model.
 
 ## The brief
 
@@ -130,8 +110,9 @@ Name the three-second read, the first-run path, the copy voice, one moment that 
 good, and the friction to avoid — concretely, such as "options cap at three with a `more`
 row", "focus lands on the first option", "the card is one line wider than an answer".
 
-The experience seat drafts it from `docs/ui-art-direction.md`, the rubric's probes in
-`docs/agents/hillclimb-rubric.md`, and `docs/ui-contract.md`. The council critiques it.
+The experience seat drafts it from the project docs named by the seam
+(`docs.artDirection` and `docs.contract`, when they exist) and the rubric in the
+`hillclimb` skill. The council critiques it.
 
 **It travels forward.** The chosen thesis is written into the spec, and the hillclimb gate
 later scores the built artifact against this thesis *and* the rubric, so the intent is not
@@ -154,7 +135,7 @@ Some questions cannot be settled in prose — "does this look good?", "is the pr
 worth the cost?". The council may spend **one throwaway visual probe** per feature:
 
 - two static fragments, same content, differing only in the decision under test (plain HTML,
-  or a seeded Razor page);
+  or a seeded project page);
 - screenshotted at 375 and 900, light and dark;
 - chosen by eye and written up with the reason;
 - **then deleted.** Never committed, never cited as a deliverable.
@@ -163,7 +144,8 @@ Cap it at one screen. If the probe does not settle the question, it goes to the 
 
 ## Output
 
-Write one file, `.scratch/<feature>/council.md`:
+Write one file, in the seam's issue directory (default
+`.scratch/<feature>/council.md`):
 
 1. Question, constraints, non-goals.
 2. Proposals — one per seat, unedited.

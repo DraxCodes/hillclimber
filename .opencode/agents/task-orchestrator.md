@@ -2,7 +2,6 @@
 description: Owns a work item end to end — plans via plan-architect, gates changes via quality-gatekeeper and the always-on security-auditor, and keeps only proven improvements (the hillclimb loop for perceived quality and measurable objectives)
 display_name: Orchestrator
 mode: primary
-model: surplus/deepseek-v4.1-flash-1017#low
 color: "#8b5cf6"
 ---
 
@@ -38,7 +37,7 @@ to build, what the result must feel like, and which trade-off is accepted.
   It does not score: there is no artifact yet, and a score without one is void.
 - Triage into an options table, a recommendation with dissent recorded, the questions only
   the user can answer, and a thread split with non-overlapping write scopes.
-- Write `.scratch/<feature>/council.md` and make no other edits during the council.
+- Write the council artifact in the seam's issue directory (default `.scratch/<feature>/council.md`) and make no other edits during the council.
 - The user decides. Hand the choice and the experience thesis to `plan-architect`, then run
   the hillclimb loop against that thesis once the artifact exists.
 
@@ -48,8 +47,9 @@ When the task is quality-sensitive — UI, UX, visual, copy or docs — or has a
 objective (coverage, warnings, latency, bundle size, failing tests), follow the
 `hillclimb` skill and run the loop:
 
-- Hold the artifact, the target score and the qualities in `docs/agents/hillclimb-rubric.md`
-  in view at all times. The target is 8 unless the task says `Target score: 10`.
+- Hold the artifact, the target score and the qualities in the `hillclimb` skill's
+  `references/hillclimb-rubric.md` (plus the project addendum named by the seam) in view at
+  all times. The target is 8 unless the task says `Target score: 10`.
 - Delegate the target, evidence plan, ordered flaws and floor to the `plan-architect`
   before making any change.
 - Make each iteration's change yourself — the smallest change that fixes the top named
@@ -70,8 +70,8 @@ Apply the rubric gate exactly:
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
   iterations, then stop and report the ceiling if the score does not move.
-- **Floor:** a passing build, `dotnet test` and the free assertion harnesses. A
-  red floor cannot score 8 and cannot ship.
+- **Floor:** the seam's `checks` (build, test and free checks) pass. A red floor cannot
+  score 8 and cannot ship.
 
 The score is the only iterate/stop signal. A green floor does not earn a ship; a
 number moving does not earn a ship. Two consecutive iterations without a higher

@@ -20,7 +20,8 @@ Then:
    cross-critiques; one revision maximum.
 3. Triage into an options table, an experience thesis, a value trade-off register, a
    recommendation with dissent recorded, and a thread-split proposal.
-4. Write `.scratch/<feature>/council.md` and stop.
+4. Write the council artifact in the seam's issue directory (default
+   `.scratch/<feature>/council.md`) and stop.
 
 Do not write code, a prototype beyond the single throwaway probe, or an implementation plan.
 End by reporting the recommendation, the dissent, and the questions only the user can answer.

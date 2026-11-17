@@ -12,8 +12,9 @@ latency, size) with a `plan-architect` agent and a read-only
 
 ## The decision
 
-The gate is the 1–10 rubric in `docs/agents/hillclimb-rubric.md`. Read it before
-the first score; quote it, don't paraphrase it.
+The gate is the 1–10 rubric in this skill's `references/hillclimb-rubric.md`, plus the
+project addendum named by the seam. Read both before the first score; quote them, don't
+paraphrase them.
 
 - **Below 8:** name the specific subjective flaws holding it back (for example
   clunky transitions, visual clutter, unclear hierarchy), fix those flaws, and
@@ -21,13 +22,12 @@ the first score; quote it, don't paraphrase it.
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
   iterations, then stop and report the ceiling if the score does not move.
-- **Floor:** a passing build, `dotnet test` and the free assertion harnesses. A
-  red floor cannot score 8 and cannot ship.
+- **Floor:** the seam's `checks` (build, test and free) pass. A red floor cannot score 8
+  and cannot ship.
 
-The score is the only iterate/stop signal. A green floor does not earn a ship; a
-number moving does not earn a ship. `scripts/ui/polish.mjs` is supporting evidence,
-not a threshold: it exits 0 whatever its UPS, so only a harness error or a detected
-run fails it.
+The score is the only iterate/stop signal. A green floor does not earn a ship; a number
+moving does not earn a ship. A paid check runs only with explicit approval, and is
+supporting evidence rather than a threshold unless the seam says otherwise.
 
 ## Roles
 
@@ -48,9 +48,10 @@ run fails it.
    `Target score: 10` in the task or spec raises it. Record the target; do not ask.
 2. **Plan.** Launch `plan-architect`. Capture the target, evidence plan, ordered
    flaws, floor and stop conditions. Do not proceed without a baseline score.
-3. **Baseline.** Seed temporary sample data, capture the evidence, and have
-   `quality-gatekeeper` score the current artifact. Ensure the working tree is
-   clean before the first change.
+3. **Baseline.** Capture the evidence the seam's `verify` block declares — seed, capture
+   command, widths and themes — or the measurable command for a non-visual target. Have
+   `quality-gatekeeper` score the current artifact. Ensure the working tree is clean before
+   the first change.
 4. **Iterate.** For each step in the plan:
    1. Make the smallest change that targets the top named flaw.
    2. Re-capture the evidence for the affected screens and states.
@@ -66,12 +67,10 @@ run fails it.
 
 ## The floor
 
-Before any score counts, run the project's free checks: `dotnet test`, the build
-warnings, and the free assertion harnesses (`theme-nav`, `security`, `providers`).
-`scripts/ui/polish.mjs` runs as supporting evidence: its UPS is reported, and only
-a harness error or a detected run fails it. The paid `scripts/ui/surfaces.mjs` runs
-only with explicit approval, Surplus only, and stopped immediately. Label anything
-not run as **not run**; never imply it passed.
+Before any score counts, run the seam's `checks`: build, test and the free checks. A paid
+check runs only with explicit approval. Label anything not run as **not run**; never imply
+it passed. The project section of `AGENTS.md` may add nuance (a dev host that must be
+stopped first, a check that needs a live server); it may not weaken the floor.
 
 ## Rules
 

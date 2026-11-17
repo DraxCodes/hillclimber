@@ -56,6 +56,23 @@
       }
     }
   },
+  "agents": {
+    "task-orchestrator": {
+      "model": "surplus/deepseek-v4.1-flash-1017#low"
+    },
+    "plan-architect": {
+      "model": "surplus/deepseek-v4.1-flash-1017#medium",
+      "permissions": [{ "action": "edit", "resource": "*", "effect": "deny" }]
+    },
+    "quality-gatekeeper": {
+      "model": "surplus/deepseek-v4.1-flash-1017#medium",
+      "permissions": [{ "action": "edit", "resource": "*", "effect": "deny" }]
+    },
+    "security-auditor": {
+      "model": "surplus/deepseek-v4.1-flash-1017#medium",
+      "permissions": [{ "action": "edit", "resource": "*", "effect": "deny" }]
+    }
+  },
   "permissions": [
     { "action": "shell", "resource": "*", "effect": "allow" },
     { "action": "read", "resource": "**/.env*", "effect": "ask" },

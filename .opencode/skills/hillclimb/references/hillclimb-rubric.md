@@ -9,6 +9,10 @@ Scores are whole numbers. Every level is defined by things you can observe, not 
 taste adjectives. The user-supplied anchors at 5, 8 and 10 are restated exactly;
 the levels between them fill in the observable traits.
 
+A project may add probes and caps in the addendum named by its seam
+(`docs.rubricAddendum`). The addendum extends this rubric; it never lowers the
+floor or weakens a level. When the two disagree, the stricter reading wins.
+
 ## How to look
 
 Run these probes before scoring. Each is an action, not an impression.
@@ -21,50 +25,24 @@ Run these probes before scoring. Each is an action, not an impression.
 3. **State sweep.** Visit empty, loading, success, error, long-content and
    disconnected states. Also try zero items, one item, the longest label and the
    largest value. A missing, unstyled or misleading state is a flaw.
-4. **Width and theme.** Check 375px and 900px wide, in light and dark. Look for
-   overflow, clipping, unreadable contrast, and elements that vanish or reorder in
-   a way that changes meaning.
+4. **Width and theme.** When the artifact has a layout, check the widths and themes
+   the seam's `verify` block declares. Look for overflow, clipping, unreadable
+   contrast, and elements that vanish or reorder in a way that changes meaning.
 5. **Keyboard pass.** Tab from the top. Focus must be visible at every stop, the
    order must match reading order, nothing traps focus, and Escape must close what
    it opened.
 6. **Copy read.** Read every visible string aloud. Flag placeholder or debug text,
    internal jargon, duplicated labels, sentences that explain the obvious, and
    errors that blame the user.
-7. **Dead-end sweep.** Click every control that looks interactive. It must respond;
-   the response must lead somewhere or say why it cannot; a disabled control must
-   explain itself.
-8. **Provenance probe.** For every visible AI surface, name the AI Element it is and
-   open the doc that defines it. A bespoke AI block where a documented element
-   exists is a flaw. For every non-AI surface, name the shadcn base component; a
-   one-off equivalent is a flaw. The surface map in
-   [`docs/ui-contract.md`](../ui-contract.md) is the expected answer — a surface
-   that disagrees with it is a flaw even when it looks right.
-9. **State fidelity probe.** For `Prompt Input`, `Reasoning`, `Plan`, `Sources`,
-   `Task`, `Tool` and `Inline Citation`, exercise closed, open, streaming,
-   complete, failed and disabled in both themes. A component with only its resting
-   state is a flaw, and so is a trigger whose `aria-expanded` never changes.
-10. **Composition probe.** A multi-subagent handoff renders as one Plan whose steps
-    settle in order, not as unrelated cards; `Reasoning` collapses when its stream
-    ends; `Sources` expands to real URLs; a failure opens to its output; a note or
-    a divider is a `Marker`. Styling a composition you did not compose is a flaw.
-11. **Model visibility probe.** The composer names the exact provider and model
-    before send, while streaming and when disabled; the name does not truncate at
-    375px.
-12. **Token probe.** Sample the rendered palette against `app.css` in both themes. A
-    colour outside the documented mapping, a hard-coded hex inside a port, or a
-    token that exists in one theme only is a flaw unless a recorded exception names
-    it.
-13. **Art direction probe.** Score the screen against
-    [`docs/ui-art-direction.md`](../ui-art-direction.md). At three seconds, name the
-    primary level and check that only it competes for attention. Then check the
-    measure (prose 60-75ch), the rhythm (8px inside a group, 24px+ between
-    groups), the type scale (three sizes plus one micro), the accent budget (one
-    job), and that mono appears only on data. A screen that passes probes 1-12 but
-    has no hierarchy is an 8, not a 9.
+7. **Dead-end sweep.** Click or invoke every control that looks interactive. It must
+   respond; the response must lead somewhere or say why it cannot; a disabled
+   control must explain itself.
 
-Probes 8-12 are the addendum from `.scratch/ui-pivot-shadcn/spec.md`. Probe 13
-scores [`docs/ui-art-direction.md`](../ui-art-direction.md). The contract they
-check is [`docs/ui-contract.md`](../ui-contract.md).
+When the seam's `verify.surface` is not `none`, the project documents named by
+`docs.contract` and `docs.artDirection` (when they exist) supply the provenance,
+state-fidelity and art-direction probes. Read the addendum before scoring; a
+surface that disagrees with a documented contract is a flaw even when it looks
+right.
 
 ## Levels
 
@@ -76,7 +54,8 @@ check is [`docs/ui-contract.md`](../ui-contract.md).
 
 Observable traits:
 
-- All thirteen probes pass, and the reviewer can say "no flaw found" without hedging.
+- Every probe in this rubric and the project addendum passes, and the reviewer can
+  say "no flaw found" without hedging.
 - Every state — empty, loading, success, error, long content, disconnected — is
   designed and readable, with a sensible next action.
 - Defaults and preserved context mean the common task needs no setup; the obvious
@@ -90,9 +69,9 @@ Observable traits:
 ### 9 — Finished, with one named edge
 
 - The main path and every primary state meet the level-10 traits.
-- The art-direction probe passes on every primary state: three levels of hierarchy
-  are visible at three seconds, and measure, type and rhythm are consistent at 375
-  and 900 in both themes.
+- The project addendum's hierarchy check passes on every primary state: the
+  intended hierarchy is visible at three seconds, and measure, type and rhythm are
+  consistent at the declared widths and themes.
 - Exactly one named, low-exposure imperfection remains: a rare state, an advanced
   control, or a single microinconsistency a first-time user would not meet while
   doing the primary task.
@@ -112,7 +91,7 @@ Observable traits:
 - Empty, loading and error states exist, are readable, and offer a next action.
 - No placeholder, debug, lorem or "coming soon" copy on a shipped surface.
 - Spacing, type and alignment are consistent between sibling elements; nothing
-  overflows or clips at 375px or 900px in either theme.
+  overflows or clips at a declared width or theme.
 - Remaining flaws are nits a user would not notice or name.
 
 ### 7 — Nearly clean
@@ -190,43 +169,39 @@ Observable traits:
 - **Below 8:** name the specific subjective flaws holding it back (for example
   clunky transitions, visual clutter, unclear hierarchy), fix those flaws, and
   iterate.
-- **Provenance cap:** a UI surface with a provenance, composition or state
-  violation that is not recorded in the contract cannot score above 7. A recorded
-  exception does not cap the score — it is judged on its stated cost. See
-  [`docs/ui-contract.md`](../ui-contract.md).
-- **Art direction:** passing probes 1-12 caps the score at 8. A 9 or a 10 requires
-  probe 13, judged from screenshots against
-  [`docs/ui-art-direction.md`](../ui-art-direction.md). Compliance is the floor for
-  a good score, not the score.
 - **8 or above:** stop and ship, unless the task explicitly demands a 10.
 - **8–9 with a 10 demanded:** name what a 10 requires, attempt at most two
   iterations, then stop and report the ceiling if the score does not move.
-- **Floor:** a passing build, `dotnet test` and the free assertion harnesses. A
-  red floor cannot score 8 and cannot ship.
+- **Project caps:** the addendum named by the seam may cap the score for a
+  documented violation (provenance, composition, state fidelity). A recorded
+  exception is judged on its stated cost, not capped.
+- **Floor:** the seam's `checks` (build, test and free) pass. A red floor cannot
+  score 8 and cannot ship. A paid check runs only with explicit approval and is
+  supporting evidence, not a threshold.
 
 The score is the only iterate/stop signal. A green floor does not earn a ship; a
 number moving does not earn a ship. Only the rubric does. Two consecutive
 iterations without a higher score stop the loop.
 
-`scripts/ui/polish.mjs` is supporting evidence, not a threshold: it reports a UI
-Polish Score and exits 0 whatever the score, so only a harness error or a detected
-run fails it. Do not turn its UPS into a gate until backlog issue 05 adds one.
+A project may record a non-scoring supporting metric in its seam or addendum. It is
+evidence, not a gate, unless the project says otherwise.
 
 ## Evidence a score must cite
 
 A score without this evidence is invalid and is treated as below 8.
 
-- **Seed:** the temporary sample data used, what state it exercises, and where the
-  seed lives. It stays uncommitted, in one throwaway file plus one hook.
-- **Shots:** screenshots at 900 and 375, light and dark, named by screen and state.
+- **Seed:** when `verify.surface` is not `none`, the temporary sample data used,
+  what state it exercises, and where the seed lives. It stays uncommitted, in one
+  throwaway file plus one hook.
+- **Shots:** when `verify.capture` is set, screenshots at the seam's declared widths
+  and themes, named by screen and state.
 - **Read-through:** a short note from the first-run and keyboard passes — what was
   tried, what paused, what was guessed.
 - **Flaws and strengths:** each one states *what* is visible, *where* (screen,
   selector, viewport, theme), and *what condition* exposes it. "Cluttered" alone is
-  not evidence; "three equally weighted buttons above the input at 375 light"
-  is.
-- **Contract:** `no violations`, or the provenance, composition or state violation
-  with its surface and the debt or exception that covers it.
+  not evidence; "three equally weighted buttons above the input at 375 light" is.
+- **Contract:** when the seam names `docs.contract`, either `no violations`, or the
+  violation with its surface and the debt or exception that covers it.
 - **Floor:** the exact commands run and their observed result; anything not run is
   labelled "not run".
 
@@ -242,17 +217,17 @@ Flaws holding it at 7:
 Why not 8: <the level-8 trait that is missing>
 Why not 6: <the level-6 trait that is absent>
 Contract: <no violations | violation, surface, debt or exception>
-Floor: dotnet test <result>; build <result>; polish <UPS and exit, or not run>
+Floor: <command> <result>; <command> <result>; <not run>
 ```
 
 ## Anti-inflation rules
 
 - An 8 or above must name the level-7 flaws that are demonstrably absent.
-- A 10 must state that no flaw was found across all thirteen probes.
+- A 10 must state that no flaw was found across every probe, including the
+  addendum's.
 - A below-8 score must name at least one concrete flaw with its location and the
   condition that exposes it.
-- A score cannot credit a surface whose debt ID is still open: "Marker renders
-  errors" is not true while C1 is in the register.
+- A score cannot credit a surface whose documented debt is still open.
 - Scores are whole numbers; no 7.5.
 - Record the score per iteration with its delta and the reason. Two consecutive
   iterations without a higher score stop the loop; a drop reverts the change.

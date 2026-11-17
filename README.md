@@ -233,13 +233,13 @@ throttling, tool-output logging, filesystem scope, and the OpenRouter base-URL o
 
 ```
 ClimberWeb/            Blazor Server app (pages, services, auth, command runner)
-ClimberWeb.Tests/      xUnit tests (550 passing)
+ClimberWeb.Tests/      xUnit tests
 scripts/               status/coverage, fixture, and Playwright UI checks
 status/                committed coverage/test artifact read by /status
 fixtures/              throwaway sample project for climb proofs
-.opencode/agents/      task-orchestrator, plan-architect, quality-gatekeeper, security-auditor
+.opencode/             vendored workflow base (pinned; see .opencode/README.md)
 .scratch/              specs and tracked issues (local markdown)
-docs/                  logo and README assets
+docs/                  logo, UI contract/art direction, ADR, and README assets
 ```
 
 ## Testing
@@ -337,6 +337,24 @@ Current state: **550 tests passing, 0 failed, 0 skipped**, **63.10% line / 53.36
 coverage**, and a **96/100 coverage rating** on `/status` (9/10 hot paths at the rubric bar;
 Scroll math at 75% line is the open gap). The token-spending `surfaces.mjs` harness is
 **not run** as part of the default checks, so it never contributes to the UI dimension.
+
+## Agent workflows
+
+The project-agnostic agent workflows — council, hillclimb, grilling, handoff, the
+security lens and the 1–10 rubric — are a **vendored, pinned copy** of the
+`opencode-workflows` base under `.opencode/`, versioned in
+[`.opencode/workflow.json`](.opencode/workflow.json) and described in
+[`.opencode/README.md`](.opencode/README.md). The base's own source repo is
+`C:\Users\joelp\code\opencode-workflows`.
+
+This repo's only project-specific additions are its seam
+(`.opencode/workflow.json`), the checks and harnesses in `scripts/ui`, the design
+docs (`docs/ui-contract.md`, `docs/ui-art-direction.md`) and the rubric addendum
+([`docs/agents/hillclimb-addendum.md`](docs/agents/hillclimb-addendum.md)).
+`AGENTS.md` carries the injected managed block plus this project's notes.
+
+Check the copy for drift with `node .opencode/tools/base.mjs check .` and validate
+the seam with `node .opencode/tools/base.mjs doctor .`.
 
 ## License
 

@@ -66,6 +66,12 @@ secrets/
 *.p12
 
 # ---------------------------------------------------------------------------
+# OpenCode workflow base (vendored; backups and staging are machine-local)
+# ---------------------------------------------------------------------------
+.opencode/.workflow-backup/
+.opencode/.workflow-stage/
+
+# ---------------------------------------------------------------------------
 # OpenCode engineering pack (generated; reinstall with the pack script)
 # ---------------------------------------------------------------------------
 .agents/skills/

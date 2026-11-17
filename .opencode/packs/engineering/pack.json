@@ -1,5 +1,5 @@
 {
-  "$comment": "Optional engineering skills, installed per project on demand. These are NOT part of the universal base. Install with: node .opencode/scripts/install-engineering-pack.mjs",
+  "$comment": "Optional engineering skills, installed per project on demand. These are NOT part of the universal base. Install with: node .opencode/tools/base.mjs pack install engineering .",
   "agent": "opencode",
   "sources": [
     {

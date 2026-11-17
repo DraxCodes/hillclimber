@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Install the optional engineering skill pack described in
-// .opencode/engineering-pack.json, using the skills CLI (https://skills.sh).
+// Install the optional engineering skill pack described in pack.json beside this
+// file, using the skills CLI (https://skills.sh).
 //
 // Project scope: the skills land in this project (.agents/skills/, which
 // OpenCode reads), so they travel with the repo and never touch ~/.config.
 //
-// Usage:  node .opencode/scripts/install-engineering-pack.mjs
+// Usage:  node .opencode/tools/base.mjs pack install engineering .
+//   or:   node .opencode/packs/engineering/install.mjs
 
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -13,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const manifestPath = join(here, "..", "engineering-pack.json");
+const manifestPath = join(here, "pack.json");
 
 let manifest;
 try {

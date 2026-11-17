@@ -3,10 +3,10 @@ description: Install the optional engineering skill pack for this project
 ---
 
 Install the optional engineering skill pack defined in
-`.opencode/engineering-pack.json`. Run:
+`.opencode/packs/engineering/pack.json`. Run:
 
 ```sh
-node .opencode/scripts/install-engineering-pack.mjs
+node .opencode/tools/base.mjs pack install engineering .
 ```
 
 The pack is opt-in and project-scoped; it is not part of the universal base.
