@@ -6,9 +6,10 @@
 //   node scripts/dev/drive.mjs goto /activity
 //   node scripts/dev/drive.mjs text [--limit 4000]
 //   node scripts/dev/drive.mjs errors [--keep]
-//   node scripts/dev/drive.mjs shot [--full] [path]
+//   node scripts/dev/drive.mjs shot [--full] [--width 900] [--height 1200] [--theme light|dark] [path]
 //   node scripts/dev/drive.mjs reload
 //   node scripts/dev/drive.mjs stop
+//   node scripts/dev/drive.mjs help
 //
 // `start` detaches a small loopback control server; the window stays open and stays unlocked
 // between commands. The PIN is typed like a person types it — this never weakens the gate, and
@@ -99,6 +100,16 @@ async function settle(page) {
   return (await page.locator('#pin').count()) === 0;
 }
 
+async function settleContent(page) {
+  // A screenshot taken while the page is still fetching its first read shows a placeholder
+  // instead of the page. Wait out the two known placeholders; other pages pass immediately.
+  await page
+    .waitForFunction(
+      () => !/Checking providers|Reading the repository/i.test(document.body.innerText),
+      { timeout: 8000 })
+    .catch(() => {});
+}
+
 function attach(context) {
   const page = context.pages()[0] ?? (context.newPage());
   const errors = [];
@@ -138,6 +149,7 @@ async function serve({ headless, route }) {
   });
   log('browser ready');
   const { page, errors, loads } = attach(context);
+  page.on('close', () => log('page closed'));
 
   const go = async (target) => {
     await page.goto(`${hostBase}${target}`, { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -202,12 +214,31 @@ async function serve({ headless, route }) {
         }
 
         case 'POST /shot': {
+          if (body.theme === 'light' || body.theme === 'dark') {
+            await page.evaluate((value) => localStorage.setItem('hillclimber-theme', value), body.theme);
+            await page.reload({ waitUntil: 'domcontentloaded' });
+            await settle(page);
+          }
+
+          const current = page.viewportSize() ?? { width: 1440, height: 1000 };
+          const width = Number(body.width) || current.width;
+          const height = Number(body.height) || current.height;
+          if (width !== current.width || height !== current.height) {
+            await page.setViewportSize({ width, height });
+          }
+
           const path = body.path
             ? resolve(String(body.path))
-            : join(shotsDir, `drive-${new Date().toISOString().replace(/[:.]/g, '-')}.png`);
+            : join(shotsDir, `drive-${width}x${height}-${new Date().toISOString().replace(/[:.]/g, '-')}.png`);
           mkdirSync(dirname(path), { recursive: true });
+          await settleContent(page);
           await page.screenshot({ path, fullPage: Boolean(body.full) });
-          send(200, { path, url: page.url() });
+          send(200, {
+            path,
+            url: page.url(),
+            viewport: `${width}x${height}`,
+            theme: await page.evaluate(() => document.documentElement.getAttribute('data-theme')),
+          });
           return;
         }
 
@@ -239,6 +270,17 @@ async function serve({ headless, route }) {
 
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
   const port = server.address().port;
+
+  // If the window goes away, so should the control server: a driver whose page is gone cannot
+  // answer anything, and leaving a state file behind only makes `status` lie about it.
+  context.on('close', () => {
+    log('browser closed; stopping');
+    server.close();
+    rmSync(statePath, { force: true });
+    process.exit(0);
+  });
+
+  process.on('exit', (code) => log(`exiting with code ${code}`));
 
   writeState({
     pid: process.pid,
@@ -272,7 +314,11 @@ async function start({ headless, route }) {
     return 0;
   }
 
-  if (state) rmSync(statePath, { force: true }); // a state file without a server is stale
+  if (state) {
+    // A state file with no server behind it means the last driver died without saying why.
+    console.error(`the previous driver was not answering; opening a new one. Log tail:\n${tail(5)}`);
+    rmSync(statePath, { force: true }); // stale
+  }
 
   const child = spawn(
     process.execPath,
@@ -309,6 +355,29 @@ function tail(lines) {
     return '';
   }
 }
+
+const HELP = `Keep one browser window on the live dev host, already unlocked.
+
+Usage: node scripts/dev/drive.mjs <command> [options]
+
+Commands:
+  start           open the window, or report the one already open
+  status          the current page, unlock state, console errors and load count
+  goto <route>    navigate, unlocking if the gate appears
+  text            print the page's visible text (--limit N)
+  errors          print and clear the console errors seen so far (--keep to leave them)
+  shot            save a PNG (--full, --width N, --height N, --theme light|dark, then an optional path)
+  reload          reload the page and unlock it again
+  stop            close the window
+  help            this text
+
+Options:
+  --headless      with start: no visible window, for scripted runs
+  --route <path>  with start: the first page (default /)
+  --limit <n>     with text: characters to print (default 20000)
+
+Shots land in ${shotsDir} when no path is given.
+Control state lives in ${stateDir}.`;
 
 async function call(method, path, body) {
   const state = readState();
@@ -355,7 +424,7 @@ async function call(method, path, body) {
   return 0;
 }
 
-const [command = 'status', ...rest] = process.argv.slice(2);
+const [command = 'help', ...rest] = process.argv.slice(2);
 const headless = rest.includes('--headless');
 const routeAt = rest.indexOf('--route');
 const route = routeAt >= 0 ? rest[routeAt + 1] : '/';
@@ -415,14 +484,31 @@ const code = await (async () => {
     case 'errors':
       return call('GET', `/errors${rest.includes('--keep') ? '?keep=1' : ''}`);
     case 'shot': {
-      const path = rest.find((value) => !value.startsWith('--'));
+      const value = (name) => {
+        const at = rest.indexOf(name);
+        return at >= 0 ? rest[at + 1] : undefined;
+      };
+      const path = rest.find(
+        (item, index) => !item.startsWith('--') && !['--width', '--height', '--theme'].includes(rest[index - 1]));
       const full = rest.includes('--full');
-      return call('POST', '/shot', { path, full });
+      return call('POST', '/shot', {
+        path,
+        full,
+        width: value('--width'),
+        height: value('--height'),
+        theme: value('--theme'),
+      });
     }
     case 'reload':
       return call('POST', '/reload');
+    case 'help':
+    case '--help':
+    case '-h':
+      console.log(HELP);
+      return 0;
     default:
-      console.error(`unknown command "${command}". See the header of scripts/dev/drive.mjs.`);
+      console.error(`unknown command "${command}".\n`);
+      console.error(HELP);
       return 2;
   }
 })();

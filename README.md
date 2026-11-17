@@ -104,7 +104,13 @@ node scripts/dev/drive.mjs start     # one persistent window, already unlocked
 ```
 
 `drive.mjs` types the PIN like a person would — there is no bypass — then stays logged in and takes
-commands: `goto /activity`, `text`, `errors`, `shot [path]`, `reload`, `stop`.
+commands: `goto /activity`, `text`, `errors`, `shot`, `reload`, `stop`. `shot` takes
+`--width`, `--height` and `--theme light|dark`, and `help` lists everything.
+
+A plain `dotnet build` or `dotnet test` is expected to leave the app alone, and does: the project
+excludes the repo `bin` from watch and hides the generated `obj` AssemblyInfo from its design-time
+item list, so neither write looks like a source change. A save that has to rebuild still restarts
+the host, and the tab waits for the new process rather than reloading into the gap.
 
 The open tab reloads itself when the running host changes, and never while a field has focus. Two
 things the loop deliberately does not do:

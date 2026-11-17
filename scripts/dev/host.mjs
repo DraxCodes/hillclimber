@@ -130,14 +130,68 @@ function tail(lines) {
   return text.slice(-lines).join('\n');
 }
 
-function renderErrors() {
-  if (!existsSync(logPath)) return 0;
+function currentRun() {
+  if (!existsSync(logPath)) return '';
   const text = readFileSync(logPath, 'utf8');
   // Only the current run: the log is appended to across starts.
   const marker = text.lastIndexOf('=== ');
-  const current = marker >= 0 ? text.slice(marker) : text;
-  return (current.match(/Unhandled exception rendering component/g) ?? []).length;
+  return marker >= 0 ? text.slice(marker) : text;
 }
+
+function renderErrors() {
+  return (currentRun().match(/Unhandled exception rendering component/g) ?? []).length;
+}
+
+function lastFailure() {
+  const text = currentRun();
+  const known = [
+    /Failed to bind to address [^\r\n:]+[^\r\n]*/,
+    /Exited with error code -?\d+/,
+    /Unhandled exception\. [^\r\n]*/,
+  ];
+
+  for (const pattern of known) {
+    const matches = text.match(pattern);
+    if (matches?.length) return matches[matches.length - 1].trim();
+  }
+  return null;
+}
+
+function gloss(iso) {
+  if (!iso) return 'unknown';
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return iso;
+
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
+  const clock = new Date(then).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  let age;
+  if (seconds < 60) age = `${seconds} s`;
+  else if (seconds < 3600) age = `${Math.round(seconds / 60)} min`;
+  else age = `${(seconds / 3600).toFixed(1)} h`;
+
+  return `${clock} (${age} ago)`;
+}
+
+const HELP = `Start, stop and inspect the live dev host on ${base}.
+
+Usage: node scripts/dev/host.mjs <command> [options]
+
+Commands:
+  start           start the watched host, or report that it is already up
+  stop            stop it and wait for the port to be free
+  restart         stop, then start again (the recovery for a wedged watch)
+  status          say what is actually serving, and what to do if it is not
+
+Options:
+  --force         with start: take the port from a process this script did not start
+
+Files: log ${logPath}
+       state ${statePath}`;
 
 async function start({ force = false } = {}) {
   const state = readState();
@@ -186,6 +240,9 @@ async function start({ force = false } = {}) {
         ...process.env,
         ASPNETCORE_ENVIRONMENT: 'Development',
         ASPNETCORE_URLS: `http://localhost:${port}`,
+        // The app locates the repository from its own directory, which is the temp output here.
+        // `/status` reads this key, so the dev host still shows the real branch and history.
+        Climber__RepoRoot: repo,
       },
       detached: true,
       stdio: ['ignore', log, log],
@@ -242,24 +299,52 @@ async function status() {
   const state = readState();
   const current = await stamp();
   const owners = portOwners();
+  const watchPid = state?.watchPid ?? null;
+  const watchUp = alive(watchPid);
+  const failure = lastFailure();
 
   if (!current) {
-    console.log(`${base}: down${owners.length ? ` (held by pid ${owners.join(', ')})` : ''}`);
+    console.log(`${base}: down`);
+    if (owners.length) {
+      console.log(`port holder: pid ${owners.join(', ')} (answering nothing)`);
+      console.log('next: node scripts/dev/host.mjs start --force');
+    } else if (watchUp) {
+      console.log(`watch pid: ${watchPid} (running, not answering yet)`);
+      console.log('next: node scripts/dev/host.mjs status (again in a moment), or restart');
+    } else {
+      if (failure) console.log(`last failure: ${failure}`);
+      console.log('next: node scripts/dev/host.mjs start');
+    }
     return 1;
   }
 
   console.log(`${base}: up`);
-  console.log(`watch pid: ${state?.watchPid ?? 'unknown'}${alive(state?.watchPid) ? '' : ' (not running)'}`);
+  console.log(`watch: ${watchUp ? `pid ${watchPid}` : `pid ${watchPid ?? 'unknown'} — not running`}`);
   console.log(`app pid: ${current.pid}`);
-  console.log(`build: ${current.build ?? 'unknown'}`);
-  console.log(`source: ${current.source ?? 'unknown'}`);
-  console.log(`started: ${current.startedAt}`);
-  console.log(`render errors in this log: ${renderErrors()}`);
+  console.log(`build: ${gloss(current.build)}`);
+  console.log(`source: ${gloss(current.source)}`);
+  console.log(`started: ${gloss(current.startedAt)}`);
+  console.log(`render errors this run: ${renderErrors()}`);
+  if (failure) console.log(`last failure in this run: ${failure}`);
   console.log(`log: ${logPath}`);
+
+  if (!watchUp) {
+    // Something is serving, but this script can no longer restart it. Say so instead of calling
+    // that "up": a save will not apply, and the next failure has no recovery.
+    console.log('note: nothing is watching for changes; edits will not be applied');
+    console.log('next: node scripts/dev/host.mjs restart');
+    return 1;
+  }
+
   return 0;
 }
 
-const [command = 'status', ...rest] = process.argv.slice(2);
+async function help() {
+  console.log(HELP);
+  return 0;
+}
+
+const [command = 'help', ...rest] = process.argv.slice(2);
 const force = rest.includes('--force');
 
 const code = await (async () => {
@@ -272,8 +357,13 @@ const code = await (async () => {
       return (await stop()) === 0 ? start({ force: true }) : 1;
     case 'status':
       return status();
+    case 'help':
+    case '--help':
+    case '-h':
+      return help();
     default:
-      console.error(`unknown command "${command}". Use start, stop, restart or status.`);
+      console.error(`unknown command "${command}".\n`);
+      console.error(HELP);
       return 2;
   }
 })();
