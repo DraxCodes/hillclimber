@@ -12,7 +12,7 @@ first.
 
 ## Lane 2 — transport (`ClimberWeb/Services/`)
 
-- [ ] **2.1** `QuestionContract.cs`: kinds, statuses, options, state, outcomes,
+- [x] **2.1** `QuestionContract.cs`: kinds, statuses, options, state, outcomes,
   `QuestionLine.Write/Parse`, `QuestionSupport.Classify`. Add `LogKind.Question`,
   `LogEntry.Question`, the `LogFormatter.Parse` branch, the `LogGrouper` case (a question is
   never folded into a turn) and `OutputItemKind.Question`.
@@ -20,25 +20,25 @@ first.
   not label; line JSON round-trip; written line has no `password`/`authorization`/`url` key;
   collapse keeps the last line per form and never reorders; a question closes an open turn.
   *Floor:* build + `dotnet test`.
-- [ ] **2.2** `OpenCodeServe.cs`: `ServeChild`, `IServeProcess` seam, URL-line resolution,
+- [x] **2.2** `OpenCodeServe.cs`: `ServeChild`, `IServeProcess` seam, URL-line resolution,
   per-run password, close-stdin/kill.
   *Tests:* one URL line, loopback only; startup timeout kills the tree; `ToString()` and every
   log string exclude the secret. Guarded `[Trait("Live","true")]` real child binds loopback and
   requires auth; returns early if `opencode` is not on `PATH`.
-- [ ] **2.3** `OpenCodeFormClient.cs`: list/reply/cancel/get + `WatchAsync` SSE loop and outcome
+- [x] **2.3** `OpenCodeFormClient.cs`: list/reply/cancel/get + `WatchAsync` SSE loop and outcome
   mapping.
   *Tests:* status→outcome table (204/409/400/5xx/timeout/refused); frame parser handles `data:`
   with/without space, comments, blank frames. Guarded `[live]` create/reply/409/400/cancel.
-- [ ] **2.4** `QuestionChannel.cs`: allowlist dispatch, reconcile → `Stale`, reconnect/backoff,
+- [x] **2.4** `QuestionChannel.cs`: allowlist dispatch, reconcile → `Stale`, reconnect/backoff,
   `Changed`, consent filter.
   *Tests:* `permission.asked` produces no event/state; reconnect lists pending as `Stale`;
   409/400/unconfirmed/disconnected mapping; cancel message never echoed.
-- [ ] **2.5** Wire into `RunService`/`IRunService` (two methods), publish via
+- [x] **2.5** Wire into `RunService`/`IRunService` (answer, dismiss, check), publish via
   `Log(QuestionLine.Write(state))`, dispose on terminal, `IAsyncDisposable`.
   *Tests:* fake channel `Pending → Answered` adds exactly two question lines; a throwing channel
   changes no run status; answering with no channel is a no-op `Disconnected`; the password never
   appears in `Logs`.
-- [ ] **2.6** `Climber:Questions = off | serve` (default `off`) in `QuestionTransport.cs`,
+- [x] **2.6** `Climber:Questions = off | serve` (default `off`) in `QuestionTransport.cs`,
   registered in `Program.cs`.
   *Tests:* `off|serve|garbage → off`.
 
@@ -112,7 +112,7 @@ anything not run as "not run".
 ## Checklist
 
 - [x] 0.1 spec + plan
-- [ ] 2.1–2.6 seam, supervisor, client, channel, wiring, flag
+- [x] 2.1–2.6 seam, supervisor, client, channel, wiring, flag
 - [ ] floor: build + `dotnet test`
 - [ ] 3.1–3.3 row, contract block, `Home.razor` hook
 - [ ] 3.5 dev stimulus + `questions.mjs` + 16 shots

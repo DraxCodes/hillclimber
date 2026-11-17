@@ -24,6 +24,12 @@ builder.Services.AddSingleton<ICommandRunner, ProcessCommandRunner>();
 // real work rather than a transcript, so the fixture host replaces it with a refusing guard
 // too: a playback host never drives opencode, whichever method is chosen.
 var playback = PlaybackRunService.IsEnabled(builder.Environment.IsDevelopment());
+
+// Questions ride a per-run `opencode serve --stdio` child. Off unless Climber:Questions is
+// `serve`: the plain producer stays the default, so a typo or an unset key costs nothing.
+builder.Services.AddSingleton<IQuestionChannelFactory>(sp =>
+    QuestionTransport.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+
 if (playback)
 {
     builder.Services.AddSingleton<IRunService>(
