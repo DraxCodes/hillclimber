@@ -1,6 +1,10 @@
 # Thread plan — interactive model questions
 
-**Status:** lane 2 in progress. **Date:** 2026-11-16. **Spec:** [spec.md](spec.md).
+**Status:** lanes 0, 2, 3, 3.5 and 5 done; the row scored **8/10** and shipped. Lane 4 (persistence)
+is next. **Date:** 2026-11-17. **Spec:** [spec.md](spec.md). **Handoff:** [handoff.md](handoff.md).
+
+All of this work lives on the `feat/interactive-questions` branch; `master` is back at
+`23be0ba` (= `origin/master`) and has none of it.
 
 Each step is one atomic commit and reverts alone. `[live]` = proved against a real `opencode`
 child; `[free]` = no process. Lane order is dependency order. Lanes 4–6 are planned, not built
